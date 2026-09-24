@@ -1,0 +1,34 @@
+# Исключения Git
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.db
+*.sqlite3
+
+node_modules/
+dist/
+test-results/
+playwright-report/
+
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+*.log
+
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Производные отчёты импорта (генерируются заново)
+data/imported/*
+!data/imported/.gitkeep
+
+# Случайные локальные выгрузки отчётов в корне
+/Автоматизация*.xlsx
+/*_readable.xlsx

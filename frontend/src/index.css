@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply h-full scroll-smooth;
+  }
+
+  body {
+    @apply min-h-full bg-steel-50 text-steel-900 font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 100% -20%, rgba(240, 115, 22, 0.06), transparent),
+      linear-gradient(180deg, #f7f8fa 0%, #f1f2f5 100%);
+    background-attachment: fixed;
+  }
+
+  #root {
+    @apply min-h-full;
+  }
+
+  * {
+    @apply border-steel-200;
+  }
+
+  ::selection {
+    background: rgba(212, 90, 10, 0.18);
+  }
+}
+
+@layer components {
+  .page-surface {
+    @apply rounded border border-steel-200 bg-white shadow-panel;
+  }
+
+  .brand-mark {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded bg-ink font-display text-sm font-bold tracking-wide text-brand-400;
+  }
+
+  .app-rail {
+    @apply border-r border-steel-200 bg-ink text-steel-200;
+  }
+
+  .nav-item-active {
+    @apply border-l-2 border-brand-500 bg-ink-mute text-white;
+  }
+
+  .nav-item {
+    @apply border-l-2 border-transparent text-steel-400 hover:bg-ink-soft hover:text-steel-100;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .delay-1 {
+    animation-delay: 80ms;
+  }
+
+  .delay-2 {
+    animation-delay: 160ms;
+  }
+
+  .delay-3 {
+    animation-delay: 240ms;
+  }
+}
