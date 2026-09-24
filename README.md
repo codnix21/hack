@@ -23,10 +23,11 @@ docker compose up -d --build
 
 | Адрес | Назначение |
 |-------|------------|
-| http://localhost:3000 | Интерфейс |
-| http://localhost:8000/api | API |
-| http://localhost:8000/docs | OpenAPI |
-| http://localhost:8000/health | Проверка работоспособности |
+| http://127.0.0.1:8910 | Интерфейс (Docker) |
+| http://127.0.0.1:8010/api | API (отладка) |
+| http://127.0.0.1:8010/docs | OpenAPI |
+| http://127.0.0.1:8010/health | Проверка работоспособности |
+| https://bas.netcorehub.ru | Прод (FastPanel → :8910) |
 
 После старта: **Администрирование → Импорт материалов** (каталог CSV, датасеты XLSX, обогащение DOCX).
 
