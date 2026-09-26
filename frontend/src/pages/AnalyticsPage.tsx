@@ -40,10 +40,12 @@ export function AnalyticsPage() {
   }
 
   const data = query.data!
-  const matchingRows = Object.entries(data.matching_by_status || {}).map(([status, count]) => ({
-    status: matchStatusLabel(status),
-    count,
-  }))
+  const matchingRows = Object.entries(data.matching_by_status || {})
+    .filter(([status, count]) => status && count != null && Number(count) > 0)
+    .map(([status, count]) => ({
+      status: matchStatusLabel(status),
+      count: Number(count),
+    }))
 
   return (
     <div>
@@ -100,7 +102,7 @@ export function AnalyticsPage() {
           {matchingRows.length === 0 ? (
             <EmptyState
               title="Нет данных подбора"
-              description="Запустите подбор в демонстрационном или своём проекте."
+              description="Откройте демо-проект → «Подбор» → «Запустить подбор». После этого здесь появятся статусы «Подходит / Требует проверки / Не подходит»."
             />
           ) : (
             <div className="h-72">

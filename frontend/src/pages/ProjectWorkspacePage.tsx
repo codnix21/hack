@@ -151,15 +151,10 @@ export function ProjectWorkspacePage() {
       // Гость на демо: результаты только в ответе run (в БД не пишутся).
       // Сразу кладём их в кэш, иначе invalidate → GET /results вернёт пусто.
       qc.setQueryData(['matching', id], data)
-      if (!data.read_only) {
-        void qc.invalidateQueries({ queryKey: ['matching', id] })
-      }
+      void qc.invalidateQueries({ queryKey: ['matching', id] })
+      void qc.invalidateQueries({ queryKey: ['analytics'] })
       const suitable = data.suitable ?? data.results?.filter((r) => r.status === 'suitable').length ?? 0
-      toastSuccess(
-        data.read_only
-          ? `Подбор выполнен (просмотр): подходящих ${suitable}`
-          : `Подбор выполнен: подходящих ${suitable}`,
-      )
+      toastSuccess(`Подбор выполнен: подходящих ${suitable}`)
     },
     onError: (e) => toastError(getFriendlyError(e)),
   })
