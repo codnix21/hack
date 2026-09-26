@@ -11,6 +11,7 @@ import { Select } from '../components/ui/Select'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { Card } from '../components/ui/Card'
 import { toastError, toastSuccess } from '../store/toastStore'
+import { useAuthStore } from '../store/authStore'
 
 type FieldKey = 'name' | 'object_type_id' | 'industry_id' | 'region' | 'work_mode' | 'description'
 
@@ -29,6 +30,14 @@ export function ProjectCreatePage() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEdit = Boolean(id)
+  const isGuest = useAuthStore((s) => s.isGuest)
+
+  useEffect(() => {
+    if (isGuest) {
+      toastError('Гостевой режим только для просмотра — зарегистрируйтесь, чтобы создавать проекты')
+      navigate('/app/demo', { replace: true })
+    }
+  }, [isGuest, navigate])
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')

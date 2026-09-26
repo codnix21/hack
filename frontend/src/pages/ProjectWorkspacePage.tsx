@@ -28,6 +28,7 @@ import { ImportFlow } from '../components/project/ImportFlow'
 import { EconomicsPanel } from '../components/project/EconomicsPanel'
 import { FloorPlanVisualization } from '../components/project/FloorPlanVisualization'
 import { toastError, toastSuccess } from '../store/toastStore'
+import { useAuthStore } from '../store/authStore'
 import { formatCurrency, formatHours, formatKg, formatMps, formatNumber, formatPercent } from '../utils/format'
 import {
   matchStatusIcon,
@@ -76,6 +77,7 @@ export function ProjectWorkspacePage() {
   const [search, setSearch] = useSearchParams()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const isGuest = useAuthStore((s) => s.isGuest)
   const step = search.get('step') || 'params'
   const [params, setParams] = useState<ProjectParams>({})
   const [selectedIds, setSelectedIds] = useState<number[]>(() => {
@@ -148,13 +150,19 @@ export function ProjectWorkspacePage() {
   const runSelectionMut = useMutation({
     mutationFn: () => matchingApi.run(id),
     onSuccess: (data) => {
-      // Гость на демо: результаты только в ответе run (в БД не пишутся).
-      // Сразу кладём их в кэш, иначе invalidate → GET /results вернёт пусто.
+      // Гость: результаты только в ответе run (в БД не пишутся) — не invalidate,
+      // иначе GET /results вернёт пусто и затрёт кэш.
       qc.setQueryData(['matching', id], data)
-      void qc.invalidateQueries({ queryKey: ['matching', id] })
-      void qc.invalidateQueries({ queryKey: ['analytics'] })
+      if (!data.read_only) {
+        void qc.invalidateQueries({ queryKey: ['matching', id] })
+        void qc.invalidateQueries({ queryKey: ['analytics'] })
+      }
       const suitable = data.suitable ?? data.results?.filter((r) => r.status === 'suitable').length ?? 0
-      toastSuccess(`Подбор выполнен: подходящих ${suitable}`)
+      toastSuccess(
+        data.read_only
+          ? `Подбор выполнен (просмотр): подходящих ${suitable}`
+          : `Подбор выполнен: подходящих ${suitable}`,
+      )
     },
     onError: (e) => toastError(getFriendlyError(e)),
   })
@@ -306,15 +314,26 @@ export function ProjectWorkspacePage() {
         }
       />
 
+      {isGuest && (
+        <div className="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Гостевой режим: можно просматривать демо и запускать подбор/расчёты без сохранения.
+          Чтобы менять данные и сохранять результаты — зарегистрируйтесь.
+        </div>
+      )}
+
       <Tabs items={STEPS} value={step} onChange={setStep} className="mb-5" />
 
       {step === 'params' && (
         <Card
           title="Параметры объекта"
           actions={
-            <Button loading={saveParamsMut.isPending} onClick={() => saveParamsMut.mutate()}>
-              Сохранить
-            </Button>
+            !isGuest ? (
+              <Button loading={saveParamsMut.isPending} onClick={() => saveParamsMut.mutate()}>
+                Сохранить
+              </Button>
+            ) : (
+              <Badge variant="warning">Только просмотр</Badge>
+            )
           }
         >
           {paramsQuery.isLoading ? (
@@ -327,14 +346,28 @@ export function ProjectWorkspacePage() {
               values={params}
               onChange={setParams}
               schema={paramSchema}
+              readOnly={isGuest}
             />
           )}
         </Card>
       )}
 
       {step === 'import' && (
-        <Card title="Импорт параметров объекта" subtitle="Скачайте Excel-шаблон, заполните жёлтую колонку и загрузите файл">
-          <ImportFlow projectId={id} />
+        <Card
+          title="Импорт параметров объекта"
+          subtitle={
+            isGuest
+              ? 'В гостевом режиме импорт недоступен — только просмотр демо-данных'
+              : 'Скачайте Excel-шаблон, заполните жёлтую колонку и загрузите файл'
+          }
+        >
+          {isGuest ? (
+            <p className="text-sm text-steel-600">
+              Зарегистрируйтесь, чтобы загружать параметры из Excel и сохранять их в проекте.
+            </p>
+          ) : (
+            <ImportFlow projectId={id} />
+          )}
         </Card>
       )}
 

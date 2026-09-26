@@ -37,13 +37,15 @@ def _ensure_access(user: Optional[User], project: Project, write: bool = False):
     if write:
         if user is None:
             raise HTTPException(401, detail="Требуется аутентификация")
+        if user.role == "guest":
+            raise HTTPException(
+                403,
+                detail="Гостевой режим только для просмотра — зарегистрируйтесь, чтобы сохранять изменения",
+            )
         if user.role == "admin":
             return
-        if project.is_demo and user.role == "guest":
-            raise HTTPException(403, detail="Гость не может изменять демо-проекты — клонируйте проект")
-        if project.owner_id != user.id and not (project.is_demo and not write):
-            if project.owner_id != user.id:
-                raise HTTPException(403, detail="Нет доступа к проекту")
+        if project.owner_id != user.id:
+            raise HTTPException(403, detail="Нет доступа к проекту")
         return
     if not can_access_project(user, project):
         raise HTTPException(403, detail="Нет доступа к проекту")

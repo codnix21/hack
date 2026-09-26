@@ -24,6 +24,7 @@ import { SkeletonCards } from '../components/ui/Skeleton'
 import { Pagination } from '../components/ui/Pagination'
 import { ConfirmDialog } from '../components/ui/Modal'
 import { toastError, toastSuccess } from '../store/toastStore'
+import { useAuthStore } from '../store/authStore'
 import { formatDate, PROJECT_STATUS_LABELS } from '../utils/format'
 import type { Project } from '../types'
 
@@ -41,6 +42,7 @@ type ConfirmAction = { type: 'delete' | 'archive'; project: Project }
 export function ProjectsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const isGuest = useAuthStore((s) => s.isGuest)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [objectTypeId, setObjectTypeId] = useState('')
@@ -142,12 +144,14 @@ export function ProjectsPage() {
           { label: 'Мои проекты' },
         ]}
         actions={
-          <Link to="/app/projects/new">
-            <Button>
-              <Plus className="h-4 w-4" />
-              Создать проект
-            </Button>
-          </Link>
+          !isGuest ? (
+            <Link to="/app/projects/new">
+              <Button>
+                <Plus className="h-4 w-4" />
+                Создать проект
+              </Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -200,10 +204,14 @@ export function ProjectsPage() {
       {!query.isLoading && !query.isError && pageItems.length === 0 && (
         <div className="page-surface">
           <EmptyState
-            title="Проектов пока нет"
-            description="Создайте первый проект или откройте демонстрационный сценарий."
-            actionLabel="Создать проект"
-            onAction={() => navigate('/app/projects/new')}
+            title={isGuest ? 'Нет доступных проектов' : 'Проектов пока нет'}
+            description={
+              isGuest
+                ? 'В гостевом режиме доступны только демонстрационные сценарии.'
+                : 'Создайте первый проект или откройте демонстрационный сценарий.'
+            }
+            actionLabel={isGuest ? 'К демонстрации' : 'Создать проект'}
+            onAction={() => navigate(isGuest ? '/app/demo' : '/app/projects/new')}
           />
         </div>
       )}
@@ -243,18 +251,22 @@ export function ProjectsPage() {
                   <Button size="sm" onClick={() => navigate(`/app/projects/${p.id}`)}>
                     Открыть
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate(`/app/projects/${p.id}/edit`)}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Изменить
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => copyMut.mutate(p.id)}>
-                    <Copy className="h-3.5 w-3.5" />
-                    Копировать
-                  </Button>
+                  {!isGuest && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/app/projects/${p.id}/edit`)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Изменить
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => copyMut.mutate(p.id)}>
+                        <Copy className="h-3.5 w-3.5" />
+                        Копировать
+                      </Button>
+                    </>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -286,25 +298,29 @@ export function ProjectsPage() {
                   >
                     <FileSpreadsheet className="h-3.5 w-3.5" />
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={actionPending}
-                    onClick={() => setConfirm({ type: 'archive', project: p })}
-                  >
-                    <Archive className="h-3.5 w-3.5" />
-                    Архивировать
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-700"
-                    disabled={actionPending}
-                    onClick={() => setConfirm({ type: 'delete', project: p })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Удалить
-                  </Button>
+                  {!isGuest && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={actionPending}
+                        onClick={() => setConfirm({ type: 'archive', project: p })}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                        Архивировать
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-700"
+                        disabled={actionPending}
+                        onClick={() => setConfirm({ type: 'delete', project: p })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Удалить
+                      </Button>
+                    </>
+                  )}
                 </div>
               </article>
             ))}

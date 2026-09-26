@@ -28,6 +28,7 @@ import { Skeleton } from '../ui/Skeleton'
 import { formatCurrency, formatNumber, formatPercent } from '../../utils/format'
 import { assumptionLabel, breakdownLabel, formulaLabel, valueSourceLabel } from '../../utils/labels'
 import { toastError, toastSuccess } from '../../store/toastStore'
+import { useAuthStore } from '../../store/authStore'
 
 interface EconomicsPanelProps {
   projectId: string
@@ -97,6 +98,7 @@ function scenarioRow(r: EconomicsScenarioResult) {
 }
 
 export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanelProps) {
+  const isGuest = useAuthStore((s) => s.isGuest)
   const isEconomics = mode === 'economics'
   const isScenarios = mode === 'scenarios'
   const [whatIf, setWhatIf] = useState<WhatIfSliders>({ ...DEFAULT_WHAT_IF })
@@ -163,7 +165,7 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
         const peak = Number(purchase.assumptions?.peak_demand)
         if (!Number.isNaN(peak) && peak > 0) setBasePeakDemand(peak)
       }
-      toastSuccess('Экономика рассчитана')
+      toastSuccess(isGuest ? 'Экономика рассчитана (просмотр, без сохранения)' : 'Экономика рассчитана')
     },
     onError: (e) => toastError(getFriendlyError(e)),
   })

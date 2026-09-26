@@ -43,6 +43,12 @@ export function SettingsPage() {
             <dd className="font-medium">{isGuest ? 'Гостевой' : 'Авторизованный'}</dd>
           </div>
         </dl>
+        {isGuest && (
+          <p className="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Гость может только просматривать демо-проекты и запускать подбор/расчёты без записи в
+            базу. Создание, изменение и импорт данных недоступны.
+          </p>
+        )}
       </Card>
     </div>
   )

@@ -74,9 +74,9 @@ export function DemoPage() {
         <div className="page-surface">
           <EmptyState
             title="Демонстрационные проекты недоступны"
-            description="Сервер не вернул готовые сценарии. Создайте собственный проект."
-            actionLabel="Создать проект"
-            onAction={() => navigate('/app/projects/new')}
+            description="Сервер не вернул готовые сценарии."
+            actionLabel={isGuest ? undefined : 'Создать проект'}
+            onAction={isGuest ? undefined : () => navigate('/app/projects/new')}
           />
         </div>
       )}

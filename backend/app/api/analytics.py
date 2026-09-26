@@ -12,8 +12,38 @@ from app.models.misc import AuditLog, Calculation
 from app.models.project import Project, ProjectSolution
 from app.models.robot import Robot
 from app.models.user import User
+from app.services.matching import run_matching
 
 router = APIRouter(prefix="/analytics", tags=["Аналитика"])
+
+
+def _matching_stats_from_db(db: Session) -> dict[str, int]:
+    match_stats = (
+        db.query(ProjectSolution.status, func.count(ProjectSolution.id))
+        .group_by(ProjectSolution.status)
+        .all()
+    )
+    return {s: c for s, c in match_stats if s}
+
+
+def _matching_stats_from_demos(db: Session) -> dict[str, int]:
+    """Если в БД нет сохранённого подбора — сводка по демо (без записи)."""
+    demos = db.query(Project).filter(Project.is_demo.is_(True), Project.is_archived.is_(False)).all()
+    if not demos:
+        return {}
+    robots = db.query(Robot).filter(Robot.archived.is_(False)).all()
+    if not robots:
+        return {}
+    counts: dict[str, int] = {"suitable": 0, "needs_review": 0, "excluded": 0}
+    for project in demos:
+        object_type_code = None
+        if project.object_type_id:
+            ot = db.query(ObjectType).filter(ObjectType.id == project.object_type_id).first()
+            object_type_code = ot.code if ot else None
+        for row in run_matching(robots, project.object_params or {}, object_type_code):
+            st = row.get("status") or "needs_review"
+            counts[st] = counts.get(st, 0) + 1
+    return {k: v for k, v in counts.items() if v > 0}
 
 
 @router.get("/summary", summary="Сводная аналитика")
@@ -31,11 +61,9 @@ def summary(
     projects_total = db.query(func.count(Project.id)).filter(Project.is_archived.is_(False)).scalar() or 0
     demos = db.query(func.count(Project.id)).filter(Project.is_demo.is_(True)).scalar() or 0
     calcs = db.query(func.count(Calculation.id)).scalar() or 0
-    match_stats = (
-        db.query(ProjectSolution.status, func.count(ProjectSolution.id))
-        .group_by(ProjectSolution.status)
-        .all()
-    )
+    matching_by_status = _matching_stats_from_db(db)
+    if not matching_by_status:
+        matching_by_status = _matching_stats_from_demos(db)
     manufacturers = db.query(func.count(Manufacturer.id)).filter(Manufacturer.archived.is_(False)).scalar() or 0
 
     avg_price = db.query(func.avg(Robot.price_rub)).filter(Robot.archived.is_(False), Robot.price_rub.isnot(None)).scalar()
@@ -46,7 +74,7 @@ def summary(
         "projects_total": projects_total,
         "demo_projects": demos,
         "calculations_total": calcs,
-        "matching_by_status": {s: c for s, c in match_stats},
+        "matching_by_status": matching_by_status,
         "manufacturers_total": manufacturers,
         "industries_total": db.query(func.count(Industry.id)).scalar() or 0,
         "object_types_total": db.query(func.count(ObjectType.id)).scalar() or 0,

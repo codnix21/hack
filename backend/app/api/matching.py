@@ -44,30 +44,32 @@ def run_match(
     suitable = [r for r in results if r["status"] == "suitable"]
     top_ids = {r["robot_id"] for r in suitable[:select_top]}
 
-    # Сохраняем всегда (в т.ч. гость на демо) — иначе аналитика/PDF/повторный вход пустые
-    db.query(ProjectSolution).filter(ProjectSolution.project_id == project_id).delete()
-    for r in results:
-        db.add(
-            ProjectSolution(
-                project_id=project_id,
-                robot_id=r["robot_id"],
-                selected=r["robot_id"] in top_ids,
-                match_score=r["match_score"],
-                match_reasons=r["match_reasons"],
-                exclusion_reasons=r["exclusion_reasons"],
-                status=r["status"],
+    # Гость — только просмотр: подбор в ответ API, без записи в БД
+    read_only = user.role == "guest"
+    if not read_only:
+        db.query(ProjectSolution).filter(ProjectSolution.project_id == project_id).delete()
+        for r in results:
+            db.add(
+                ProjectSolution(
+                    project_id=project_id,
+                    robot_id=r["robot_id"],
+                    selected=r["robot_id"] in top_ids,
+                    match_score=r["match_score"],
+                    match_reasons=r["match_reasons"],
+                    exclusion_reasons=r["exclusion_reasons"],
+                    status=r["status"],
+                )
             )
+        project.updated_at = utcnow()
+        db.commit()
+        log_action(
+            db,
+            "matching.run",
+            user.id,
+            "project",
+            project_id,
+            {"total": len(results), "suitable": len(suitable)},
         )
-    project.updated_at = utcnow()
-    db.commit()
-    log_action(
-        db,
-        "matching.run",
-        user.id,
-        "project",
-        project_id,
-        {"total": len(results), "suitable": len(suitable)},
-    )
 
     out = []
     for r in results:
@@ -87,7 +89,7 @@ def run_match(
         "suitable": len([x for x in out if x["status"] == "suitable"]),
         "needs_review": len([x for x in out if x["status"] == "needs_review"]),
         "excluded": len([x for x in out if x["status"] == "excluded"]),
-        "read_only": False,
+        "read_only": read_only,
         "results": out,
     }
 

@@ -134,9 +134,16 @@ interface ObjectParamsFormProps {
   values: ProjectParams
   onChange: (next: ProjectParams) => void
   schema?: ParamSchema | null
+  readOnly?: boolean
 }
 
-export function ObjectParamsForm({ objectType, values, onChange, schema }: ObjectParamsFormProps) {
+export function ObjectParamsForm({
+  objectType,
+  values,
+  onChange,
+  schema,
+  readOnly = false,
+}: ObjectParamsFormProps) {
   const fields =
     schema?.properties && Object.keys(schema.properties).length > 0
       ? schemaToFields(schema)
@@ -154,6 +161,7 @@ export function ObjectParamsForm({ objectType, values, onChange, schema }: Objec
               onChange={(e) => onChange({ ...values, [f.key]: e.target.value })}
               options={f.options || []}
               placeholder="Выберите значение"
+              disabled={readOnly}
             />
           )
         }
@@ -180,6 +188,7 @@ export function ObjectParamsForm({ objectType, values, onChange, schema }: Objec
                 { value: 'false', label: 'Нет' },
               ]}
               placeholder="Выберите значение"
+              disabled={readOnly}
             />
           )
         }
@@ -196,6 +205,8 @@ export function ObjectParamsForm({ objectType, values, onChange, schema }: Objec
                   [f.key]: e.target.value === '' ? null : e.target.value,
                 })
               }
+              disabled={readOnly}
+              readOnly={readOnly}
             />
           )
         }
@@ -212,6 +223,8 @@ export function ObjectParamsForm({ objectType, values, onChange, schema }: Objec
                 [f.key]: e.target.value === '' ? null : Number(e.target.value),
               })
             }
+            disabled={readOnly}
+            readOnly={readOnly}
           />
         )
       })}

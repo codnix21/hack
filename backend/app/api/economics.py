@@ -122,6 +122,10 @@ def calculate(
         raise HTTPException(400, detail=str(exc)) from exc
     result["robot_id"] = inputs["robot_id"]
 
+    # Гость только смотрит расчёт — без записи в БД
+    if user.role == "guest":
+        return {"calculation_id": None, "version": 0, "results": result, "read_only": True}
+
     last = (
         db.query(Calculation)
         .filter(Calculation.project_id == project_id)
@@ -224,6 +228,10 @@ def what_if(
         "robots_count": alt_result["robots_count"] - base_result["robots_count"],
     }
     payload = {"base": base_result, "alternative": alt_result, "delta": delta, "changes": req.changes}
+
+    # Гость — только просмотр, без записи what-if в БД
+    if user.role == "guest":
+        return {**payload, "read_only": True}
 
     # Persist last what-if on latest calculation so Excel/PDF export can include it
     last = (
