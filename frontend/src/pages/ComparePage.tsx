@@ -39,6 +39,7 @@ export function ComparePage() {
   const [pickerSearch, setPickerSearch] = useState('')
   const [pickerPage, setPickerPage] = useState(1)
 
+  const projectReturn = params.get('project')
   const ids = useMemo(() => parseIds(params.get('ids')), [params])
 
   const setIds = (next: string[]) => {
@@ -48,8 +49,10 @@ export function ComparePage() {
     } catch {
       /* ignore quota */
     }
-    if (unique.length === 0) setParams({}, { replace: true })
-    else setParams({ ids: unique.join(',') }, { replace: true })
+    const nextParams: Record<string, string> = {}
+    if (unique.length) nextParams.ids = unique.join(',')
+    if (projectReturn) nextParams.project = projectReturn
+    setParams(nextParams, { replace: true })
   }
 
   const addId = (id: string | number) => {
@@ -178,20 +181,33 @@ export function ComparePage() {
         subtitle="Выберите решения из каталога и сопоставьте характеристики"
         crumbs={[
           { label: 'Панель управления', to: '/app' },
+          ...(projectReturn
+            ? [{ label: 'Проект', to: `/app/projects/${projectReturn}?step=compare` }]
+            : []),
           { label: 'Сравнение' },
         ]}
         actions={
-          <Button
-            onClick={() => {
-              setPickerOpen(true)
-              setPickerPage(1)
-            }}
-            disabled={atLimit}
-            aria-label="Добавить решение к сравнению"
-          >
-            <Plus className="h-4 w-4" />
-            Добавить решение
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {projectReturn && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/app/projects/${projectReturn}?step=compare`)}
+              >
+                Вернуться в проект
+              </Button>
+            )}
+            <Button
+              onClick={() => {
+                setPickerOpen(true)
+                setPickerPage(1)
+              }}
+              disabled={atLimit}
+              aria-label="Добавить решение к сравнению"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить решение
+            </Button>
+          </div>
         }
       />
 

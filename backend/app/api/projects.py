@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import can_access_project, get_current_user, get_current_user_optional
 from app.models.catalog_meta import ObjectType
-from app.models.misc import Calculation, DataSource
+from app.models.misc import Calculation
 from app.models.project import Project, ProjectSolution, Scenario
 from app.models.user import User, utcnow
 from app.schemas import (
@@ -19,7 +19,6 @@ from app.schemas import (
     ProjectUpdate,
 )
 from app.services.audit import log_action
-from app.services.export import export_project_excel, export_project_pdf
 from app.services.import_catalog import import_project_params, preview_import, validate_mapped_rows, read_tabular
 from app.services.param_templates import build_params_template_xlsx, template_filename
 from app.services.uploads import read_and_validate_upload
@@ -200,51 +199,12 @@ def export_project(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional),
 ):
-    project = _get_project(db, project_id)
-    _ensure_access(user, project)
-    sols = db.query(ProjectSolution).filter(ProjectSolution.project_id == project_id).all()
-    solutions = [
-        {
-            "robot_id": s.robot_id,
-            "status": s.status,
-            "match_score": s.match_score,
-            "match_reasons": s.match_reasons,
-            "exclusion_reasons": s.exclusion_reasons,
-        }
-        for s in sols
-    ]
-    scenarios = [
-        {"code": s.code, "name_ru": s.name_ru, "results": s.results}
-        for s in db.query(Scenario).filter(Scenario.project_id == project_id).all()
-    ]
-    calc = (
-        db.query(Calculation)
-        .filter(Calculation.project_id == project_id)
-        .order_by(Calculation.version.desc())
-        .first()
-    )
-    economics = (calc.results if calc else None) or {}
-    sources = db.query(DataSource).all()
+    """Совместимый эндпоинт — делегирует в /export/{id}/pdf|excel."""
+    from app.api.export import export_excel, export_pdf
+
     if format == "pdf":
-        data = export_project_pdf(project, economics, solutions)
-        return Response(
-            data,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="project_{project_id}.pdf"'},
-        )
-    data = export_project_excel(
-        project,
-        solutions,
-        economics,
-        scenarios,
-        assumptions=(economics or {}).get("assumptions"),
-        sources=sources,
-    )
-    return Response(
-        data,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f'attachment; filename="project_{project_id}.xlsx"'},
-    )
+        return export_pdf(project_id, db, user)
+    return export_excel(project_id, db, user)
 
 
 # --- params ---

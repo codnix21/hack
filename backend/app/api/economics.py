@@ -128,6 +128,9 @@ def calculate(
         .order_by(Calculation.version.desc())
         .first()
     )
+    # Не теряем сохранённый what-if при новом пересчёте
+    if last and isinstance(last.results, dict) and last.results.get("what_if"):
+        result["what_if"] = last.results["what_if"]
     version = (last.version + 1) if last else 1
     calc = Calculation(
         project_id=project_id,

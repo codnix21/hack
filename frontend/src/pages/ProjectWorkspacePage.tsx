@@ -12,8 +12,9 @@ import {
 import { catalogApi } from '../api/catalog'
 import { projectsApi } from '../api/projects'
 import { economicsApi, matchingApi, visualizationApi } from '../api/economics'
+import { compareApi } from '../api/compare'
 import { getFriendlyError } from '../api/client'
-import type { MatchingResultItem, ProjectParams } from '../types'
+import type { MatchingResultItem, ProjectParams, Robot } from '../types'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Tabs } from '../components/ui/Tabs'
 import { Button } from '../components/ui/Button'
@@ -27,8 +28,14 @@ import { ImportFlow } from '../components/project/ImportFlow'
 import { EconomicsPanel } from '../components/project/EconomicsPanel'
 import { FloorPlanVisualization } from '../components/project/FloorPlanVisualization'
 import { toastError, toastSuccess } from '../store/toastStore'
-import { formatCurrency, formatKg, formatNumber, formatPercent } from '../utils/format'
-import { matchStatusIcon, matchStatusLabel, isMissingDataWarning, breakdownLabel } from '../utils/labels'
+import { formatCurrency, formatHours, formatKg, formatMps, formatNumber, formatPercent } from '../utils/format'
+import {
+  matchStatusIcon,
+  matchStatusLabel,
+  isMissingDataWarning,
+  breakdownLabel,
+  dataOriginLabel,
+} from '../utils/labels'
 
 const STEPS = [
   { id: 'params', label: 'Параметры' },
@@ -71,7 +78,24 @@ export function ProjectWorkspacePage() {
   const qc = useQueryClient()
   const step = search.get('step') || 'params'
   const [params, setParams] = useState<ProjectParams>({})
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>(() => {
+    try {
+      const raw = sessionStorage.getItem(`project_${id}_compare_ids`)
+      const parsed = raw ? (JSON.parse(raw) as number[]) : []
+      return Array.isArray(parsed) ? parsed.map(Number).filter((n) => Number.isFinite(n)) : []
+    } catch {
+      return []
+    }
+  })
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`project_${id}_compare_ids`, JSON.stringify(selectedIds))
+    } catch {
+      /* ignore */
+    }
+  }, [id, selectedIds])
+
   const [scenarioId, setScenarioId] = useState('purchase')
   const [statusFilter, setStatusFilter] = useState('all')
   const [expandedId, setExpandedId] = useState<number | null>(null)
@@ -163,6 +187,29 @@ export function ProjectWorkspacePage() {
     if (statusFilter === 'all') return results
     return results.filter((r) => r.status === statusFilter)
   }, [results, statusFilter])
+
+  const compareInlineQuery = useQuery({
+    queryKey: ['project-compare', id, selectedIds.join(',')],
+    queryFn: () => compareApi.get(selectedIds),
+    enabled: !!id && step === 'compare' && selectedIds.length >= 2,
+  })
+
+  const selectedNames = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const r of results) {
+      if (r.robot_name) map.set(r.robot_id, r.robot_name)
+    }
+    for (const r of compareInlineQuery.data?.robots || []) {
+      map.set(r.id, r.name)
+    }
+    return map
+  }, [results, compareInlineQuery.data])
+
+  const compareRobots: Robot[] = useMemo(() => {
+    const list = compareInlineQuery.data?.robots || []
+    const byId = new Map(list.map((r) => [r.id, r]))
+    return selectedIds.map((rid) => byId.get(rid)).filter(Boolean) as Robot[]
+  }, [compareInlineQuery.data, selectedIds])
 
   const pagedResults = useMemo(() => {
     const start = (matchPage - 1) * matchPageSize
@@ -509,6 +556,28 @@ export function ProjectWorkspacePage() {
               {filteredResults.length === 0 && (
                 <p className="text-sm text-steel-500">Нет решений в выбранном фильтре.</p>
               )}
+              {selectedIds.length > 0 && (
+                <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 shadow-panel">
+                  <p className="text-sm text-steel-800">
+                    Выбрано для сравнения: <strong>{selectedIds.length}</strong>
+                    {selectedIds.length < 2 && ' (нужно минимум 2)'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedIds.length < 2}
+                      onClick={() => setStep('compare')}
+                    >
+                      <GitCompare className="h-4 w-4" />
+                      К сравнению
+                    </Button>
+                    <Button size="sm" onClick={() => setStep('economics')}>
+                      Далее: экономика
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -517,28 +586,128 @@ export function ProjectWorkspacePage() {
       {step === 'compare' && (
         <Card
           title="Сравнение выбранных решений"
+          subtitle="Сравнение внутри проекта — без ухода на отдельную страницу"
           actions={
-            <Button
-              disabled={selectedIds.length < 2}
-              onClick={() => navigate(`/app/compare?ids=${selectedIds.join(',')}`)}
-            >
-              <GitCompare className="h-4 w-4" />
-              Открыть сравнение
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => setStep('selection')}>
+                Изменить выбор
+              </Button>
+              <Button onClick={() => setStep('economics')}>Далее: экономика</Button>
+            </div>
           }
         >
           {selectedIds.length < 2 ? (
             <EmptyState
               title="Выберите не менее двух роботов"
-              description="Отметьте решения на шаге «Подбор» для детального сравнения."
+              description="Отметьте решения галочками на шаге «Подбор», затем вернитесь сюда."
               actionLabel="К подбору"
               onAction={() => setStep('selection')}
             />
           ) : (
-            <p className="text-sm text-steel-600">
-              Выбрано: {selectedIds.length}. Перейдите к полной странице сравнения или продолжите
-              экономический анализ.
-            </p>
+            <div className="space-y-4">
+              <ul className="flex flex-wrap gap-2">
+                {selectedIds.map((rid) => (
+                  <li
+                    key={rid}
+                    className="inline-flex items-center gap-2 rounded border border-steel-200 bg-steel-50 px-2.5 py-1 text-sm"
+                  >
+                    {selectedNames.get(rid) || `#${rid}`}
+                    <button
+                      type="button"
+                      className="text-steel-400 hover:text-steel-800"
+                      aria-label="Убрать из сравнения"
+                      onClick={() => setSelectedIds((ids) => ids.filter((x) => x !== rid))}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {compareInlineQuery.isLoading && <SkeletonRows rows={6} />}
+              {compareInlineQuery.isError && (
+                <p className="text-sm text-red-600">{getFriendlyError(compareInlineQuery.error)}</p>
+              )}
+              {compareRobots.length >= 2 && (
+                <div className="overflow-x-auto rounded border border-steel-200">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-steel-200 bg-steel-50">
+                        <th className="px-3 py-2 text-left font-medium text-steel-600">Параметр</th>
+                        {compareRobots.map((r) => (
+                          <th key={r.id} className="min-w-[140px] px-3 py-2 text-left font-medium">
+                            {r.name}
+                            <div className="mt-0.5 text-xs font-normal text-steel-500">
+                              {dataOriginLabel(r.data_origin)}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(
+                        [
+                          ['Назначение', (r: Robot) => r.purpose || 'Нет данных'],
+                          ['Страна', (r: Robot) => r.country || 'Нет данных'],
+                          ['Грузоподъёмность', (r: Robot) => formatKg(r.payload_kg)],
+                          ['Скорость', (r: Robot) => formatMps(r.speed_mps)],
+                          ['Автономность', (r: Robot) => formatHours(r.autonomy_hours)],
+                          ['Цена', (r: Robot) => formatCurrency(r.price_rub)],
+                          [
+                            'Производительность',
+                            (r: Robot) =>
+                              r.productivity_ops_per_hour != null
+                                ? `${formatNumber(r.productivity_ops_per_hour)} оп/ч`
+                                : 'Нет данных',
+                          ],
+                        ] as const
+                      ).map(([label, getter]) => (
+                        <tr key={label} className="border-t border-steel-100">
+                          <td className="px-3 py-2 text-steel-500">{label}</td>
+                          {compareRobots.map((r) => (
+                            <td key={`${label}-${r.id}`} className="px-3 py-2 text-steel-800">
+                              {getter(r)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="rounded border border-steel-200 bg-steel-50 px-4 py-3 text-sm text-steel-700">
+                <p className="font-medium text-steel-900">Что дальше</p>
+                <ol className="mt-1 list-decimal space-y-1 pl-5">
+                  <li>
+                    <button type="button" className="text-brand-700 hover:underline" onClick={() => setStep('economics')}>
+                      Экономика
+                    </button>{' '}
+                    — CAPEX/OPEX для выбранного сценария покупки
+                  </li>
+                  <li>
+                    <button type="button" className="text-brand-700 hover:underline" onClick={() => setStep('scenarios')}>
+                      Анализ сценариев
+                    </button>{' '}
+                    — сравнение «без роботов / покупка / RaaS»
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      className="text-brand-700 hover:underline"
+                      onClick={() => setStep('visualization')}
+                    >
+                      Визуализация
+                    </button>{' '}
+                    →{' '}
+                    <button type="button" className="text-brand-700 hover:underline" onClick={() => setStep('results')}>
+                      Результаты
+                    </button>{' '}
+                    → экспорт PDF/Excel
+                  </li>
+                </ol>
+              </div>
+            </div>
           )}
         </Card>
       )}
