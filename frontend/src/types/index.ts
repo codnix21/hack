@@ -194,10 +194,10 @@ export interface CompareResponse {
 }
 
 export interface MatchingResultItem {
-  id: number
-  project_id: number
+  id?: number | null
+  project_id?: number | null
   robot_id: number
-  selected: boolean
+  selected?: boolean
   match_score?: number | null
   match_reasons?: unknown
   exclusion_reasons?: unknown
@@ -214,6 +214,7 @@ export interface MatchingResultsResponse {
   suitable?: number
   needs_review?: number
   excluded?: number
+  read_only?: boolean
 }
 
 export interface EconomicsRequest {

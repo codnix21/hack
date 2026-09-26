@@ -28,7 +28,7 @@ import { EconomicsPanel } from '../components/project/EconomicsPanel'
 import { FloorPlanVisualization } from '../components/project/FloorPlanVisualization'
 import { toastError, toastSuccess } from '../store/toastStore'
 import { formatCurrency, formatKg, formatNumber, formatPercent } from '../utils/format'
-import { matchStatusIcon, matchStatusLabel, isMissingDataWarning } from '../utils/labels'
+import { matchStatusIcon, matchStatusLabel, isMissingDataWarning, breakdownLabel } from '../utils/labels'
 
 const STEPS = [
   { id: 'params', label: 'Параметры' },
@@ -124,8 +124,18 @@ export function ProjectWorkspacePage() {
   const runSelectionMut = useMutation({
     mutationFn: () => matchingApi.run(id),
     onSuccess: (data) => {
-      toastSuccess(`Подбор выполнен: подходящих ${data.suitable ?? data.results?.length ?? 0}`)
-      qc.invalidateQueries({ queryKey: ['matching', id] })
+      // Гость на демо: результаты только в ответе run (в БД не пишутся).
+      // Сразу кладём их в кэш, иначе invalidate → GET /results вернёт пусто.
+      qc.setQueryData(['matching', id], data)
+      if (!data.read_only) {
+        void qc.invalidateQueries({ queryKey: ['matching', id] })
+      }
+      const suitable = data.suitable ?? data.results?.filter((r) => r.status === 'suitable').length ?? 0
+      toastSuccess(
+        data.read_only
+          ? `Подбор выполнен (просмотр): подходящих ${suitable}`
+          : `Подбор выполнен: подходящих ${suitable}`,
+      )
     },
     onError: (e) => toastError(getFriendlyError(e)),
   })
@@ -332,18 +342,19 @@ export function ProjectWorkspacePage() {
                     </thead>
                     <tbody>
                       {pagedResults.map((r) => {
-                      const open = expandedId === r.id
+                      const rowKey = r.id ?? r.robot_id
+                      const open = expandedId === rowKey
                       const matches = reasonsList(r.match_reasons)
                       const exclusions = reasonsList(r.exclusion_reasons)
                       return (
-                        <Fragment key={r.id}>
+                        <Fragment key={rowKey}>
                           <tr className="border-t border-steel-100 hover:bg-steel-50/80">
                             <td className="px-3 py-2">
                               <button
                                 type="button"
                                 className="rounded p-1 text-steel-500 hover:bg-steel-100"
                                 aria-label="Показать причины"
-                                onClick={() => setExpandedId(open ? null : r.id)}
+                                onClick={() => setExpandedId(open ? null : rowKey)}
                               >
                                 {open ? (
                                   <ChevronDown className="h-4 w-4" />
@@ -532,13 +543,9 @@ export function ProjectWorkspacePage() {
         </Card>
       )}
 
-      {step === 'economics' && <EconomicsPanel projectId={id} />}
+      {step === 'economics' && <EconomicsPanel projectId={id} mode="economics" />}
 
-      {step === 'scenarios' && (
-        <Card title="Анализ сценариев" subtitle="Сравнение без роботизации / покупка / роботы как услуга">
-          <EconomicsPanel projectId={id} />
-        </Card>
-      )}
+      {step === 'scenarios' && <EconomicsPanel projectId={id} mode="scenarios" />}
 
       {step === 'visualization' && (
         <Card
@@ -575,7 +582,7 @@ export function ProjectWorkspacePage() {
       )}
 
       {step === 'results' && (
-        <Card title="Итоговые результаты">
+        <Card title="Итоговые результаты" subtitle="Сводка по проекту · полная детализация в PDF/Excel">
           {resultsEconomicsQuery.isLoading && <SkeletonRows rows={4} />}
           {resultsEconomicsQuery.isError && (
             <p className="text-sm text-red-600">{getFriendlyError(resultsEconomicsQuery.error)}</p>
@@ -589,56 +596,122 @@ export function ProjectWorkspacePage() {
             />
           )}
           {econ && (
-            <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <ResultKpi title="Роботы" value={formatNumber(econ.robots_count)} />
-              <ResultKpi title="CAPEX" value={formatCurrency(econ.capex?.capex)} />
-              <ResultKpi title="OPEX / год" value={formatCurrency(econ.opex?.opex_annual)} />
-              <ResultKpi
-                title="Годовой эффект"
-                value={formatCurrency(econ.annual_effect?.annual_effect)}
-              />
-              <ResultKpi
-                title="Окупаемость"
-                value={
-                  econ.payback?.payback_years != null
-                    ? `${formatNumber(econ.payback.payback_years, 1)} лет`
-                    : 'Недостаточно данных для расчёта'
-                }
-              />
-              <ResultKpi
-                title="ROI"
-                value={
-                  econ.roi?.roi_percent != null
-                    ? formatPercent(Number(econ.roi.roi_percent))
-                    : 'Недостаточно данных для расчёта'
-                }
-              />
-              <ResultKpi title="TCO" value={formatCurrency(econ.tco?.tco)} />
+            <div className="space-y-5">
+              <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                Результат — <strong>предварительная оценка</strong> и требует верификации при
+                обследовании объекта. Демонстрационные данные не заменяют исходные материалы.
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-steel-800">
+                  Экономика (сценарий «Покупка»)
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <ResultKpi title="Роботы" value={formatNumber(econ.robots_count)} />
+                  <ResultKpi title="CAPEX" value={formatCurrency(econ.capex?.capex)} />
+                  <ResultKpi title="OPEX / год" value={formatCurrency(econ.opex?.opex_annual)} />
+                  <ResultKpi
+                    title="Годовой эффект"
+                    value={formatCurrency(econ.annual_effect?.annual_effect)}
+                  />
+                  <ResultKpi
+                    title="Окупаемость"
+                    value={
+                      econ.payback?.payback_years != null
+                        ? `${formatNumber(econ.payback.payback_years, 1)} лет`
+                        : 'Недостаточно данных для расчёта'
+                    }
+                  />
+                  <ResultKpi
+                    title="ROI"
+                    value={
+                      econ.roi?.roi_percent != null
+                        ? formatPercent(Number(econ.roi.roi_percent))
+                        : 'Недостаточно данных для расчёта'
+                    }
+                  />
+                  <ResultKpi title="TCO" value={formatCurrency(econ.tco?.tco)} />
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded border border-steel-200 bg-white p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-steel-800">Состав CAPEX</h3>
+                  <dl className="space-y-1.5 text-sm">
+                    {Object.entries(econ.capex?.breakdown || {}).map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-3 border-b border-steel-50 py-1">
+                        <dt className="text-steel-500">{breakdownLabel(k)}</dt>
+                        <dd className="font-medium">
+                          {typeof v === 'number' ? formatCurrency(v) : String(v)}
+                        </dd>
+                      </div>
+                    ))}
+                    {!Object.keys(econ.capex?.breakdown || {}).length && (
+                      <p className="text-steel-500">Нет разбивки</p>
+                    )}
+                  </dl>
+                </div>
+                <div className="rounded border border-steel-200 bg-white p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-steel-800">Состав OPEX / год</h3>
+                  <dl className="space-y-1.5 text-sm">
+                    {Object.entries(econ.opex?.breakdown || {}).map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-3 border-b border-steel-50 py-1">
+                        <dt className="text-steel-500">{breakdownLabel(k)}</dt>
+                        <dd className="font-medium">
+                          {typeof v === 'number' ? formatCurrency(v) : String(v)}
+                        </dd>
+                      </div>
+                    ))}
+                    {!Object.keys(econ.opex?.breakdown || {}).length && (
+                      <p className="text-steel-500">Нет разбивки</p>
+                    )}
+                  </dl>
+                </div>
+              </div>
+
+              <div className="rounded border border-steel-200 bg-white p-4 text-sm text-steel-700">
+                <h3 className="mb-2 font-semibold text-steel-800">Краткое заключение</h3>
+                <p>
+                  {econ.payback?.payback_years == null
+                    ? 'При текущих допущениях окупаемость не определена (годовой эффект ≤ 0 или недостаточно данных). Скорректируйте параметры на вкладке «Анализ сценариев».'
+                    : econ.payback.payback_years <= 3
+                      ? `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет — в зоне привлекательной предынвестиционной гипотезы (до 3 лет).`
+                      : econ.payback.payback_years <= 5
+                        ? `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет — умеренный горизонт (3–5 лет). Рекомендуется проверить чувствительность к цене и спросу.`
+                        : `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет (более 5 лет). Имеет смысл сравнить RaaS и уточнить допущения по труду и производительности.`}
+                </p>
+                {results.length > 0 && (
+                  <p className="mt-2">
+                    Подбор: рассмотрено {results.length}, подходит{' '}
+                    {results.filter((r) => r.status === 'suitable').length}, требует проверки{' '}
+                    {results.filter((r) => r.status === 'needs_review').length}, не подходит{' '}
+                    {results.filter((r) => r.status === 'excluded').length}.
+                  </p>
+                )}
+              </div>
+
+              <p className="text-sm text-steel-600">
+                В <strong>PDF</strong> и <strong>Excel</strong>: параметры объекта, подобранные
+                решения, экономика с формулами, сценарии, допущения и источники. Кнопки экспорта — в
+                шапке страницы.
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <Link to={`/app/projects/${id}?step=economics`}>
+                  <Button variant="outline">К экономике</Button>
+                </Link>
+                <Link to={`/app/projects/${id}?step=scenarios`}>
+                  <Button variant="outline">К сценариям</Button>
+                </Link>
+                <Link to={`/app/projects/${id}?step=visualization`}>
+                  <Button variant="outline">К визуализации</Button>
+                </Link>
+                <Link to="/app/projects">
+                  <Button variant="secondary">К списку проектов</Button>
+                </Link>
+              </div>
             </div>
           )}
-          <div className="space-y-4 text-sm text-steel-700">
-            <p>
-              Проект «{project.name}» готов к экспорту. Используйте кнопки PDF и Excel в шапке
-              страницы для выгрузки отчёта.
-            </p>
-            {results.length > 0 && (
-              <p>
-                В подборе: {results.length} решений, подходящих:{' '}
-                {results.filter((r) => r.status === 'suitable').length}.
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Link to={`/app/projects/${id}?step=economics`}>
-                <Button variant="outline">К экономике</Button>
-              </Link>
-              <Link to={`/app/projects/${id}?step=visualization`}>
-                <Button variant="outline">К визуализации</Button>
-              </Link>
-              <Link to="/app/projects">
-                <Button variant="secondary">К списку проектов</Button>
-              </Link>
-            </div>
-          </div>
         </Card>
       )}
     </div>

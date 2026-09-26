@@ -73,8 +73,15 @@ def run_match(
 
     out = []
     for r in results:
+        robot = next((x for x in robots if x.id == r["robot_id"]), None)
         item = dict(r)
         item["selected"] = r["robot_id"] in top_ids
+        # Surrogate id для UI; после сохранения GET /results отдаёт id из БД
+        item["id"] = r["robot_id"]
+        item["project_id"] = project_id
+        item["robot_name"] = robot.name if robot else None
+        item["robot_payload_kg"] = robot.payload_kg if robot else None
+        item["robot_price_rub"] = robot.price_rub if robot else None
         out.append(item)
 
     return {

@@ -31,6 +31,8 @@ import { toastError, toastSuccess } from '../../store/toastStore'
 
 interface EconomicsPanelProps {
   projectId: string
+  /** economics — расчёт покупки и разбивка; scenarios — сравнение 3 сценариев + what-if */
+  mode?: 'economics' | 'scenarios'
 }
 
 const SCENARIO_CODES = ['baseline', 'purchase', 'raas'] as const
@@ -94,7 +96,9 @@ function scenarioRow(r: EconomicsScenarioResult) {
   }
 }
 
-export function EconomicsPanel({ projectId }: EconomicsPanelProps) {
+export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanelProps) {
+  const isEconomics = mode === 'economics'
+  const isScenarios = mode === 'scenarios'
   const [whatIf, setWhatIf] = useState<WhatIfSliders>({ ...DEFAULT_WHAT_IF })
   const [scenarios, setScenarios] = useState<ReturnType<typeof scenarioRow>[]>([])
   const [assumptions, setAssumptions] = useState<Record<string, number | string | boolean>>({})
@@ -326,10 +330,16 @@ export function EconomicsPanel({ projectId }: EconomicsPanelProps) {
 
   return (
     <div className="space-y-5">
+      <p className="text-sm text-steel-600">
+        {isEconomics
+          ? 'Расчёт экономики для сценария «Покупка»: состав CAPEX/OPEX, допущения и формулы. Сравнение вариантов и «что если» — на вкладке «Анализ сценариев».'
+          : 'Сравнение трёх сценариев (без роботизации / покупка / RaaS), анализ «что если» и чувствительность. Детальная разбивка покупки — на вкладке «Экономика».'}
+      </p>
+
       <div className="flex flex-wrap gap-2">
         <Button loading={calcAllMut.isPending} onClick={() => calcAllMut.mutate()}>
           <Play className="h-4 w-4" />
-          Пересчитать сценарии
+          {isEconomics ? 'Рассчитать экономику' : 'Пересчитать сценарии'}
         </Button>
         <Button variant="outline" onClick={openExplain}>
           <Info className="h-4 w-4" />
@@ -337,6 +347,140 @@ export function EconomicsPanel({ projectId }: EconomicsPanelProps) {
         </Button>
       </div>
 
+      {isEconomics && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Kpi
+              title="Роботов"
+              value={lastResult?.robots_count != null ? formatNumber(lastResult.robots_count) : 'Нет данных'}
+              hint="Расчётное количество для пикового спроса"
+            />
+            <Kpi
+              title="CAPEX"
+              value={
+                lastResult?.capex?.capex != null
+                  ? formatCurrency(lastResult.capex.capex)
+                  : 'Нет данных'
+              }
+              hint="Первоначальные капитальные затраты"
+            />
+            <Kpi
+              title="OPEX / год"
+              value={
+                lastResult?.opex?.opex_annual != null
+                  ? formatCurrency(lastResult.opex.opex_annual)
+                  : 'Нет данных'
+              }
+              hint="Эксплуатационные затраты в год"
+            />
+            <Kpi
+              title="Срок окупаемости"
+              value={
+                lastResult?.payback?.payback_years != null
+                  ? formatNumber(lastResult.payback.payback_years, 1)
+                  : 'Недостаточно данных для расчёта'
+              }
+              unit={lastResult?.payback?.payback_years != null ? 'лет' : undefined}
+              hint="Ориентировочный период возврата инвестиций"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Kpi
+              title="Годовой эффект"
+              value={formatCurrency(lastResult?.annual_effect?.annual_effect)}
+              hint="Ожидаемый чистый эффект за год"
+            />
+            <Kpi
+              title="ROI"
+              value={
+                lastResult?.roi?.roi_percent != null
+                  ? formatPercent(Number(lastResult.roi.roi_percent))
+                  : 'Нет данных'
+              }
+              hint="Возврат инвестиций относительно CAPEX"
+            />
+            <Kpi
+              title="TCO"
+              value={
+                lastResult?.tco?.tco != null ? formatCurrency(lastResult.tco.tco) : 'Нет данных'
+              }
+              hint="Совокупная стоимость владения"
+            />
+            <Kpi
+              title="Сценарий"
+              value="Покупка оборудования"
+              hint="Основной сценарий этой вкладки"
+            />
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Card title="Состав CAPEX">
+              {Object.keys(lastResult?.capex?.breakdown || {}).length === 0 ? (
+                <p className="text-sm text-steel-500">Запустите расчёт.</p>
+              ) : (
+                <dl className="space-y-2 text-sm">
+                  {Object.entries(lastResult!.capex!.breakdown!).map(([k, v]) => (
+                    <div
+                      key={k}
+                      className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                    >
+                      <dt className="text-steel-500">{breakdownLabel(k)}</dt>
+                      <dd className="font-medium text-steel-800">
+                        {typeof v === 'number' ? formatCurrency(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </Card>
+            <Card title="Состав OPEX / год">
+              {Object.keys(lastResult?.opex?.breakdown || {}).length === 0 ? (
+                <p className="text-sm text-steel-500">Запустите расчёт.</p>
+              ) : (
+                <dl className="space-y-2 text-sm">
+                  {Object.entries(lastResult!.opex!.breakdown!).map(([k, v]) => (
+                    <div
+                      key={k}
+                      className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                    >
+                      <dt className="text-steel-500">{breakdownLabel(k)}</dt>
+                      <dd className="font-medium text-steel-800">
+                        {typeof v === 'number' ? formatCurrency(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </Card>
+          </div>
+
+          <Card title="Допущения модели">
+            <p className="mb-3 text-xs text-steel-500">
+              {valueSourceLabel('assumption')} — значения по умолчанию. Изменить ключевые параметры
+              можно во вкладке «Анализ сценариев».
+            </p>
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              {Object.entries(assumptions)
+                .slice(0, 16)
+                .map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                  >
+                    <dt className="text-steel-500">{assumptionLabel(k)}</dt>
+                    <dd className="font-medium text-steel-800">{String(v)}</dd>
+                  </div>
+                ))}
+              {Object.keys(assumptions).length === 0 && (
+                <p className="text-steel-500 sm:col-span-2">Запустите расчёт.</p>
+              )}
+            </dl>
+          </Card>
+        </>
+      )}
+
+      {isScenarios && (
+        <>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           title="Лучший сценарий"
@@ -630,6 +774,8 @@ export function EconomicsPanel({ projectId }: EconomicsPanelProps) {
             />
           </div>
         </Card>
+      )}
+        </>
       )}
 
       <Modal open={explainOpen} onClose={() => setExplainOpen(false)} title="Как рассчитано" size="lg">

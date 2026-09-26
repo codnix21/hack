@@ -741,6 +741,13 @@ def export_project_excel(
         [
             ("", ""),
             (
+                "Важно",
+                (
+                    "Результат является предварительной оценкой и требует верификации "
+                    "при обследовании объекта."
+                ),
+            ),
+            (
                 "Примечание",
                 (
                     "Отчёт подготовлен для ознакомления. Демонстрационные данные не заменяют исходные материалы проекта."
@@ -753,7 +760,7 @@ def export_project_excel(
     _append_kv_block(ws_title, cover_rows, start_row=5)
     for r in range(5, ws_title.max_row + 1):
         label = ws_title.cell(r, 1).value
-        if label in {"Результаты подбора", "Ключевые показатели экономики"}:
+        if label in {"Результаты подбора", "Ключевые показатели экономики", "Важно"}:
             ws_title.cell(r, 1).fill = SECTION_FILL
             ws_title.cell(r, 2).fill = SECTION_FILL
             ws_title.cell(r, 1).font = Font(bold=True, color="1F4E79")
