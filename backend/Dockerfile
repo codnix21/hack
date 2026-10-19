@@ -12,7 +12,8 @@ RUN set -eux; \
       fonts-dejavu-core; \
     rm -rf /var/lib/apt/lists/*
 
-# Offline wheels (ezdxf и зависимости) — воспроизводимая установка без PyPI при наличии .wheels
+# Offline wheels (ezdxf): положите .whl в .wheels/ — pip возьмёт их без PyPI.
+# Пустая папка (.gitkeep) тоже ок: тогда установка идёт с PyPI.
 COPY requirements.txt .
 COPY .wheels/ /tmp/wheels/
 RUN pip install --no-cache-dir --find-links=/tmp/wheels -r requirements.txt \
