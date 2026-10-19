@@ -67,8 +67,18 @@ def empty_layout(width_m: float = 60.0, length_m: float = 40.0) -> dict[str, Any
                 "rotation": 0,
             }
         ],
+        "routes": [],
         "source": "manual",
     }
+
+
+def polyline_length_m(points: list[dict]) -> float:
+    total = 0.0
+    for i in range(1, len(points)):
+        dx = float(points[i]["x"]) - float(points[i - 1]["x"])
+        dy = float(points[i]["y"]) - float(points[i - 1]["y"])
+        total += (dx * dx + dy * dy) ** 0.5
+    return round(total, 3)
 
 
 def default_warehouse_objects(width_m: float, length_m: float, zones: int = 3) -> list[dict]:
@@ -236,12 +246,42 @@ def sanitize_layout(raw: Optional[dict], fallback_w: float = 60.0, fallback_l: f
     width_m = max(5.0, width_m)
     length_m = max(5.0, length_m)
     objects = _sync_wall_contour(objects, width_m, length_m)
+
+    routes: list[dict[str, Any]] = []
+    for item in data.get("routes") or []:
+        if not isinstance(item, dict):
+            continue
+        pts_raw = item.get("points") or []
+        points: list[dict[str, float]] = []
+        for p in pts_raw:
+            if not isinstance(p, dict):
+                continue
+            try:
+                px = float(p.get("x"))
+                py = float(p.get("y"))
+            except (TypeError, ValueError):
+                continue
+            points.append({"x": round(px, 3), "y": round(py, 3)})
+        if len(points) < 2:
+            continue
+        routes.append(
+            {
+                "id": str(item.get("id") or _id("route")),
+                "name": str(item.get("name") or "Маршрут"),
+                "points": points,
+                "source_id": item.get("source_id"),
+                "destination_id": item.get("destination_id"),
+                "manual": True,
+            }
+        )
+
     return {
         "version": LAYOUT_VERSION,
         "unit": "m",
         "width_m": round(width_m, 3),
         "length_m": round(length_m, 3),
         "objects": objects,
+        "routes": routes,
         "source": data.get("source") or "manual",
         "dxf_meta": data.get("dxf_meta") if isinstance(data.get("dxf_meta"), dict) else None,
     }
@@ -330,74 +370,109 @@ def layout_to_visualization(layout: dict[str, Any], robots_count: int = 3) -> di
                 return {"id": full["id"], "name": full["name"], "x": ax, "y": ay}
         return obj
 
-    task_specs: list[tuple[str, str, dict, dict]] = []
-    if loads and racks:
-        for i, rack in enumerate(racks[:6]):
-            task_specs.append(
-                (
-                    "inbound",
-                    f"task_in_{i + 1}",
-                    loads[i % len(loads)],
-                    _endpoint(rack, True),
-                )
-            )
-    if racks and unloads:
-        for i, rack in enumerate(racks[:6]):
-            task_specs.append(
-                (
-                    "outbound",
-                    f"task_out_{i + 1}",
-                    _endpoint(rack, True),
-                    unloads[i % len(unloads)],
-                )
-            )
-    if not task_specs and loads and unloads:
-        for i in range(min(4, max(len(loads), len(unloads)))):
-            task_specs.append(
-                ("transfer", f"task_tr_{i + 1}", loads[i % len(loads)], unloads[i % len(unloads)])
-            )
-    if charging and task_specs:
-        src = unloads[0] if unloads else task_specs[0][2]
-        task_specs.append(("to_charge", "task_charge_1", src, charging[0]))
-
     tasks: list[dict] = []
     routes: list[dict] = []
-    for ttype, tid, src, dst in task_specs:
-        start_pt = (float(src["x"]), float(src["y"]))
-        goal_pt = (float(dst["x"]), float(dst["y"]))
-        route = plan_route(
-            layout,
-            start_pt,
-            goal_pt,
-            clearance_m=clearance,
-            route_id=f"route_{tid}",
-            name=f"{src.get('name', 'A')} → {dst.get('name', 'B')}",
-        )
-        if route.get("blocked"):
-            route_warnings.append(f"{tid}: {route.get('blocked_reason')}")
-            # инвариант: недоступный маршрут не несёт исполняемой геометрии/длины
+    manual_routes = [r for r in (layout.get("routes") or []) if len(r.get("points") or []) >= 2]
+    use_manual = bool(manual_routes)
+
+    if use_manual:
+        # Ручные полилинии из редактора — приоритет над A*
+        for i, mr in enumerate(manual_routes):
+            pts = list(mr["points"])
+            rid = str(mr.get("id") or f"route_manual_{i + 1}")
+            rname = str(mr.get("name") or f"Маршрут {i + 1}")
             route = {
-                **route,
-                "points": [],
-                "length_m": 0.0,
-                "blocked": True,
-                "status": "blocked",
+                "id": rid,
+                "name": rname,
+                "points": pts,
+                "length_m": polyline_length_m(pts),
+                "blocked": False,
+                "status": "ok",
+                "manual": True,
+                "source": "manual",
             }
-        routes.append(route)
-        tasks.append(
-            {
-                "id": tid,
-                "type": ttype,
-                "source_id": src.get("id"),
-                "destination_id": dst.get("id"),
-                "source_name": src.get("name"),
-                "destination_name": dst.get("name"),
-                "status": "blocked" if route.get("blocked") else "queued",
-                "robot_id": None,
-                "route": route,
-                "blocked_reason": route.get("blocked_reason"),
-            }
-        )
+            routes.append(route)
+            tasks.append(
+                {
+                    "id": f"task_manual_{i + 1}",
+                    "type": "manual",
+                    "source_id": mr.get("source_id"),
+                    "destination_id": mr.get("destination_id"),
+                    "source_name": "Старт маршрута",
+                    "destination_name": "Финиш маршрута",
+                    "status": "queued",
+                    "robot_id": None,
+                    "route": route,
+                    "blocked_reason": None,
+                }
+            )
+    else:
+        task_specs: list[tuple[str, str, dict, dict]] = []
+        if loads and racks:
+            for i, rack in enumerate(racks[:6]):
+                task_specs.append(
+                    (
+                        "inbound",
+                        f"task_in_{i + 1}",
+                        loads[i % len(loads)],
+                        _endpoint(rack, True),
+                    )
+                )
+        if racks and unloads:
+            for i, rack in enumerate(racks[:6]):
+                task_specs.append(
+                    (
+                        "outbound",
+                        f"task_out_{i + 1}",
+                        _endpoint(rack, True),
+                        unloads[i % len(unloads)],
+                    )
+                )
+        if not task_specs and loads and unloads:
+            for i in range(min(4, max(len(loads), len(unloads)))):
+                task_specs.append(
+                    ("transfer", f"task_tr_{i + 1}", loads[i % len(loads)], unloads[i % len(unloads)])
+                )
+        if charging and task_specs:
+            src = unloads[0] if unloads else task_specs[0][2]
+            task_specs.append(("to_charge", "task_charge_1", src, charging[0]))
+
+        for ttype, tid, src, dst in task_specs:
+            start_pt = (float(src["x"]), float(src["y"]))
+            goal_pt = (float(dst["x"]), float(dst["y"]))
+            route = plan_route(
+                layout,
+                start_pt,
+                goal_pt,
+                clearance_m=clearance,
+                route_id=f"route_{tid}",
+                name=f"{src.get('name', 'A')} → {dst.get('name', 'B')}",
+            )
+            if route.get("blocked"):
+                route_warnings.append(f"{tid}: {route.get('blocked_reason')}")
+                # инвариант: недоступный маршрут не несёт исполняемой геометрии/длины
+                route = {
+                    **route,
+                    "points": [],
+                    "length_m": 0.0,
+                    "blocked": True,
+                    "status": "blocked",
+                }
+            routes.append(route)
+            tasks.append(
+                {
+                    "id": tid,
+                    "type": ttype,
+                    "source_id": src.get("id"),
+                    "destination_id": dst.get("id"),
+                    "source_name": src.get("name"),
+                    "destination_name": dst.get("name"),
+                    "status": "blocked" if route.get("blocked") else "queued",
+                    "robot_id": None,
+                    "route": route,
+                    "blocked_reason": route.get("blocked_reason"),
+                }
+            )
 
     n_cfg = max(0, int(robots_count))
     n_spawn = min(n_cfg, MAX_VIZ_ROBOTS)
@@ -448,9 +523,10 @@ def layout_to_visualization(layout: dict[str, Any], robots_count: int = 3) -> di
             "coord_system": "meters_xy_topleft_ydown",
             "rotation_supported": True,
             "rotation_geometry": "obb",
-            "pathfinding": "astar_los_obb",
-            "pathfinding_step_m": 0.75,
-            "pathfinding_step_adaptive": True,
+            "pathfinding": "manual_polylines" if use_manual else "astar_los_obb",
+            "pathfinding_step_m": None if use_manual else 0.75,
+            "pathfinding_step_adaptive": not use_manual,
+            "manual_routes_count": len(manual_routes) if use_manual else 0,
             "demo_robot": {
                 "width_m": DEMO_ROBOT_WIDTH_M,
                 "length_m": DEMO_ROBOT_LENGTH_M,
@@ -458,9 +534,14 @@ def layout_to_visualization(layout: dict[str, Any], robots_count: int = 3) -> di
                 "clearance_m": clearance,
             },
             "pathfinding_note": (
-                "A* (шаг 0.75 м) + LOS-сглаживание по OBB препятствий; clearance = половина ширины "
-                f"демо-робота ({DEMO_ROBOT_WIDTH_M} м) + запас {DEMO_SAFETY_CLEARANCE_M} м. "
-                "Не является проверкой физической проходимости AMR. Задания имеют индивидуальные маршруты."
+                "Маршруты заданы вручную в планировке (полилинии в метрах). "
+                "A* не используется, пока в плане есть хотя бы один ручной маршрут."
+                if use_manual
+                else (
+                    "A* (шаг 0.75 м) + LOS-сглаживание по OBB препятствий; clearance = половина ширины "
+                    f"демо-робота ({DEMO_ROBOT_WIDTH_M} м) + запас {DEMO_SAFETY_CLEARANCE_M} м. "
+                    "Не является проверкой физической проходимости AMR. Задания имеют индивидуальные маршруты."
+                )
             ),
             "conflict_avoidance": "frontend_basic_wait",
             "des_note": "Демонстрационная DES-модель, не цифровой двойник.",

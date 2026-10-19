@@ -96,6 +96,41 @@ def test_tasks_have_individual_routes():
     assert viz["meta"]["pathfinding"] == "astar_los_obb"
 
 
+def test_manual_routes_override_astar():
+    layout = sanitize_layout(
+        {
+            "width_m": 40,
+            "length_m": 30,
+            "objects": [
+                {"id": "wall_contour", "kind": "wall", "x": 0, "y": 0, "width": 40, "height": 30},
+                {"id": "load1", "kind": "load", "x": 2, "y": 2, "width": 3, "height": 3},
+                {"id": "rack1", "kind": "rack", "x": 20, "y": 10, "width": 8, "height": 10},
+            ],
+            "routes": [
+                {
+                    "id": "route_user_1",
+                    "name": "Обход",
+                    "points": [
+                        {"x": 3.5, "y": 3.5},
+                        {"x": 10, "y": 5},
+                        {"x": 24, "y": 15},
+                    ],
+                    "manual": True,
+                }
+            ],
+        }
+    )
+    assert len(layout["routes"]) == 1
+    viz = layout_to_visualization(layout, robots_count=2)
+    assert viz["meta"]["pathfinding"] == "manual_polylines"
+    assert viz["meta"]["manual_routes_count"] == 1
+    assert len(viz["routes"]) == 1
+    assert viz["routes"][0]["manual"] is True
+    assert viz["routes"][0]["points"][1]["x"] == 10
+    assert all(t["type"] == "manual" for t in viz["tasks"])
+    assert any(t["status"] == "assigned" for t in viz["tasks"])
+
+
 def test_diagonal_corner_not_through_gap():
     """Два стеллажа образуют узкий угловой стык — диагональ не должна прорезать угол."""
     layout = sanitize_layout(

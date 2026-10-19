@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Check,
   Crosshair,
   Hand,
   Maximize2,
   Plus,
+  Route,
   Save,
   Trash2,
   Undo2,
@@ -14,7 +16,7 @@ import {
 } from 'lucide-react'
 import { projectsApi } from '../../api/projects'
 import { getFriendlyError } from '../../api/client'
-import type { LayoutObject, WarehouseLayout } from '../../types'
+import type { LayoutObject, LayoutRoute, WarehouseLayout } from '../../types'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
@@ -32,7 +34,35 @@ import {
   type Viewport,
 } from './layoutViewport'
 
-type EditorTool = 'select' | 'pan'
+type EditorTool = 'select' | 'pan' | 'route'
+
+function routeLengthM(points: { x: number; y: number }[]) {
+  let total = 0
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x
+    const dy = points[i].y - points[i - 1].y
+    total += Math.hypot(dx, dy)
+  }
+  return total
+}
+
+/** Расстояние от точки до отрезка (метры). */
+function distPointToSeg(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+) {
+  const dx = bx - ax
+  const dy = by - ay
+  const len2 = dx * dx + dy * dy
+  if (len2 < 1e-9) return Math.hypot(px - ax, py - ay)
+  let t = ((px - ax) * dx + (py - ay) * dy) / len2
+  t = Math.max(0, Math.min(1, t))
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+}
 
 /** Точка в ориентированном прямоугольнике (градусы CW, Y-down). */
 export function pointInOrientedRect(
@@ -131,6 +161,8 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   const fittedKey = useRef('')
   const historyRef = useRef<WarehouseLayout[]>([])
   const [historyLen, setHistoryLen] = useState(0)
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
+  const [draftPoints, setDraftPoints] = useState<{ x: number; y: number }[]>([])
 
   const query = useQuery({
     queryKey: ['project-layout', projectId],
@@ -143,6 +175,8 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     setHistoryLen(0)
     setLayout(null)
     setSelectedId(null)
+    setSelectedRouteId(null)
+    setDraftPoints([])
   }, [projectId])
 
   useEffect(() => {
@@ -328,6 +362,43 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
       ctx.restore()
     }
 
+    // ручные маршруты
+    const drawPolyline = (
+      pts: { x: number; y: number }[],
+      stroke: string,
+      lineWidth: number,
+      dashed = false,
+    ) => {
+      if (pts.length < 1) return
+      ctx.beginPath()
+      const p0 = worldToScreen(pts[0].x, pts[0].y, vp)
+      ctx.moveTo(p0.x, p0.y)
+      for (let i = 1; i < pts.length; i++) {
+        const p = worldToScreen(pts[i].x, pts[i].y, vp)
+        ctx.lineTo(p.x, p.y)
+      }
+      ctx.strokeStyle = stroke
+      ctx.lineWidth = lineWidth
+      ctx.setLineDash(dashed ? [8, 6] : [])
+      ctx.stroke()
+      ctx.setLineDash([])
+      for (const pt of pts) {
+        const s = worldToScreen(pt.x, pt.y, vp)
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, 4, 0, Math.PI * 2)
+        ctx.fillStyle = stroke
+        ctx.fill()
+      }
+    }
+    for (const r of layout.routes || []) {
+      const selected = r.id === selectedRouteId
+      drawPolyline(r.points, selected ? '#c2410c' : '#ea580c', selected ? 3 : 2)
+    }
+    if (draftPoints.length) {
+      const preview = cursorM ? [...draftPoints, cursorM] : draftPoints
+      drawPolyline(preview, '#f97316', 2, true)
+    }
+
     // scale bar
     const barM = scaleBarMeters(vp.zoom)
     const barPx = barM * vp.zoom
@@ -348,9 +419,11 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     ctx.fillStyle = '#334155'
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
     ctx.fillText(`${barM} м`, bx + barPx + 8, by + 4)
-  }, [layout, vp, selectedId, canvasSize])
+  }, [layout, vp, selectedId, selectedRouteId, draftPoints, cursorM, canvasSize])
 
   const selected = layout?.objects.find((o) => o.id === selectedId) || null
+  const selectedRoute = layout?.routes?.find((r) => r.id === selectedRouteId) || null
+  const layoutRoutes = layout?.routes || []
 
   const toMeters = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current
@@ -370,6 +443,81 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     }
     return null
   }
+
+  const hitTestRoute = (mx: number, my: number) => {
+    if (!layout?.routes?.length) return null
+    const tolM = Math.max(0.4, 6 / vp.zoom)
+    for (let ri = layout.routes.length - 1; ri >= 0; ri--) {
+      const r = layout.routes[ri]
+      for (let i = 1; i < r.points.length; i++) {
+        const a = r.points[i - 1]
+        const b = r.points[i]
+        if (distPointToSeg(mx, my, a.x, a.y, b.x, b.y) <= tolM) return r
+      }
+    }
+    return null
+  }
+
+  const finishDraftRoute = () => {
+    if (!layout || readOnly || draftPoints.length < 2) {
+      if (draftPoints.length === 1) toastError('Нужны минимум 2 точки маршрута')
+      return
+    }
+    const route: LayoutRoute = {
+      id: newId('route'),
+      name: `Маршрут ${(layout.routes?.length || 0) + 1}`,
+      points: draftPoints.map((p) => ({
+        x: Math.round(p.x * 1000) / 1000,
+        y: Math.round(p.y * 1000) / 1000,
+      })),
+      manual: true,
+    }
+    commitLayout({ ...layout, routes: [...(layout.routes || []), route] })
+    setDraftPoints([])
+    setSelectedRouteId(route.id)
+    setSelectedId(null)
+    setTool('select')
+    toastSuccess('Маршрут добавлен — сохраните план')
+  }
+
+  const cancelDraftRoute = () => {
+    setDraftPoints([])
+  }
+
+  const removeSelectedRoute = () => {
+    if (!layout || !selectedRouteId || readOnly) return
+    commitLayout({
+      ...layout,
+      routes: (layout.routes || []).filter((r) => r.id !== selectedRouteId),
+    })
+    setSelectedRouteId(null)
+  }
+
+  const updateSelectedRoute = (patch: Partial<LayoutRoute>) => {
+    if (!layout || !selectedRouteId || readOnly) return
+    commitLayout({
+      ...layout,
+      routes: (layout.routes || []).map((r) =>
+        r.id === selectedRouteId ? { ...r, ...patch } : r,
+      ),
+    })
+  }
+
+  useEffect(() => {
+    if (tool !== 'route') return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setDraftPoints([])
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        finishDraftRoute()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- finishDraftRoute зависит от draft/layout
+  }, [tool, draftPoints, layout, readOnly])
 
   const clampObject = (o: LayoutObject, x: number, y: number) => {
     if (!layout) return { x, y }
@@ -459,7 +607,10 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             size="sm"
             variant={tool === 'select' ? 'primary' : 'outline'}
             data-testid="layout-tool-select"
-            onClick={() => setTool('select')}
+            onClick={() => {
+              setTool('select')
+              setDraftPoints([])
+            }}
             aria-pressed={tool === 'select'}
             title="Выбор и перемещение"
           >
@@ -470,13 +621,33 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             size="sm"
             variant={tool === 'pan' ? 'primary' : 'outline'}
             data-testid="layout-tool-pan"
-            onClick={() => setTool('pan')}
+            onClick={() => {
+              setTool('pan')
+              setDraftPoints([])
+            }}
             aria-pressed={tool === 'pan'}
             title="Панорама"
           >
             <Hand className="h-3.5 w-3.5" />
             Панорама
           </Button>
+          {!readOnly && (
+            <Button
+              size="sm"
+              variant={tool === 'route' ? 'primary' : 'outline'}
+              data-testid="layout-tool-route"
+              onClick={() => {
+                setTool('route')
+                setSelectedId(null)
+                setSelectedRouteId(null)
+              }}
+              aria-pressed={tool === 'route'}
+              title="Клик — точки маршрута, Enter / «Готово» — завершить"
+            >
+              <Route className="h-3.5 w-3.5" />
+              Маршрут
+            </Button>
+          )}
         </div>
         <div className="h-6 w-px bg-steel-200" aria-hidden />
         <div className="flex items-center gap-1" role="group" aria-label="Вид">
@@ -588,16 +759,41 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 return
               }
               if (readOnly) return
+              if (tool === 'route') {
+                e.preventDefault()
+                const step = snap ? adaptiveGridStepM(vp.zoom) : 0
+                const px = snapValue(x, step, snap)
+                const py = snapValue(y, step, snap)
+                const cx = Math.max(0, Math.min(layout.width_m, px))
+                const cy = Math.max(0, Math.min(layout.length_m, py))
+                setDraftPoints((prev) => [...prev, { x: cx, y: cy }])
+                setSelectedId(null)
+                setSelectedRouteId(null)
+                return
+              }
               const hit = hitTest(x, y)
               if (hit) {
                 setSelectedId(hit.id)
+                setSelectedRouteId(null)
                 historyRef.current = [...historyRef.current.slice(-19), structuredClone(layout)]
                 setHistoryLen(historyRef.current.length)
                 setDrag({ id: hit.id, ox: x - hit.x, oy: y - hit.y })
-              } else {
-                setSelectedId(null)
-                setPanDrag({ x: e.clientX, y: e.clientY, panX: vp.panX, panY: vp.panY })
+                return
               }
+              const hitR = hitTestRoute(x, y)
+              if (hitR) {
+                setSelectedRouteId(hitR.id)
+                setSelectedId(null)
+                return
+              }
+              setSelectedId(null)
+              setSelectedRouteId(null)
+              setPanDrag({ x: e.clientX, y: e.clientY, panX: vp.panX, panY: vp.panY })
+            }}
+            onDoubleClick={(e) => {
+              if (tool !== 'route' || readOnly) return
+              e.preventDefault()
+              finishDraftRoute()
             }}
             onMouseMove={(e) => {
               const { x, y } = toMeters(e.clientX, e.clientY)
@@ -639,11 +835,35 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
               Размер: {layout.width_m} × {layout.length_m} м · {formatArea(layout.width_m, layout.length_m)} м²
               {cursorM ? ` · курсор ${cursorM.x.toFixed(1)}, ${cursorM.y.toFixed(1)} м` : ''}
               {snap ? ` · шаг ${adaptiveGridStepM(vp.zoom)} м` : ''}
+              {layoutRoutes.length ? ` · маршрутов ${layoutRoutes.length}` : ''}
             </p>
             <p className="rounded bg-white/90 px-2 py-1 font-mono text-[11px] text-steel-500" data-testid="layout-zoom-label">
               {vp.zoom.toFixed(1)} px/м
             </p>
           </div>
+          {tool === 'route' && !readOnly ? (
+            <div className="absolute left-2 top-2 flex flex-wrap items-center gap-2 rounded border border-orange-200 bg-white/95 p-2 shadow-sm">
+              <p className="text-xs text-steel-700">
+                Маршрут: клик — точка ({draftPoints.length})
+                {draftPoints.length >= 2
+                  ? ` · ${routeLengthM(draftPoints).toFixed(1)} м`
+                  : ''}
+                . Двойной клик / Enter — готово, Esc — отмена.
+              </p>
+              <Button
+                size="sm"
+                data-testid="layout-route-finish"
+                disabled={draftPoints.length < 2}
+                onClick={finishDraftRoute}
+              >
+                <Check className="h-3.5 w-3.5" />
+                Готово
+              </Button>
+              <Button size="sm" variant="ghost" onClick={cancelDraftRoute}>
+                Отмена
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="nc-panel space-y-3 p-3">
@@ -683,7 +903,31 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
               })
             }}
           />
-          {selected ? (
+          {selectedRoute ? (
+            <>
+              <p className="pt-2 text-sm font-semibold text-steel-800">Маршрут</p>
+              <Input
+                label="Название"
+                disabled={readOnly}
+                value={selectedRoute.name || ''}
+                onChange={(e) => updateSelectedRoute({ name: e.target.value })}
+              />
+              <p className="text-xs text-steel-600">
+                Точек: {selectedRoute.points.length} · длина{' '}
+                {routeLengthM(selectedRoute.points).toFixed(1)} м
+              </p>
+              <p className="text-[11px] text-steel-500">
+                В DES этот маршрут используется вместо авто-A*. Сохраните план.
+              </p>
+              <p className="font-mono text-[10px] text-steel-400">ID: {selectedRoute.id}</p>
+              {!readOnly && (
+                <Button size="sm" variant="ghost" className="text-red-700" onClick={removeSelectedRoute}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Удалить маршрут
+                </Button>
+              )}
+            </>
+          ) : selected ? (
             <>
               <p className="pt-2 text-sm font-semibold text-steel-800">Объект</p>
               <Input
@@ -760,7 +1004,28 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             <div className="space-y-2 text-xs text-steel-600">
               <p className="font-medium text-steel-800">Ничего не выбрано</p>
               <p>Клик по объекту — свойства. Колёсико — масштаб, пустая область — панорама.</p>
-              <p className="text-steel-500">Добавьте стеллаж или зону кнопками слева, затем сохраните план.</p>
+              <p className="text-steel-500">
+                Инструмент «Маршрут» — выставить точки вручную (оранжевая линия). Без ручных
+                маршрутов DES строит пути через A*.
+              </p>
+              {layoutRoutes.length > 0 ? (
+                <ul className="space-y-1 border-t border-steel-100 pt-2">
+                  {layoutRoutes.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        className="w-full rounded px-1 py-0.5 text-left hover:bg-steel-50"
+                        onClick={() => {
+                          setSelectedRouteId(r.id)
+                          setSelectedId(null)
+                        }}
+                      >
+                        {r.name || r.id} · {routeLengthM(r.points).toFixed(1)} м
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           )}
         </div>

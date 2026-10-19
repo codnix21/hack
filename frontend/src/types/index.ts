@@ -45,12 +45,24 @@ export interface LayoutObject {
   from_dxf?: boolean
 }
 
+/** Ручной маршрут в метрах (полилиния). В DES имеет приоритет над A*. */
+export interface LayoutRoute {
+  id: string
+  name?: string
+  points: { x: number; y: number }[]
+  source_id?: string | null
+  destination_id?: string | null
+  manual?: boolean
+}
+
 export interface WarehouseLayout {
   version?: number
   unit: string
   width_m: number
   length_m: number
   objects: LayoutObject[]
+  /** Ручные маршруты; если есть — симуляция едет по ним */
+  routes?: LayoutRoute[]
   source?: string
   dxf_meta?: Record<string, unknown> | null
 }
