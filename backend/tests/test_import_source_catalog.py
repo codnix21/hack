@@ -118,3 +118,33 @@ def test_import_does_not_delete_source_robots(db_session):
     )
     assert report.total_rows == 0
     assert db_session.query(Robot).filter(Robot.data_origin == "source").count() == count
+
+
+MULTI = Path(__file__).parent / "fixtures" / "catalog_multi_industry.csv"
+
+
+def test_import_source_date_not_fabricated(db_session):
+    import_source_catalog(db_session, path=FIXTURE, write_normalized=False, commit=True)
+    robot = (
+        db_session.query(Robot)
+        .filter(Robot.data_origin == "source", Robot.external_id.isnot(None))
+        .first()
+    )
+    assert robot is not None
+    assert robot.source_date is None
+    origins = (robot.raw_data or {}).get("_field_origins") or {}
+    assert origins.get("source_date") == "unknown"
+
+
+def test_import_keeps_multi_industry_variants(db_session):
+    report = import_source_catalog(db_session, path=MULTI, write_normalized=False, commit=True)
+    assert report.added == 1
+    assert report.updated == 1  # вторая строка того же id
+    robot = db_session.query(Robot).filter(Robot.external_id == "dup-001").one()
+    variants = (robot.raw_data or {}).get("catalog_variants") or []
+    assert len(variants) == 2
+    industries = set((robot.raw_data or {}).get("industries_all") or [])
+    assert "Торговля и услуги" in industries
+    assert "Промышленность" in industries
+    # Не создаём вторую карточку только из-за второй отрасли
+    assert db_session.query(Robot).filter(Robot.external_id == "dup-001").count() == 1

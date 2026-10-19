@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ASSUMPTION_LABELS,
+  KNOWN_USER_FACING_KEYS,
+  MATCH_STATUS_LABELS,
+  METRIC_LABELS,
+  OBJECT_PARAM_LABELS,
   assumptionLabel,
   auditActionLabel,
   breakdownLabel,
@@ -13,9 +18,13 @@ import {
   isMissingDataWarning,
   matchStatusIcon,
   matchStatusLabel,
+  metricLabel,
+  missingCheckLabel,
   objectParamLabel,
   projectStatusLabel,
+  unknownFieldLabel,
   valueSourceLabel,
+  workModeLabel,
 } from './labels'
 
 describe('labels', () => {
@@ -32,7 +41,7 @@ describe('labels', () => {
   })
 
   it('localizes match statuses', () => {
-    expect(matchStatusLabel('suitable')).toBe('Подходит')
+    expect(matchStatusLabel('suitable')).toBe('Предварительно подходит')
     expect(matchStatusLabel('needs_review')).toBe('Требует проверки')
     expect(matchStatusLabel('excluded')).toBe('Не подходит')
   })
@@ -46,7 +55,7 @@ describe('labels', () => {
   it('localizes assumption and breakdown keys', () => {
     expect(assumptionLabel('utilization')).toBe('Загрузка оборудования')
     expect(breakdownLabel('equipment')).toBe('Оборудование')
-    expect(formulaLabel('annual_effect')).toBe('Годовой эффект')
+    expect(formulaLabel('annual_effect')).toBe('Годовой экономический эффект')
     expect(objectParamLabel('area_m2')).toBe('Площадь')
     expect(objectParamLabel('storage_type')).toBe('Тип хранения')
     expect(objectParamLabel('rovnost_pola_otklonenie')).toBe('Ровность пола (отклонение)')
@@ -55,12 +64,41 @@ describe('labels', () => {
         properties: { storage_type: { title: 'Тип хранения, код' } },
       }),
     ).toBe('Тип хранения')
-    expect(assumptionLabel('unknown_key')).toBe('unknown_key')
+    // словарь приоритетнее schema.title
+    expect(
+      objectParamLabel('peak_demand', {
+        properties: { peak_demand: { title: 'Пиковый спрос, оп/ч' } },
+      }),
+    ).toBe('Пиковая нагрузка')
+    expect(assumptionLabel('unknown_key')).toBe('Параметр без подписи')
+    expect(unknownFieldLabel('foo_bar')).toBe('Параметр без подписи')
+  })
+
+  it('covers known user-facing keys with Russian labels (no raw snake_case)', () => {
+    for (const key of KNOWN_USER_FACING_KEYS) {
+      const label =
+        METRIC_LABELS[key] ||
+        FORMULA_OR_STATUS(key) ||
+        OBJECT_PARAM_LABELS[key] ||
+        ASSUMPTION_LABELS[key] ||
+        MATCH_STATUS_LABELS[key] ||
+        metricLabel(key)
+      expect(label, key).toBeTruthy()
+      expect(label, key).not.toBe(key)
+      expect(label, key).not.toMatch(/_/)
+    }
+    expect(metricLabel('capex')).toContain('CAPEX')
+    expect(objectParamLabel('current_labor_cost_year')).toMatch(/персонал/i)
+    expect(objectParamLabel('peak_demand')).toMatch(/нагрузк/i)
+    expect(missingCheckLabel('missing_checks')).toBe('Что необходимо проверить')
+    expect(workModeLabel('2shift')).toBe('2 смены')
+    expect(workModeLabel('24x7')).toMatch(/Круглосуточно/)
   })
 
   it('localizes admin and catalog codes', () => {
     expect(projectStatusLabel('draft')).toBe('Черновик')
     expect(auditActionLabel('economics.calculate')).toBe('Расчёт экономики')
+    expect(auditActionLabel('unknown.action.xyz')).toBe('Действие журнала')
     expect(catalogTypeLabel('brs')).toBe('БРС')
     expect(catalogTypeLabel('software')).toBe('ПО')
   })
@@ -94,3 +132,13 @@ describe('labels', () => {
     expect(isMissingDataWarning('✓ Грузоподъёмность достаточна')).toBe(false)
   })
 })
+
+function FORMULA_OR_STATUS(key: string): string | undefined {
+  if (key === 'suitable' || key === 'needs_review' || key === 'excluded') {
+    return MATCH_STATUS_LABELS[key]
+  }
+  if (key === 'available') return 'Доступен'
+  if (key === 'estimated') return OBJECT_PARAM_LABELS.estimated
+  if (key === 'missing_checks') return 'Что необходимо проверить'
+  return undefined
+}

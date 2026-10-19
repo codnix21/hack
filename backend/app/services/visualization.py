@@ -512,8 +512,18 @@ def _medical_layout(
 def generate_layout(
     object_params: dict,
     robots_count: int = 1,
+    saved_layout: Optional[dict] = None,
 ) -> dict[str, Any]:
     params = object_params or {}
+    if saved_layout and (saved_layout.get("objects") or saved_layout.get("width_m")):
+        from app.services.layout import layout_to_visualization, sanitize_layout
+
+        layout = sanitize_layout(
+            saved_layout,
+            fallback_w=float(params.get("area_width_m") or params.get("width_m") or 60),
+            fallback_l=float(params.get("area_length_m") or params.get("length_m") or 100),
+        )
+        return layout_to_visualization(layout, robots_count)
     width_m = float(params.get("area_width_m") or params.get("width_m") or 60)
     length_m = float(params.get("area_length_m") or params.get("length_m") or 100)
     zones_count = int(params.get("zones_count") or params.get("storage_zones") or 4)
@@ -569,8 +579,9 @@ def generate_simulation_config(
     robots_count: int,
     productivity: Optional[float] = None,
     economics: Optional[dict] = None,
+    saved_layout: Optional[dict] = None,
 ) -> dict[str, Any]:
-    layout = generate_layout(object_params, robots_count)
+    layout = generate_layout(object_params, robots_count, saved_layout=saved_layout)
     params = object_params or {}
     peak = float(params.get("peak_demand") or params.get("peak_ops_per_hour") or 100)
     prod = float(productivity or params.get("productivity") or 40)

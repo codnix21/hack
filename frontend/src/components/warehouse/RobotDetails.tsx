@@ -1,5 +1,6 @@
 import type { SimRobot, SimTask } from '../../simulation/types'
 import { STATUS_COLOR, STATUS_LABEL_RU, TASK_STATUS_RU } from '../../simulation/types'
+import { displayRouteLengthM } from '../../simulation/simMetrics'
 import { formatNumber } from '../../utils/format'
 
 interface Props {
@@ -53,43 +54,46 @@ export function RobotDetails({
       )}
 
       {!robot ? (
-        <div className="px-4 py-8 text-center">
+        <div className="px-3 py-5 text-center">
           <p className="text-sm font-medium text-steel-800">Робот не выбран</p>
           <p className="mt-1 text-xs text-steel-500">
             Нажмите на AMR на схеме или выберите вкладку выше.
           </p>
         </div>
       ) : (
-        <div className="p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="font-display text-2xl font-semibold uppercase tracking-wide text-ink">
-                {robot.label}
-              </p>
-              <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.14em] text-steel-400">
-                {robot.type} · автономный мобильный робот
+        <div className="p-3">
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="nc-title-sm text-base">{robot.label}</p>
+              <p className="nc-body mt-0.5 text-xs">
+                {robot.type} · AMR
               </p>
             </div>
             <StatusChip status={robot.status} />
           </div>
 
           <BatteryBar value={robot.battery} />
+          <p className="mt-0.5 text-[10px] text-steel-400">Заряд — демо-параметр</p>
 
-          <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3">
+          {robot.waitReason ? (
+            <p className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+              {robot.waitReason}
+            </p>
+          ) : null}
+
+          <dl className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-2">
             <Metric
               label="Скорость"
-              value={`${formatNumber(robot.speedFactor * 1.2, 1)} м/с`}
+              value={`${formatNumber(robot.speedMps * robot.speedFactor, 1)} м/с`}
               demo
             />
             <Metric label="Груз" value={`${formatNumber(robot.cargoKg, 0)} кг`} demo />
-            <Metric label="Пройдено" value={formatNumber(robot.completedDistance, 2)} demo />
+            <Metric label="Пройдено" value={`${formatNumber(robot.completedDistance, 1)} м`} demo />
             <Metric label="Циклы" value={String(robot.cycles)} demo />
           </dl>
 
-          <div className="mt-4 rounded border border-steel-100 bg-steel-50/60 p-3">
-            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-steel-400">
-              Задание
-            </p>
+          <div className="mt-2.5 rounded border border-steel-100 bg-steel-50/60 p-2">
+            <p className="nc-section-label mb-1">Задание</p>
             {task ? (
               <dl className="space-y-1.5 text-sm">
                 <div className="flex justify-between gap-2">
@@ -108,6 +112,15 @@ export function RobotDetails({
                   <dt className="text-steel-500">Куда</dt>
                   <dd className="text-right text-steel-800">{task.destination}</dd>
                 </div>
+                {displayRouteLengthM(task) != null ? (
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-steel-500">Длина маршрута</dt>
+                    <dd className="text-steel-800">{formatNumber(displayRouteLengthM(task)!, 1)} м</dd>
+                  </div>
+                ) : null}
+                {task.blockedReason ? (
+                  <p className="pt-1 text-xs text-red-700">{task.blockedReason}</p>
+                ) : null}
               </dl>
             ) : (
               <p className="text-sm text-steel-500">Нет активного задания</p>

@@ -268,52 +268,327 @@ def _coerce_param_value(key: str, value: Any) -> Any:
     return normalized
 
 
+def _finalize_imported_params(params: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Согласование труда/пика после импорта; конфликты → предупреждения, без молчаливой подмены."""
+    from app.services.labor_cost import estimate_peak_from_daily_ops, resolve_current_labor_cost
+
+    warnings: list[str] = []
+    out = dict(params)
+    labor = resolve_current_labor_cost(out, assumption_default=0.0)
+    if labor["labor_cost_origin"] != "model_assumption" and labor["current_labor_cost_year"] > 0:
+        if out.get("current_labor_cost_year") in (None, "", 0, "0"):
+            out["current_labor_cost_year"] = labor["current_labor_cost_year"]
+        out.setdefault("staff_cost_year", labor["current_labor_cost_year"])
+        warnings.extend(labor.get("warnings") or [])
+    else:
+        # Явные конфликты при наличии источников, даже если выбран приоритетный
+        warnings.extend([w for w in (labor.get("warnings") or []) if "Конфликт" in w])
+
+    if out.get("peak_demand") in (None, "", 0, "0"):
+        peak, how = estimate_peak_from_daily_ops(out)
+        if peak:
+            out["peak_demand"] = peak
+            warnings.append(
+                f"Пиковая нагрузка оценена ({how}) = {peak} оп/ч — подтвердите значение."
+            )
+
+    if warnings:
+        out["_import_warnings"] = warnings
+    return out, warnings
+
+
+def _detect_key_value_columns(columns: list[str]) -> tuple[Optional[int], Optional[int]]:
+    low = [c.lower().strip() for c in columns]
+    key_col_idx = next(
+        (i for i, n in enumerate(low) if any(x in n for x in ("параметр", "param", "ключ", "name", "field"))),
+        None,
+    )
+    val_col_idx = next(
+        (i for i, n in enumerate(low) if any(x in n for x in ("значен", "value"))),
+        None,
+    )
+    return key_col_idx, val_col_idx
+
+
 def import_project_params(content: bytes, filename: str, mapping: Optional[dict[str, str]] = None) -> dict[str, Any]:
     """Импорт параметров объекта проекта из таблицы (ключ-значение или одна строка)."""
-    df = read_tabular(content, filename)
+    try:
+        df = read_tabular(content, filename)
+    except ValueError as exc:
+        from app.services.safe_errors import public_error_detail
+
+        return {
+            "object_params": {},
+            "mapping": mapping or {},
+            "errors": [
+                public_error_detail(exc, fallback="Не удалось разобрать файл. Проверьте формат CSV/Excel."),
+            ],
+            "mode": None,
+        }
+    except Exception:
+        return {
+            "object_params": {},
+            "mapping": mapping or {},
+            "errors": ["Не удалось разобрать файл. Проверьте формат CSV/Excel."],
+            "mode": None,
+        }
+
     columns = [str(c) for c in df.columns]
     if mapping is None:
-        mapping = suggest_mapping(columns)
+        mapping = suggest_param_column_mapping(columns)
 
-    # key/value: Параметр | Значение | …
-    if len(columns) >= 2 and len(df) >= 1:
-        low = [c.lower().strip() for c in columns]
-        key_col_idx = next(
-            (i for i, n in enumerate(low) if any(x in n for x in ("параметр", "param", "ключ", "name"))),
-            None,
-        )
-        val_col_idx = next(
-            (i for i, n in enumerate(low) if any(x in n for x in ("значен", "value"))),
-            None,
-        )
-        if key_col_idx is not None and val_col_idx is not None:
-            params: dict[str, Any] = {}
-            for _, row in df.iterrows():
-                raw_key = row.iloc[key_col_idx]
-                if pd.isna(raw_key):
-                    continue
-                label = str(raw_key).strip()
-                if not label or label.lower() in ("параметр", "parameter", "ключ"):
-                    continue
-                k = resolve_param_key(label)
-                v = row.iloc[val_col_idx]
-                if pd.isna(v) or (isinstance(v, str) and not v.strip()):
-                    continue
-                params[k] = _coerce_param_value(k, v)
-            return {"object_params": params, "mapping": mapping, "mode": "key_value"}
+    if df.empty or len(columns) == 0:
+        return {"object_params": {}, "mapping": mapping, "errors": ["Пустой файл"], "mode": None}
+
+    key_col_idx, val_col_idx = _detect_key_value_columns(columns)
+    if key_col_idx is not None and val_col_idx is not None:
+        params: dict[str, Any] = {}
+        unrecognized_labels: list[str] = []
+        for _, row in df.iterrows():
+            raw_key = row.iloc[key_col_idx]
+            if pd.isna(raw_key):
+                continue
+            label = str(raw_key).strip()
+            if not label or label.lower() in ("параметр", "parameter", "ключ"):
+                continue
+            k = resolve_param_key(label)
+            v = row.iloc[val_col_idx]
+            if pd.isna(v) or (isinstance(v, str) and not v.strip()):
+                continue
+            # Если ключ не изменился после resolve и не канонический — помечаем
+            if k == label and not _is_canonical_param(k):
+                unrecognized_labels.append(label)
+            params[k] = _coerce_param_value(k, v)
+        params, warnings = _finalize_imported_params(params)
+        if unrecognized_labels:
+            warnings.append(
+                "Не сопоставлены с моделью NETCORE (сохранены как есть): "
+                + ", ".join(unrecognized_labels[:12])
+                + ("…" if len(unrecognized_labels) > 12 else "")
+            )
+        return {
+            "object_params": params,
+            "mapping": mapping,
+            "mode": "key_value",
+            "warnings": warnings,
+            "unrecognized_labels": unrecognized_labels,
+        }
 
     # Single wide data row
     if len(df) >= 1:
         row = df.iloc[0]
         params = {}
+        ignored_columns: list[str] = []
         for col in columns:
             if str(col).lower().startswith("unnamed"):
                 continue
-            canon = resolve_param_key(mapping.get(col, col))
+            mapped = (mapping or {}).get(col) or col
+            if mapped in ("ignore", "", None):
+                ignored_columns.append(col)
+                continue
+            canon = resolve_param_key(str(mapped))
             val = row[col]
             if pd.isna(val) or (isinstance(val, str) and not str(val).strip()):
                 continue
             params[canon] = _coerce_param_value(canon, val)
-        return {"object_params": params, "mapping": mapping, "mode": "wide_row", "preview": params}
+        params, warnings = _finalize_imported_params(params)
+        return {
+            "object_params": params,
+            "mapping": mapping,
+            "mode": "wide_row",
+            "preview": params,
+            "warnings": warnings,
+            "ignored_columns": ignored_columns,
+        }
 
-    return {"object_params": {}, "mapping": mapping, "errors": ["Пустой файл"]}
+    return {"object_params": {}, "mapping": mapping, "errors": ["Пустой файл"], "mode": None}
+
+
+def _is_canonical_param(key: str) -> bool:
+    try:
+        from app.services.import_source_datasets import PARAM_ALIASES as DS_ALIASES
+    except Exception:
+        DS_ALIASES = {}
+    known = set(DS_ALIASES.values()) if isinstance(DS_ALIASES, dict) else set()
+    known |= {
+        "peak_demand",
+        "area_m2",
+        "area_width_m",
+        "area_length_m",
+        "aisle_width_mm",
+        "required_payload_kg",
+        "current_labor_cost_year",
+        "staff_count",
+        "staff_salary_month",
+        "payroll_tax_coef",
+        "ops_count",
+        "charging_stations",
+        "zones_count",
+        "shifts_count",
+        "shift_hours",
+        "peak_factor",
+    }
+    if key in known:
+        return True
+    # resolve_param_key нормализует русские ярлыки в канон
+    resolved = resolve_param_key(key)
+    return resolved != key and resolved in known
+
+
+def suggest_param_column_mapping(columns: list[str]) -> dict[str, str]:
+    """Сопоставление колонок wide-таблицы → параметры объекта (не каталог роботов)."""
+    mapping: dict[str, str] = {}
+    for col in columns:
+        canon = resolve_param_key(col)
+        if canon != col or _is_canonical_param(canon):
+            mapping[col] = canon
+        else:
+            # попробуем вложенные алиасы через нижний регистр
+            low = col.lower().strip().replace("ё", "е")
+            guessed = resolve_param_key(low)
+            mapping[col] = guessed if guessed != low else "ignore"
+    return mapping
+
+
+def validate_project_params_import(
+    content: bytes,
+    filename: str,
+    mapping: Optional[dict[str, str]] = None,
+    existing_params: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
+    """Валидация импорта параметров объекта (не каталога). Не требует robot name."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        df = read_tabular(content, filename)
+    except ValueError as exc:
+        from app.services.safe_errors import public_error_detail
+
+        return {
+            "valid": False,
+            "errors": [
+                public_error_detail(exc, fallback="Не удалось разобрать файл. Проверьте формат CSV/Excel."),
+            ],
+            "warnings": [],
+            "row_count": 0,
+            "mode": None,
+            "parsed_params": {},
+            "will_overwrite": [],
+            "unmapped_columns": [],
+        }
+    except Exception:
+        return {
+            "valid": False,
+            "errors": ["Файл повреждён или не читается как CSV/Excel"],
+            "warnings": [],
+            "row_count": 0,
+            "mode": None,
+            "parsed_params": {},
+            "will_overwrite": [],
+            "unmapped_columns": [],
+        }
+
+    if df.empty:
+        return {
+            "valid": False,
+            "errors": ["Пустой файл — нет строк данных"],
+            "warnings": [],
+            "row_count": 0,
+            "mode": None,
+            "parsed_params": {},
+            "will_overwrite": [],
+            "unmapped_columns": list(map(str, df.columns)),
+        }
+
+    parsed = import_project_params(content, filename, mapping)
+    if parsed.get("errors"):
+        errors.extend(parsed["errors"])
+    warnings.extend(parsed.get("warnings") or [])
+    params = parsed.get("object_params") or {}
+    mode = parsed.get("mode")
+
+    columns = [str(c) for c in df.columns]
+    key_i, val_i = _detect_key_value_columns(columns)
+    unmapped_columns: list[str] = []
+    if mode == "wide_row":
+        for col, dest in (mapping or parsed.get("mapping") or {}).items():
+            if dest in (None, "", "ignore"):
+                unmapped_columns.append(col)
+        for col in columns:
+            if col not in (mapping or {}) and not str(col).lower().startswith("unnamed"):
+                unmapped_columns.append(col)
+    elif key_i is None or val_i is None:
+        warnings.append(
+            "Не удалось уверенно определить колонки «Параметр» и «Значение». "
+            "Проверьте заголовки или сопоставьте колонки вручную."
+        )
+
+    # числовые поля
+    for k, v in params.items():
+        if k.startswith("_"):
+            continue
+        if k in (
+            "peak_demand",
+            "area_m2",
+            "current_labor_cost_year",
+            "staff_count",
+            "required_payload_kg",
+        ):
+            if isinstance(v, (int, float)) and v < 0:
+                errors.append(f'Поле «{k}»: значение не может быть отрицательным')
+
+    # ₽/мес vs ₽/год — не смешивать без подтверждения пользователем
+    labor_year = params.get("current_labor_cost_year")
+    salary_month = params.get("staff_salary_month")
+    if isinstance(labor_year, (int, float)) and 0 < labor_year < 500_000:
+        warnings.append(
+            "«Стоимость персонала» выглядит как сумма за месяц (< 500 000 ₽), "
+            "а в модели ожидаются ₽/год. Проверьте единицу или укажите годовой ФОТ."
+        )
+    if (
+        isinstance(salary_month, (int, float))
+        and isinstance(labor_year, (int, float))
+        and salary_month > 0
+        and abs(labor_year - salary_month) < 1
+    ):
+        warnings.append(
+            "Годовая стоимость персонала совпадает с месячной зарплатой — "
+            "возможна ошибка единицы измерения (₽/мес вместо ₽/год)."
+        )
+    # Паллеты vs операции: пик из ops_count vs inbound pallets без смешения единиц
+    if params.get("inbound_pallets_per_day") and params.get("ops_count"):
+        warnings.append(
+            "В файле есть и суточный объём операций (строки), и паллетопоток. "
+            "Пик в экономике считается в операциях/час — паллеты не подставляются как ops автоматически."
+        )
+
+    existing = existing_params or {}
+    will_overwrite = [
+        k
+        for k, v in params.items()
+        if not str(k).startswith("_")
+        and k in existing
+        and existing.get(k) not in (None, "")
+        and existing.get(k) != v
+    ]
+    if will_overwrite:
+        warnings.append(
+            f"Будут перезаписаны уже сохранённые параметры: {', '.join(will_overwrite[:10])}"
+            + ("…" if len(will_overwrite) > 10 else "")
+        )
+
+    if not params and not errors:
+        errors.append("Не распознано ни одного параметра. Проверьте заголовки и значения.")
+
+    return {
+        "valid": len(errors) == 0 and bool(params),
+        "errors": errors,
+        "warnings": warnings,
+        "row_count": len(df),
+        "mode": mode,
+        "parsed_params": params,
+        "will_overwrite": will_overwrite,
+        "unmapped_columns": sorted(set(unmapped_columns)),
+        "mapping": parsed.get("mapping") or mapping or {},
+        "unrecognized_labels": parsed.get("unrecognized_labels") or [],
+    }

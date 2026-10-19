@@ -19,3 +19,4 @@ class User(Base):
     role = Column(String(32), nullable=False, default="user")  # guest|user|admin|vendor
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # гостевая сессия

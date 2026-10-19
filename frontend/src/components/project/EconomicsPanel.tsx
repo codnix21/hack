@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LineChart,
   Line,
@@ -14,7 +14,11 @@ import {
 } from 'recharts'
 import { Info, Play, RotateCcw } from 'lucide-react'
 import { economicsApi, type EconomicsExplainResponse } from '../../api/economics'
+import { projectsApi } from '../../api/projects'
 import { getFriendlyError } from '../../api/client'
+import { AttentionPanel } from './AttentionPanel'
+import { buildAttentionItems } from '../../utils/attention'
+import { scenarioCompareColumnKeys } from './scenarioCompare'
 import type {
   EconomicsRequest,
   EconomicsScenarioResult,
@@ -25,15 +29,43 @@ import { Card } from '../ui/Card'
 import { Modal } from '../ui/Modal'
 import { Table } from '../ui/Table'
 import { Skeleton } from '../ui/Skeleton'
-import { formatCurrency, formatNumber, formatPercent } from '../../utils/format'
-import { assumptionLabel, breakdownLabel, formulaLabel, valueSourceLabel } from '../../utils/labels'
+import {
+  formatBreakdownValue,
+  formatCurrency,
+  formatNumber,
+  formatPayback,
+  formatPercent,
+} from '../../utils/format'
+import {
+  assumptionLabel,
+  breakdownLabel,
+  formulaLabel,
+  metricLabel,
+  robotsCountSourceLabel,
+  valueSourceLabel,
+} from '../../utils/labels'
 import { toastError, toastSuccess } from '../../store/toastStore'
-import { useAuthStore } from '../../store/authStore'
+import {
+  ECONOMICS_FRESHNESS_LABEL,
+  resolveEconomicsFreshness,
+} from '../../utils/economicsFreshness'
+import {
+  assessEconomicsLocal,
+  parseInputsIncompleteDetail,
+  type InputIssue,
+} from '../../utils/requiredInputs'
+import { Badge } from '../ui/Badge'
+import { Callout } from '../ui/Callout'
+import axios from 'axios'
 
 interface EconomicsPanelProps {
   projectId: string
   /** economics — расчёт покупки и разбивка; scenarios — сравнение 3 сценариев + what-if */
   mode?: 'economics' | 'scenarios'
+  /** Несохранённые параметры объекта → «Требуется пересчёт» */
+  paramsDirty?: boolean
+  /** Перейти к полю параметров объекта */
+  onGoField?: (field: string) => void
 }
 
 const SCENARIO_CODES = ['baseline', 'purchase', 'raas'] as const
@@ -51,6 +83,7 @@ interface WhatIfSliders {
   labor_reduction_share: number
   unit_price_factor: number
   peak_demand_factor: number
+  labor_cost_factor: number
 }
 
 const DEFAULT_WHAT_IF: WhatIfSliders = {
@@ -60,6 +93,7 @@ const DEFAULT_WHAT_IF: WhatIfSliders = {
   labor_reduction_share: 40,
   unit_price_factor: 0,
   peak_demand_factor: 0,
+  labor_cost_factor: 0,
 }
 
 function deltaPct(base: number | null | undefined, next: number | null | undefined): string {
@@ -84,6 +118,12 @@ function kpiValue(
 }
 
 function scenarioRow(r: EconomicsScenarioResult) {
+  const cc = (r.cost_comparison || {}) as {
+    raas_service_year?: number | null
+    remaining_manual_labor_annual?: number | null
+    total_outlay_with_remaining_labor?: number | null
+  }
+  const fc = r.fleet_capacity
   return {
     id: r.scenario,
     name: r.scenario_name_ru || SCENARIO_LABELS[r.scenario] || r.scenario,
@@ -91,14 +131,30 @@ function scenarioRow(r: EconomicsScenarioResult) {
     opex_yearly: r.opex?.opex_annual ?? 0,
     annual_effect: r.annual_effect?.annual_effect ?? 0,
     payback_years: r.payback?.payback_years ?? null,
+    payback_display: formatPayback(r.payback),
     roi: r.roi?.roi_percent ?? null,
+    roi_message: typeof r.roi?.message === 'string' ? r.roi.message : null,
     tco: r.tco?.tco ?? 0,
+    npv: r.npv?.npv ?? null,
+    npv_message: typeof r.npv?.message === 'string' ? r.npv.message : null,
+    raas_service_year: cc.raas_service_year ?? null,
+    remaining_labor: cc.remaining_manual_labor_annual ?? r.remaining_manual_labor_cost ?? null,
+    total_outlay: cc.total_outlay_with_remaining_labor ?? null,
     robots_count: r.robots_count ?? 0,
+    peak_coverage:
+      fc?.peak_coverage != null ? Number(fc.peak_coverage) : null,
+    meets_peak: fc?.meets_peak_demand ?? null,
+    input_warnings: r.input_warnings || [],
   }
 }
 
-export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanelProps) {
-  const isGuest = useAuthStore((s) => s.isGuest)
+export function EconomicsPanel({
+  projectId,
+  mode = 'scenarios',
+  paramsDirty = false,
+  onGoField,
+}: EconomicsPanelProps) {
+  const qc = useQueryClient()
   const isEconomics = mode === 'economics'
   const isScenarios = mode === 'scenarios'
   const [whatIf, setWhatIf] = useState<WhatIfSliders>({ ...DEFAULT_WHAT_IF })
@@ -107,14 +163,28 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
   const [lastResult, setLastResult] = useState<EconomicsScenarioResult | null>(null)
   const [basePurchase, setBasePurchase] = useState<EconomicsScenarioResult | null>(null)
   const [altPurchase, setAltPurchase] = useState<EconomicsScenarioResult | null>(null)
-  const [baseUnitPrice, setBaseUnitPrice] = useState(3_500_000)
-  const [basePeakDemand, setBasePeakDemand] = useState(200)
+  const [baseUnitPrice, setBaseUnitPrice] = useState(0)
+  const [basePeakDemand, setBasePeakDemand] = useState(0)
+  const [baseLaborCost, setBaseLaborCost] = useState(0)
   const [sensitivityByParam, setSensitivityByParam] = useState<
     Record<string, SensitivityPoint[]>
   >({})
   const [altDelta, setAltDelta] = useState<Record<string, number> | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainData, setExplainData] = useState<EconomicsExplainResponse | null>(null)
+  const [showAllScenarioCols, setShowAllScenarioCols] = useState(false)
+  const [inputIssues, setInputIssues] = useState<InputIssue[]>([])
+
+  const paramsForAttention = useQuery({
+    queryKey: ['project-params', projectId],
+    queryFn: () => projectsApi.getParams(projectId),
+    staleTime: 30_000,
+  })
+
+  const localReadiness = useMemo(
+    () => assessEconomicsLocal(paramsForAttention.data?.object_params || {}),
+    [paramsForAttention.data?.object_params],
+  )
 
   const whatIfDirty = useMemo(
     () => JSON.stringify(whatIf) !== JSON.stringify(DEFAULT_WHAT_IF),
@@ -139,6 +209,17 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
     queryFn: () => economicsApi.formulas(),
   })
 
+  const freshnessQuery = useQuery({
+    queryKey: ['economics-freshness', projectId],
+    queryFn: () => economicsApi.freshness(projectId),
+    staleTime: 15_000,
+  })
+
+  const freshness = resolveEconomicsFreshness(freshnessQuery.data?.status, {
+    paramsDirty,
+    hasStoredResult: lastResult?.capex?.capex != null || freshnessQuery.data?.status === 'fresh',
+  })
+
   const calcAllMut = useMutation({
     mutationFn: async () => {
       const results: EconomicsScenarioResult[] = []
@@ -152,6 +233,7 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
       return results
     },
     onSuccess: (results) => {
+      setInputIssues([])
       setScenarios(results.map(scenarioRow))
       const purchase = results.find((r) => r.scenario === 'purchase')
       if (purchase) {
@@ -160,25 +242,48 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
         setAltPurchase(null)
         setAltDelta(null)
         if (purchase.assumptions) setAssumptions(purchase.assumptions)
-        const up = Number(purchase.assumptions?.unit_price)
+        const inputs = (purchase.inputs || {}) as Record<string, unknown>
+        const up = Number(inputs.unit_price ?? purchase.assumptions?.unit_price)
         if (!Number.isNaN(up) && up > 0) setBaseUnitPrice(up)
-        const peak = Number(purchase.assumptions?.peak_demand)
+        const peak = Number(inputs.peak_demand ?? purchase.assumptions?.peak_demand)
         if (!Number.isNaN(peak) && peak > 0) setBasePeakDemand(peak)
+        const labor = Number(
+          inputs.current_labor_cost_year ?? purchase.assumptions?.current_labor_cost_year,
+        )
+        if (!Number.isNaN(labor) && labor > 0) setBaseLaborCost(labor)
       }
-      toastSuccess(isGuest ? 'Экономика рассчитана (просмотр, без сохранения)' : 'Экономика рассчитана')
+      void qc.invalidateQueries({ queryKey: ['economics-freshness', projectId] })
+      void qc.invalidateQueries({ queryKey: ['project', projectId] })
+      void qc.invalidateQueries({ queryKey: ['inputs-readiness', projectId] })
+      toastSuccess('Экономика рассчитана')
     },
-    onError: (e) => toastError(getFriendlyError(e)),
+    onError: (e) => {
+      const detail = axios.isAxiosError(e) ? e.response?.data?.detail : undefined
+      const issues = parseInputsIncompleteDetail(detail)
+      if (issues.length) {
+        setInputIssues(issues)
+        toastError(issues.map((i) => i.message).join('; '))
+        return
+      }
+      toastError(getFriendlyError(e))
+    },
   })
 
   useEffect(() => {
+    if (!paramsForAttention.isSuccess) return
+    if (!localReadiness.ready) {
+      setInputIssues(localReadiness.errors)
+      return
+    }
     calcAllMut.mutate()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId])
+  }, [projectId, paramsForAttention.isSuccess, localReadiness.ready])
 
   const whatIfMut = useMutation({
     mutationFn: () => {
       const unitPrice = baseUnitPrice * (1 + whatIf.unit_price_factor / 100)
       const peakDemand = basePeakDemand * (1 + whatIf.peak_demand_factor / 100)
+      const laborCost = baseLaborCost * (1 + whatIf.labor_cost_factor / 100)
       return economicsApi.whatIf(projectId, {
         base: { ...baseRequest, scenario: 'purchase' },
         changes: {
@@ -188,6 +293,7 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
           labor_reduction_share: whatIf.labor_reduction_share / 100,
           unit_price: unitPrice,
           peak_demand: peakDemand,
+          current_labor_cost_year: laborCost,
         },
       })
     },
@@ -226,12 +332,8 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
   const sensitivityMut = useMutation({
     mutationFn: async () => {
       const base = { ...baseRequest, scenario: 'purchase' as const }
-      const [util, price, peak] = await Promise.all([
-        economicsApi.sensitivity(projectId, {
-          base,
-          parameter: 'utilization',
-          values: [0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1.0],
-        }),
+      // ТЗ 3.5.6: минимум стоимость оборудования, объём операций, стоимость труда
+      const [price, peak, labor] = await Promise.all([
         economicsApi.sensitivity(projectId, {
           base,
           parameter: 'unit_price',
@@ -242,11 +344,16 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
           parameter: 'peak_demand',
           values: [0.7, 0.85, 1, 1.15, 1.3].map((f) => basePeakDemand * f),
         }),
+        economicsApi.sensitivity(projectId, {
+          base,
+          parameter: 'current_labor_cost_year',
+          values: [0.7, 0.85, 1, 1.15, 1.3].map((f) => baseLaborCost * f),
+        }),
       ])
       return {
-        utilization: util.rows || [],
         unit_price: price.rows || [],
         peak_demand: peak.rows || [],
+        current_labor_cost_year: labor.rows || [],
       }
     },
     onSuccess: (data) => setSensitivityByParam(data),
@@ -261,12 +368,55 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
     }, 450)
     return () => window.clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [whatIf, projectId, baseUnitPrice, basePeakDemand])
+  }, [whatIf, projectId, baseUnitPrice, basePeakDemand, baseLaborCost])
 
   const openExplain = async () => {
     setExplainOpen(true)
     const explained = await economicsApi.explain(projectId, { ...baseRequest, scenario: 'purchase' })
     setExplainData(explained)
+  }
+
+  const blockingIssues =
+    inputIssues.length > 0 ? inputIssues : !localReadiness.ready ? localReadiness.errors : []
+
+  if (!localReadiness.ready && scenarios.length === 0) {
+    return (
+      <div className="space-y-3" data-testid="economics-inputs-incomplete">
+        <Callout variant="warning">
+          <p className="font-medium">Недостаточно данных для расчёта экономики</p>
+          <p className="mt-1 text-sm">
+            Минимальные данные: {localReadiness.filled_required} из{' '}
+            {localReadiness.total_required}. Заполните обязательные поля — демо-подстановки не
+            используются.
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {localReadiness.checklist
+              .filter((c) => !c.filled)
+              .map((c) => (
+                <li key={c.field}>
+                  <button
+                    type="button"
+                    className="font-medium text-brand-800 hover:underline"
+                    onClick={() => onGoField?.(c.field)}
+                  >
+                    {c.label}
+                  </button>
+                  <span className="text-steel-600"> — {c.reason}</span>
+                </li>
+              ))}
+          </ul>
+        </Callout>
+        <Button
+          variant="outline"
+          onClick={() => {
+            const first = localReadiness.checklist.find((c) => !c.filled)
+            if (first) onGoField?.(first.field)
+          }}
+        >
+          К параметрам объекта
+        </Button>
+      </div>
+    )
   }
 
   if (calcAllMut.isPending && scenarios.length === 0) {
@@ -280,12 +430,42 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
 
   if (calcAllMut.isError && scenarios.length === 0) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-red-600">{getFriendlyError(calcAllMut.error)}</p>
-        <Button onClick={() => calcAllMut.mutate()}>
-          <Play className="h-4 w-4" />
-          Повторить расчёт
-        </Button>
+      <div className="space-y-3" data-testid="economics-inputs-incomplete">
+        <Callout variant="warning">
+          <p className="font-medium">Расчёт недоступен</p>
+          <p className="mt-1 text-sm">{getFriendlyError(calcAllMut.error)}</p>
+          {blockingIssues.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {blockingIssues.map((issue) => (
+                <li key={`${issue.field}-${issue.code}`}>
+                  <button
+                    type="button"
+                    className="font-medium text-brand-800 hover:underline"
+                    onClick={() => onGoField?.(issue.field)}
+                  >
+                    {issue.field}
+                  </button>
+                  <span className="text-steel-600"> — {issue.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Callout>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => calcAllMut.mutate()}>
+            <Play className="h-4 w-4" />
+            Повторить расчёт
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const first = blockingIssues[0]
+              if (first) onGoField?.(first.field)
+            }}
+          >
+            К параметрам
+          </Button>
+        </div>
       </div>
     )
   }
@@ -296,11 +476,13 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
     return (s.annual_effect || 0) > (acc.annual_effect || 0) ? s : acc
   }, null)
 
+  const chartCapexKey = metricLabel('capex')
+  const chartOpexKey = metricLabel('opex_year')
   const chartData = scenarios.map((s) => ({
     name: s.name,
     'Годовой эффект': s.annual_effect,
-    CAPEX: s.capex,
-    OPEX: s.opex_yearly,
+    [chartCapexKey]: s.capex,
+    [chartOpexKey]: s.opex_yearly,
   }))
 
   const formulaEntries = Object.entries(formulasQuery.data?.formulas || {}).map(
@@ -331,108 +513,385 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
     : []
 
   return (
-    <div className="space-y-5">
-      <p className="text-sm text-steel-600">
-        {isEconomics
-          ? 'Расчёт экономики для сценария «Покупка»: состав CAPEX/OPEX, допущения и формулы. Сравнение вариантов и «что если» — на вкладке «Анализ сценариев».'
-          : 'Сравнение трёх сценариев (без роботизации / покупка / RaaS), анализ «что если» и чувствительность. Детальная разбивка покупки — на вкладке «Экономика».'}
-      </p>
-
-      <div className="flex flex-wrap gap-2">
-        <Button loading={calcAllMut.isPending} onClick={() => calcAllMut.mutate()}>
-          <Play className="h-4 w-4" />
-          {isEconomics ? 'Рассчитать экономику' : 'Пересчитать сценарии'}
-        </Button>
-        <Button variant="outline" onClick={openExplain}>
-          <Info className="h-4 w-4" />
-          Как рассчитано
-        </Button>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="nc-title-sm">
+              {isEconomics ? 'Экономика внедрения' : 'Сравнение сценариев'}
+            </h2>
+            <Badge
+              variant={
+                freshness === 'fresh' ? 'success' : freshness === 'stale' ? 'warning' : 'default'
+              }
+              title={
+                freshnessQuery.data?.mismatches?.length
+                  ? `Расходятся: ${freshnessQuery.data.mismatches.join(', ')}`
+                  : undefined
+              }
+              data-testid="economics-freshness-badge"
+            >
+              {ECONOMICS_FRESHNESS_LABEL[freshness]}
+            </Badge>
+          </div>
+          <p className="nc-body mt-0.5 text-xs">
+            {isEconomics
+              ? 'CAPEX, эффект и окупаемость сценария «Покупка».'
+              : 'Сценарии «без роботов / покупка / RaaS» и чувствительность.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button
+            size="sm"
+            loading={calcAllMut.isPending}
+            disabled={!localReadiness.ready || paramsDirty}
+            title={
+              paramsDirty
+                ? 'Сначала сохраните параметры объекта'
+                : !localReadiness.ready
+                  ? 'Заполните обязательные поля'
+                  : undefined
+            }
+            onClick={() => {
+              if (paramsDirty) {
+                toastError('Сначала сохраните параметры объекта')
+                return
+              }
+              if (!localReadiness.ready) {
+                setInputIssues(localReadiness.errors)
+                toastError(
+                  localReadiness.errors[0]?.message || 'Недостаточно данных для расчёта',
+                )
+                return
+              }
+              calcAllMut.mutate()
+            }}
+          >
+            <Play className="h-4 w-4" />
+            {isEconomics ? 'Рассчитать' : 'Пересчитать'}
+          </Button>
+          <Button size="sm" variant="outline" onClick={openExplain} disabled={!localReadiness.ready}>
+            <Info className="h-4 w-4" />
+            Как рассчитано
+          </Button>
+        </div>
       </div>
+
+      {blockingIssues.length > 0 && (
+        <Callout variant="warning" data-testid="economics-missing-inputs">
+          <p className="text-sm font-medium">Перед расчётом укажите:</p>
+          <ul className="mt-1 space-y-0.5 text-sm">
+            {blockingIssues.map((issue) => (
+              <li key={`${issue.field}-${issue.code}`}>
+                <button
+                  type="button"
+                  className="text-brand-800 hover:underline"
+                  onClick={() => onGoField?.(issue.field)}
+                >
+                  {issue.message}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Callout>
+      )}
 
       {isEconomics && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi
-              title="Роботов"
-              value={lastResult?.robots_count != null ? formatNumber(lastResult.robots_count) : 'Нет данных'}
-              hint="Расчётное количество для пикового спроса"
-            />
-            <Kpi
-              title="CAPEX"
+              title={metricLabel('capex')}
               value={
                 lastResult?.capex?.capex != null
                   ? formatCurrency(lastResult.capex.capex)
                   : 'Нет данных'
               }
-              hint="Первоначальные капитальные затраты"
+              hint="Оборудование, инфраструктура, интеграция, обучение, резерв и зарядные станции (часть статей — допущения модели)"
             />
             <Kpi
-              title="OPEX / год"
-              value={
-                lastResult?.opex?.opex_annual != null
-                  ? formatCurrency(lastResult.opex.opex_annual)
-                  : 'Нет данных'
-              }
-              hint="Эксплуатационные затраты в год"
+              title={metricLabel('annual_effect')}
+              value={formatCurrency(
+                lastResult?.annual_effect?.net_annual_effect ??
+                  lastResult?.annual_effect?.annual_effect,
+              )}
+              hint="Чистый денежный эффект за год в границах модели"
             />
             <Kpi
-              title="Срок окупаемости"
-              value={
-                lastResult?.payback?.payback_years != null
-                  ? formatNumber(lastResult.payback.payback_years, 1)
-                  : 'Недостаточно данных для расчёта'
+              title={metricLabel('payback')}
+              value={lastResult ? formatPayback(lastResult.payback) : 'Нет данных'}
+              hint={
+                lastResult?.payback?.payback_years == null && lastResult?.payback?.message
+                  ? String(lastResult.payback.message)
+                  : 'По накопленным денежным потокам в пределах горизонта анализа'
               }
-              unit={lastResult?.payback?.payback_years != null ? 'лет' : undefined}
-              hint="Ориентировочный период возврата инвестиций"
+            />
+            <Kpi
+              title={metricLabel('npv')}
+              value={
+                lastResult?.npv?.npv != null
+                  ? formatCurrency(lastResult.npv.npv)
+                  : typeof lastResult?.npv?.message === 'string'
+                    ? 'Не применяется'
+                    : 'Нет данных'
+              }
+              hint={
+                typeof lastResult?.npv?.message === 'string'
+                  ? String(lastResult.npv.message)
+                  : 'Дисконтирование денежных потоков (ставка — допущение модели)'
+              }
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi
-              title="Годовой эффект"
-              value={formatCurrency(lastResult?.annual_effect?.annual_effect)}
-              hint="Ожидаемый чистый эффект за год"
-            />
-            <Kpi
-              title="ROI"
-              value={
-                lastResult?.roi?.roi_percent != null
-                  ? formatPercent(Number(lastResult.roi.roi_percent))
-                  : 'Нет данных'
-              }
-              hint="Возврат инвестиций относительно CAPEX"
-            />
-            <Kpi
-              title="TCO"
-              value={
-                lastResult?.tco?.tco != null ? formatCurrency(lastResult.tco.tco) : 'Нет данных'
-              }
-              hint="Совокупная стоимость владения"
-            />
-            <Kpi
-              title="Сценарий"
-              value="Покупка оборудования"
-              hint="Основной сценарий этой вкладки"
-            />
-          </div>
+          <AttentionPanel
+            items={buildAttentionItems({
+              params: paramsForAttention.data?.object_params || {},
+              economicsWarnings: lastResult?.input_warnings,
+            })}
+          />
+          {lastResult?.fleet_capacity && (
+            <details
+              className={`rounded border px-3 py-2 text-sm ${
+                lastResult.fleet_capacity.meets_peak_demand
+                  ? 'border-steel-200 bg-steel-50 text-steel-800'
+                  : 'border-amber-300 bg-amber-50 text-amber-950'
+              }`}
+              open={!lastResult.fleet_capacity.meets_peak_demand}
+            >
+              <summary className="cursor-pointer font-medium">
+                {metricLabel('fleet_capacity')}
+                {!lastResult.fleet_capacity.meets_peak_demand
+                  ? ' — парк не покрывает пик'
+                  : ' — подробности покрытия пика'}
+              </summary>
+              <div className="mt-2">
+                <p className="text-xs opacity-90">
+                  Единицы — операции/час (не паллеты). Пик может быть расчётной оценкой из суточного
+                  объёма. Это не физический цифровой двойник склада.
+                </p>
+                <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide opacity-70">Выбрано роботов</dt>
+                    <dd className="font-mono text-base font-semibold">
+                      {lastResult.fleet_capacity.selected_robots ?? lastResult.robots_count ?? '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide opacity-70">Расчётная потребность</dt>
+                    <dd className="font-mono text-base font-semibold">
+                      {lastResult.fleet_capacity.recommended_robots ?? '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide opacity-70">Покрытие пика</dt>
+                    <dd className="font-mono text-base font-semibold">
+                      {lastResult.fleet_capacity.peak_coverage != null
+                        ? `${(Number(lastResult.fleet_capacity.peak_coverage) * 100).toFixed(1)}%`
+                        : 'Нет данных'}
+                      {lastResult.fleet_capacity.peak_is_estimate ? ' · расчётная оценка' : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide opacity-70">Ёмкость парка</dt>
+                    <dd className="font-mono">
+                      {lastResult.fleet_capacity.fleet_capacity_ops_per_hour != null
+                        ? `${formatNumber(Number(lastResult.fleet_capacity.fleet_capacity_ops_per_hour))} оп/ч`
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide opacity-70">Пиковая нагрузка</dt>
+                    <dd className="font-mono">
+                      {lastResult.fleet_capacity.peak_demand_ops_per_hour != null
+                        ? `${formatNumber(Number(lastResult.fleet_capacity.peak_demand_ops_per_hour))} оп/ч`
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
+                {!lastResult.fleet_capacity.meets_peak_demand && (
+                  <p className="mt-2 font-medium">
+                    Выбранный парк не покрывает расчётную пиковую нагрузку. Экономика отражает
+                    выбранную конфигурацию.
+                  </p>
+                )}
+                <p className="mt-2 text-xs opacity-80">
+                  Источник числа роботов:{' '}
+                  {robotsCountSourceLabel(lastResult.fleet_capacity.robots_count_source)}.
+                </p>
+              </div>
+            </details>
+          )}
+          <details className="rounded border border-steel-200 bg-white px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-ink">
+              Дополнительные показатели (OPEX, ROI, TCO)
+            </summary>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Kpi
+                title={metricLabel('robots_count')}
+                value={
+                  lastResult?.robots_count != null
+                    ? formatNumber(lastResult.robots_count)
+                    : 'Нет данных'
+                }
+              />
+              <Kpi
+                title={metricLabel('opex_year')}
+                value={
+                  lastResult?.opex?.opex_annual != null
+                    ? formatCurrency(lastResult.opex.opex_annual)
+                    : 'Нет данных'
+                }
+              />
+              <Kpi
+                title={metricLabel('roi')}
+                value={
+                  lastResult?.roi?.roi_percent != null
+                    ? formatPercent(Number(lastResult.roi.roi_percent))
+                    : typeof lastResult?.roi?.message === 'string'
+                      ? 'Не применяется'
+                      : 'Нет данных'
+                }
+                hint={
+                  typeof lastResult?.roi?.message === 'string'
+                    ? String(lastResult.roi.message)
+                    : 'Относительно капитальных затрат сценария покупки'
+                }
+              />
+              <Kpi
+                title={metricLabel('tco')}
+                value={
+                  lastResult?.tco?.tco != null ? formatCurrency(lastResult.tco.tco) : 'Нет данных'
+                }
+                hint={
+                  typeof lastResult?.tco?.tco_note === 'string'
+                    ? String(lastResult.tco.tco_note)
+                    : 'CAPEX + OPEX × горизонт; без оставшегося ручного труда'
+                }
+              />
+            </div>
+          </details>
+          {lastResult?.cost_comparison && (
+            <div className="rounded border border-steel-200 bg-steel-50 px-3 py-2 text-sm text-steel-700">
+              <p className="font-medium text-steel-900">Структура затрат (прозрачность)</p>
+              <ul className="mt-1 grid gap-1 sm:grid-cols-2">
+                <li>
+                  Инвестиции (CAPEX):{' '}
+                  {formatCurrency(
+                    (lastResult.cost_comparison as { initial_investment?: number })
+                      .initial_investment,
+                  )}
+                </li>
+                <li>
+                  OPEX / год:{' '}
+                  {formatCurrency(
+                    (lastResult.cost_comparison as { annual_opex?: number }).annual_opex,
+                  )}
+                </li>
+                <li>
+                  Оставшийся ручной труд / год:{' '}
+                  {formatCurrency(
+                    (lastResult.cost_comparison as { remaining_manual_labor_annual?: number })
+                      .remaining_manual_labor_annual,
+                  )}
+                </li>
+                <li>
+                  Выход с учётом ручного труда (горизонт):{' '}
+                  {formatCurrency(
+                    (lastResult.cost_comparison as { total_outlay_with_remaining_labor?: number })
+                      .total_outlay_with_remaining_labor,
+                  )}
+                </li>
+              </ul>
+              {lastResult.annual_effect?.note && (
+                <p className="mt-2 text-xs text-amber-800">{String(lastResult.annual_effect.note)}</p>
+              )}
+            </div>
+          )}
+
+          {lastResult?.depreciation?.applicable &&
+            lastResult.depreciation.annual_depreciation != null && (
+              <div
+                className="rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-steel-800"
+                data-testid="depreciation-block"
+              >
+                <p className="font-medium text-steel-900">Амортизация CAPEX (бухгалтерская)</p>
+                <p className="mt-1 text-xs text-steel-600">
+                  Не денежный отток. Не вычитается из NPV / IRR / денежных потоков.
+                </p>
+                <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                  <li>
+                    Метод:{' '}
+                    {lastResult.depreciation.method_label_ru ||
+                      lastResult.depreciation.method ||
+                      'линейный'}
+                  </li>
+                  <li>
+                    Срок:{' '}
+                    {lastResult.depreciation.useful_life_years != null
+                      ? `${lastResult.depreciation.useful_life_years} лет`
+                      : '—'}{' '}
+                    <span className="text-amber-800">(допущение)</span>
+                  </li>
+                  <li>
+                    База: {formatCurrency(lastResult.depreciation.depreciable_base)}
+                    {lastResult.depreciation.asset_label
+                      ? ` · ${lastResult.depreciation.asset_label}`
+                      : ''}
+                  </li>
+                  <li>
+                    Амортизация / год:{' '}
+                    {formatCurrency(lastResult.depreciation.annual_depreciation)}
+                  </li>
+                  <li>
+                    Годовой эффект с амортизацией:{' '}
+                    {lastResult.annual_effect?.with_depreciation != null
+                      ? formatCurrency(lastResult.annual_effect.with_depreciation)
+                      : 'Нет данных'}
+                  </li>
+                  <li>
+                    Денежный годовой эффект:{' '}
+                    {formatCurrency(lastResult.annual_effect?.annual_effect)}
+                  </li>
+                </ul>
+                {lastResult.annual_effect?.accounting_note && (
+                  <p className="mt-2 text-xs text-steel-600">
+                    {String(lastResult.annual_effect.accounting_note)}
+                  </p>
+                )}
+              </div>
+            )}
 
           <div className="grid gap-5 lg:grid-cols-2">
             <Card title="Состав CAPEX">
               {Object.keys(lastResult?.capex?.breakdown || {}).length === 0 ? (
                 <p className="text-sm text-steel-500">Запустите расчёт.</p>
               ) : (
-                <dl className="space-y-2 text-sm">
-                  {Object.entries(lastResult!.capex!.breakdown!).map(([k, v]) => (
-                    <div
-                      key={k}
-                      className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
-                    >
-                      <dt className="text-steel-500">{breakdownLabel(k)}</dt>
-                      <dd className="font-medium text-steel-800">
-                        {typeof v === 'number' ? formatCurrency(v) : String(v)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <>
+                  <p className="mb-2 text-xs text-steel-500">
+                    Статьи с пометкой «допущение» — доли модели, не КП поставщика. Сумма статей
+                    должна равняться итоговому CAPEX.
+                  </p>
+                  <dl className="space-y-2 text-sm">
+                    {Object.entries(lastResult!.capex!.breakdown!).map(([k, v]) => {
+                      const src = lastResult?.capex?.component_sources?.[k]
+                      const assumed = src?.origin === 'model_assumption'
+                      return (
+                        <div
+                          key={k}
+                          className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                        >
+                          <dt className="text-steel-500">
+                            {breakdownLabel(k)}
+                            {assumed ? (
+                              <span className="ml-1 text-xs text-amber-700">(допущение)</span>
+                            ) : null}
+                          </dt>
+                          <dd className="font-medium text-steel-800">
+                            {formatBreakdownValue(k, v)}
+                          </dd>
+                        </div>
+                      )
+                    })}
+                  </dl>
+                </>
               )}
             </Card>
             <Card title="Состав OPEX / год">
@@ -446,9 +905,7 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
                       className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
                     >
                       <dt className="text-steel-500">{breakdownLabel(k)}</dt>
-                      <dd className="font-medium text-steel-800">
-                        {typeof v === 'number' ? formatCurrency(v) : String(v)}
-                      </dd>
+                      <dd className="font-medium text-steel-800">{formatBreakdownValue(k, v)}</dd>
                     </div>
                   ))}
                 </dl>
@@ -483,95 +940,206 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
 
       {isScenarios && (
         <>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
-          title="Лучший сценарий"
+          title="Лучший по эффекту"
           value={best?.name || 'Нет данных'}
-          hint="Сценарий с наибольшим годовым эффектом"
+          hint="Сценарий с наибольшим годовым экономическим эффектом"
         />
         <Kpi
-          title="CAPEX"
+          title={metricLabel('capex')}
           value={best?.capex != null ? formatCurrency(best.capex) : 'Нет данных'}
-          hint="Первоначальные капитальные затраты"
+          hint="Первоначальные капитальные затраты выбранного сценария"
         />
         <Kpi
-          title="OPEX"
-          value={best?.opex_yearly != null ? formatCurrency(best.opex_yearly) : 'Нет данных'}
-          hint="Эксплуатационные затраты в год"
-        />
-        <Kpi
-          title="Срок окупаемости"
-          value={
-            best?.payback_years != null
-              ? formatNumber(best.payback_years, 1)
-              : 'Недостаточно данных для расчёта'
-          }
-          unit={best?.payback_years != null ? 'лет' : undefined}
-          hint="Ориентировочный период возврата инвестиций"
-        />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          title="TCO"
-          value={best?.tco != null ? formatCurrency(best.tco) : 'Нет данных'}
-          hint="Совокупная стоимость владения"
-        />
-        <Kpi
-          title="ROI"
-          value={best?.roi != null ? formatPercent(Number(best.roi)) : 'Нет данных'}
-          hint="Возврат инвестиций относительно CAPEX"
-        />
-        <Kpi
-          title="Годовой эффект"
+          title={metricLabel('annual_effect')}
           value={formatCurrency(best?.annual_effect)}
           hint="Ожидаемый чистый эффект за год"
         />
         <Kpi
-          title="Изменение CAPEX (что если)"
-          value={altDelta ? formatCurrency(altDelta.capex) : 'Нет данных'}
-          hint="Разница после анализа «что если»"
+          title={metricLabel('payback')}
+          value={best?.payback_display || 'Недостаточно данных для расчёта'}
+          hint="По денежным потокам; менее 1 года — в месяцах"
         />
       </div>
+      <details className="rounded border border-steel-200 bg-white px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium">
+          Дополнительные показатели сценария
+        </summary>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi
+            title={metricLabel('opex_year')}
+            value={best?.opex_yearly != null ? formatCurrency(best.opex_yearly) : 'Нет данных'}
+          />
+          <Kpi
+            title={metricLabel('tco')}
+            value={best?.tco != null ? formatCurrency(best.tco) : 'Нет данных'}
+          />
+          <Kpi
+            title={metricLabel('roi')}
+            value={best?.roi != null ? formatPercent(Number(best.roi)) : 'Нет данных'}
+          />
+          <Kpi
+            title="Изменение CAPEX (анализ «что если»)"
+            value={altDelta ? formatCurrency(altDelta.capex) : 'Нет данных'}
+            hint="Разница после изменения допущений"
+          />
+        </div>
+      </details>
 
-      <Card title="Сравнение сценариев">
+      <Card
+        title="Сравнение сценариев"
+        actions={
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowAllScenarioCols((v) => !v)}
+          >
+            {showAllScenarioCols ? 'Только основные показатели' : 'Показать все показатели'}
+          </Button>
+        }
+      >
         <Table
-          columns={[
-            { key: 'name', header: 'Сценарий', render: (s) => s.name },
-            { key: 'robots', header: 'Роботов', render: (s) => s.robots_count },
-            { key: 'capex', header: 'CAPEX', render: (s) => formatCurrency(s.capex) },
-            { key: 'opex', header: 'OPEX / год', render: (s) => formatCurrency(s.opex_yearly) },
-            {
-              key: 'effect',
-              header: 'Годовой эффект',
-              render: (s) => formatCurrency(s.annual_effect),
-            },
-            {
-              key: 'roi',
-              header: 'ROI',
-              render: (s) => (s.roi != null ? formatPercent(Number(s.roi)) : '—'),
-            },
-            {
-              key: 'payback',
-              header: 'Окупаемость, лет',
-              render: (s) =>
-                s.payback_years != null ? formatNumber(s.payback_years, 1) : '—',
-            },
-            { key: 'tco', header: 'TCO', render: (s) => formatCurrency(s.tco) },
-          ]}
+          columns={scenarioCompareColumnKeys(showAllScenarioCols).map((key) => {
+            type Row = (typeof scenarios)[0]
+            const defs: Record<
+              string,
+              { header: string; render: (s: Row) => string | number }
+            > = {
+              name: { header: 'Сценарий', render: (s) => s.name },
+              capex: {
+                header: metricLabel('capex'),
+                render: (s) => formatCurrency(s.capex),
+              },
+              effect: {
+                header: 'Годовой денежный эффект',
+                render: (s) => formatCurrency(s.annual_effect),
+              },
+              payback: {
+                header: metricLabel('payback'),
+                render: (s) =>
+                  s.id === 'raas' ? 'Не применяется к RaaS' : s.payback_display || 'Нет данных',
+              },
+              npv: {
+                header: metricLabel('npv'),
+                render: (s) =>
+                  s.npv != null ? formatCurrency(s.npv) : 'Нет данных',
+              },
+              robots: {
+                header: metricLabel('robots_count'),
+                render: (s) =>
+                  s.robots_count != null ? String(s.robots_count) : 'Нет данных',
+              },
+              opex: {
+                header: metricLabel('opex_year'),
+                render: (s) => formatCurrency(s.opex_yearly),
+              },
+              raas: {
+                header: 'Платежи RaaS / год',
+                render: (s) =>
+                  s.id !== 'raas'
+                    ? '—'
+                    : s.raas_service_year != null
+                      ? formatCurrency(s.raas_service_year)
+                      : 'Нет данных',
+              },
+              roi: {
+                header: metricLabel('roi'),
+                render: (s) =>
+                  s.id === 'raas' || s.roi_message
+                    ? 'Не применяется'
+                    : s.roi != null
+                      ? formatPercent(Number(s.roi))
+                      : 'Нет данных',
+              },
+              tco: {
+                header: metricLabel('tco'),
+                render: (s) => formatCurrency(s.tco),
+              },
+              outlay: {
+                header: 'Полный денежный выход',
+                render: (s) =>
+                  s.total_outlay != null ? formatCurrency(s.total_outlay) : 'Нет данных',
+              },
+              coverage: {
+                header: 'Покрытие пика',
+                render: (s) =>
+                  s.id === 'baseline'
+                    ? '—'
+                    : s.peak_coverage != null
+                      ? `${(s.peak_coverage * 100).toFixed(0)}%${s.meets_peak === false ? ' ⚠' : ''}`
+                      : 'Нет данных',
+              },
+            }
+            const d = defs[key]
+            return { key, header: d.header, render: d.render }
+          })}
           rows={scenarios}
           rowKey={(s) => s.id}
         />
-        <div className="mt-6 h-72">
+        <p className="mt-2 text-xs text-steel-500">
+          По умолчанию — пять показателей для решения. ROI для RaaS не применяется. NPV и окупаемость
+          — из backend; при отсутствии данных показывается «Нет данных», не ноль.
+        </p>
+        {Object.keys(assumptions).length > 0 && (
+          <details className="mt-4 rounded border border-steel-200 bg-steel-50 px-3 py-2 text-sm text-steel-800">
+            <summary className="cursor-pointer font-medium text-ink">
+              Ключевые допущения модели (общие для сценариев)
+            </summary>
+            <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ['labor_reduction_share', 'Доля снижения труда'],
+                ['discount_rate', 'Ставка дисконта'],
+                ['years', 'Горизонт, лет'],
+                ['utilization', 'Загрузка'],
+                ['availability', 'Доступность'],
+              ].map(([key, label]) =>
+                assumptions[key] != null ? (
+                  <li key={key}>
+                    {label}: <span className="font-mono">{String(assumptions[key])}</span>
+                    {key === 'labor_reduction_share' ? ' (допущение, не норматив)' : ''}
+                  </li>
+                ) : null,
+              )}
+            </ul>
+          </details>
+        )}
+        <div className="mt-3">
+          <AttentionPanel
+            items={buildAttentionItems({
+              params: paramsForAttention.data?.object_params || {},
+              economicsWarnings: Array.from(
+                new Set(scenarios.flatMap((s) => s.input_warnings || [])),
+              ),
+            })}
+          />
+        </div>
+        <div className="mt-6 h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
+            <BarChart data={chartData} margin={{ top: 8, right: 12, left: 8, bottom: 48 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#d5dae2" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11 }}
+                interval={0}
+                angle={-18}
+                textAnchor="end"
+                height={56}
+              />
+              <YAxis
+                tick={{ fontSize: 11 }}
+                width={72}
+                tickFormatter={(v) =>
+                  Math.abs(Number(v)) >= 1_000_000
+                    ? `${(Number(v) / 1_000_000).toFixed(0)} млн`
+                    : String(v)
+                }
+              />
               <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Годовой эффект" fill="#2f5d8c" />
-              <Bar dataKey="CAPEX" fill="#667690" />
-              <Bar dataKey="OPEX" fill="#8fb6d6" />
+              <Bar dataKey={chartCapexKey} fill="#667690" />
+              <Bar dataKey={chartOpexKey} fill="#8fb6d6" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -687,6 +1255,15 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
               unit="%"
               onChange={(v) => setWhatIf((p) => ({ ...p, peak_demand_factor: v }))}
             />
+            <Slider
+              label="Изменение стоимости труда (ФОТ/год)"
+              source={whatIf.labor_cost_factor !== 0 ? 'user' : 'assumption'}
+              value={whatIf.labor_cost_factor}
+              min={-30}
+              max={30}
+              unit="%"
+              onChange={(v) => setWhatIf((p) => ({ ...p, labor_cost_factor: v }))}
+            />
             {(whatIfMut.isPending || sensitivityMut.isPending) && (
               <p className="text-xs text-steel-500">Пересчёт…</p>
             )}
@@ -751,28 +1328,31 @@ export function EconomicsPanel({ projectId, mode = 'scenarios' }: EconomicsPanel
         </Card>
       </div>
 
-      {(sensitivityByParam.utilization?.length ||
-        sensitivityByParam.unit_price?.length ||
-        sensitivityByParam.peak_demand?.length) && (
-        <Card title="Анализ чувствительности">
+      {(sensitivityByParam.unit_price?.length ||
+        sensitivityByParam.peak_demand?.length ||
+        sensitivityByParam.current_labor_cost_year?.length) && (
+        <Card
+          title="Анализ чувствительности"
+          subtitle="ТЗ 3.5.6: оборудование, объём операций, стоимость труда — полный пересчёт"
+        >
           <div className="grid gap-6 lg:grid-cols-3">
             <SensitivityChart
-              title="Загрузка"
-              data={sensitivityByParam.utilization || []}
-              formatX={(v) => `${Math.round(Number(v) * 100)}%`}
-              labelX={(l) => `Загрузка ${Math.round(Number(l) * 100)}%`}
-            />
-            <SensitivityChart
-              title="Цена единицы"
+              title="Стоимость оборудования"
               data={sensitivityByParam.unit_price || []}
               formatX={(v) => formatCurrency(Number(v))}
               labelX={(l) => `Цена ${formatCurrency(Number(l))}`}
             />
             <SensitivityChart
-              title="Пиковый спрос"
+              title="Объём операций (пик)"
               data={sensitivityByParam.peak_demand || []}
               formatX={(v) => formatNumber(Number(v), 0)}
               labelX={(l) => `Спрос ${formatNumber(Number(l), 0)}`}
+            />
+            <SensitivityChart
+              title="Стоимость труда"
+              data={sensitivityByParam.current_labor_cost_year || []}
+              formatX={(v) => formatCurrency(Number(v))}
+              labelX={(l) => `ФОТ ${formatCurrency(Number(l))}`}
             />
           </div>
         </Card>
@@ -910,13 +1490,13 @@ function Kpi({
   unit?: string
 }) {
   return (
-    <div className="rounded border border-steel-200 bg-white p-4 shadow-panel">
-      <p className="text-xs text-steel-500">{title}</p>
-      <p className="mt-1 font-display text-xl font-semibold text-steel-900">
+    <div className="nc-panel px-3 py-2.5">
+      <p className="text-[11px] text-steel-500">{title}</p>
+      <p className="mt-0.5 font-display text-lg font-semibold tabular-nums text-ink">
         {value}
         {unit ? <span className="ml-1 text-sm font-normal text-steel-500">{unit}</span> : null}
       </p>
-      {hint ? <p className="mt-1 text-xs text-steel-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-steel-500">{hint}</p> : null}
     </div>
   )
 }

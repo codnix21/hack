@@ -2,17 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --nc-bg: #f4f5f7;
+  --nc-surface: #ffffff;
+  --nc-surface-muted: #f8f9fb;
+  --nc-border: #d1d5de;
+  --nc-border-subtle: #e8eaee;
+  --nc-ink: #14171c;
+  --nc-text: #333843;
+  --nc-muted: #667084;
+  --nc-faint: #848da1;
+  --nc-accent: #d45a0a;
+  --nc-accent-soft: #fff7ed;
+  --nc-radius: 0.375rem;
+  --nc-radius-sm: 0.25rem;
+  --nc-control-h: 2.25rem;
+  --nc-control-h-sm: 2rem;
+  --nc-space-1: 0.25rem;
+  --nc-space-2: 0.5rem;
+  --nc-space-3: 0.75rem;
+  --nc-space-4: 1rem;
+  --nc-space-5: 1.25rem;
+  --nc-space-6: 1.5rem;
+  --nc-focus: 0 0 0 2px #fff, 0 0 0 4px rgba(212, 90, 10, 0.45);
+  --nc-sidebar-w: 14rem;
+  --nc-sidebar-w-collapsed: 3.5rem;
+  --nc-topbar-h: 3rem;
+}
+
 @layer base {
   html {
     @apply h-full scroll-smooth;
   }
 
   body {
-    @apply min-h-full bg-steel-50 text-steel-900 font-sans antialiased;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 100% -20%, rgba(240, 115, 22, 0.06), transparent),
-      linear-gradient(180deg, #f7f8fa 0%, #f1f2f5 100%);
-    background-attachment: fixed;
+    @apply min-h-full font-sans antialiased;
+    background-color: var(--nc-bg);
+    color: var(--nc-text);
   }
 
   #root {
@@ -20,25 +46,35 @@
   }
 
   * {
-    @apply border-steel-200;
+    border-color: var(--nc-border-subtle);
   }
 
   ::selection {
     background: rgba(212, 90, 10, 0.18);
   }
+
+  :focus-visible {
+    outline: none;
+  }
 }
 
 @layer components {
   .page-surface {
-    @apply rounded border border-steel-200 bg-white shadow-panel;
+    border-radius: var(--nc-radius);
+    border: 1px solid var(--nc-border-subtle);
+    background: var(--nc-surface);
   }
 
   .brand-mark {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded bg-ink font-display text-sm font-bold tracking-wide text-brand-400;
+    @apply inline-flex h-8 w-8 items-center justify-center font-display text-xs font-bold tracking-wide text-brand-400;
+    border-radius: var(--nc-radius-sm);
+    background: var(--nc-ink);
   }
 
   .app-rail {
-    @apply border-r border-steel-200 bg-ink text-steel-200;
+    @apply border-r text-steel-200;
+    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--nc-ink);
   }
 
   .nav-item-active {
@@ -48,22 +84,107 @@
   .nav-item {
     @apply border-l-2 border-transparent text-steel-400 hover:bg-ink-soft hover:text-steel-100;
   }
+
+  .nc-title {
+    @apply font-display text-xl font-semibold leading-snug text-ink sm:text-2xl;
+  }
+
+  .nc-title-sm {
+    @apply font-display text-base font-semibold leading-snug text-ink;
+  }
+
+  .nc-section-label {
+    @apply font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-steel-400;
+  }
+
+  .nc-body {
+    @apply text-sm leading-snug text-steel-600;
+  }
+
+  .nc-control {
+    height: var(--nc-control-h);
+    border-radius: var(--nc-radius);
+  }
+
+  .nc-control:focus-visible,
+  .nc-focusable:focus-visible {
+    box-shadow: var(--nc-focus);
+  }
+
+  .nc-panel {
+    border-radius: var(--nc-radius);
+    border: 1px solid var(--nc-border-subtle);
+    background: var(--nc-surface);
+  }
+
+  .nc-panel-muted {
+    border-radius: var(--nc-radius);
+    border: 1px solid var(--nc-border-subtle);
+    background: var(--nc-surface-muted);
+  }
+
+  .nc-table th {
+    @apply px-2.5 py-2 text-left text-xs font-semibold uppercase tracking-wide text-steel-500;
+  }
+
+  .nc-table td {
+    @apply px-2.5 py-2 text-sm text-steel-800;
+  }
+
+  .nc-table tbody tr {
+    @apply border-b border-steel-100 last:border-0;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
 
-  .delay-1 {
-    animation-delay: 80ms;
+/* Лендинг: появление текста и движение маршрута AMR на плане */
+.landing-rise {
+  animation: rise-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.landing-rise-delay-1 {
+  animation-delay: 0.12s;
+}
+.landing-rise-delay-2 {
+  animation-delay: 0.22s;
+}
+.landing-rise-delay-3 {
+  animation-delay: 0.34s;
+}
+
+.landing-route {
+  stroke-dasharray: 14 10;
+  animation: landing-route-dash 18s linear infinite;
+}
+
+.landing-robot {
+  animation: landing-robot-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes landing-route-dash {
+  to {
+    stroke-dashoffset: -480;
   }
+}
 
-  .delay-2 {
-    animation-delay: 160ms;
+@keyframes landing-robot-pulse {
+  0%,
+  100% {
+    opacity: 1;
   }
+  50% {
+    opacity: 0.55;
+  }
+}
 
-  .delay-3 {
-    animation-delay: 240ms;
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise,
+  .landing-route,
+  .landing-robot {
+    animation: none !important;
   }
 }

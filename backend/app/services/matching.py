@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Optional
 
 
@@ -405,14 +406,34 @@ def match_robot_to_project(
         status = "excluded"
         score = min(score, 40)
 
+    # Неполный каталог: не показывать «идеальный» балл без фактических ТТХ
+    if missing_checks and status != "excluded":
+        evidence_cap = max(40.0, 100.0 - 10.0 * len(missing_checks))
+        if score > evidence_cap:
+            score = evidence_cap
+            reasons.append(
+                f"ℹ Балл ограничен ({evidence_cap:.0f}): в каталоге не хватает "
+                f"{len(missing_checks)} характеристик для полной проверки"
+            )
+
     score = max(0.0, min(100.0, score))
     if status == "suitable" and not reasons:
         reasons.append("✓ Базовые критерии выполнены")
+
+    if score >= 80:
+        score_label = "Высокое соответствие (при наличии данных)"
+    elif score >= 60:
+        score_label = "Умеренное соответствие — нужна проверка"
+    elif score >= 40:
+        score_label = "Слабое соответствие"
+    else:
+        score_label = "Низкое соответствие / исключение"
 
     return {
         "robot_id": robot.id,
         "status": status,
         "match_score": round(score, 2),
+        "score_label": score_label,
         "match_reasons": reasons,
         "exclusion_reasons": exclusions,
         "warnings": warnings,
@@ -420,16 +441,110 @@ def match_robot_to_project(
     }
 
 
+def _fleet_and_story(robot: Any, object_params: dict, match: dict[str, Any]) -> dict[str, Any]:
+    """Количество и текст рекомендации без выдуманных ТТХ."""
+    from app.services.economics import (
+        DEFAULT_ASSUMPTIONS,
+        calc_capex,
+        calc_payback,
+        calc_robots_count,
+    )
+
+    params = object_params or {}
+    peak = _get_param(params, "peak_demand", "peak_ops_per_hour")
+    prod = getattr(robot, "productivity_ops_per_hour", None)
+    price = getattr(robot, "price_rub", None)
+    extra: dict[str, Any] = {
+        "recommended_count": None,
+        "utilization_estimate": None,
+        "estimated_capex": None,
+        "estimated_payback_years": None,
+        "recommendation_text": None,
+        "data_gaps": list(match.get("missing_checks") or []),
+    }
+    if match["status"] == "excluded":
+        extra["recommendation_text"] = (
+            "Решение исключено: обязательные ограничения объекта не выполнены. "
+            + "; ".join(match.get("exclusion_reasons") or [])
+        )
+        return extra
+
+    if peak is None or prod is None:
+        extra["recommendation_text"] = (
+            f"Модель «{getattr(robot, 'name', robot.id)}» проходит базовые ограничения, "
+            "но количество единиц не рассчитано: нет пикового спроса объекта или "
+            "производительности в исходных материалах."
+        )
+        return extra
+
+    try:
+        count = calc_robots_count(
+            float(peak),
+            float(prod),
+            float(params.get("utilization") or DEFAULT_ASSUMPTIONS["utilization"]),
+            float(params.get("availability") or DEFAULT_ASSUMPTIONS["availability"]),
+            float(params.get("reserve") or DEFAULT_ASSUMPTIONS["reserve"]),
+        )
+    except ValueError:
+        extra["recommendation_text"] = "Недостаточно корректных чисел для расчёта парка."
+        return extra
+
+    n = count["robots_count"]
+    extra["recommended_count"] = n
+    extra["utilization_estimate"] = count["coefficients"]["utilization"]
+    extra["robots_count_detail"] = count
+    if price:
+        cap = calc_capex(equipment=float(price) * n, robots_count=n)
+        extra["estimated_capex"] = cap["capex"]
+        extra["estimated_capex_is_assumption"] = True
+        labor = float(params.get("current_labor_cost_year") or 0)
+        reduction = float(params.get("labor_reduction_share") or DEFAULT_ASSUMPTIONS["labor_reduction_share"])
+        if labor > 0:
+            pb = calc_payback(cap["capex"], labor * reduction)
+            extra["estimated_payback_years"] = pb.get("payback_years")
+    gaps = []
+    if price is None:
+        gaps.append("цена не указана в каталоге")
+    name = getattr(robot, "name", f"id {robot.id}")
+    aisle_note = ""
+    if "width_mm" in (match.get("missing_checks") or []):
+        aisle_note = " Требуется проверить ширину проходов: габарит робота в исходных материалах не задан."
+    charge = _get_param(params, "charging_stations")
+    charge_note = ""
+    if charge is not None:
+        try:
+            if int(charge) < max(1, math.ceil(n / 3)):
+                charge_note = (
+                    f" При парке {n} ед. стоит проверить число зарядных станций "
+                    f"(сейчас {int(charge)})."
+                )
+        except (TypeError, ValueError):
+            pass
+    extra["recommendation_text"] = (
+        f"Рекомендуется {n} роботов модели «{name}». "
+        f"Расчётная производительность парка покрывает пик {peak} оп/ч "
+        f"при производительности единицы {prod} оп/ч, загрузке "
+        f"{count['coefficients']['utilization']} и доступности "
+        f"{count['coefficients']['availability']} (допущения модели)."
+        f"{aisle_note}{charge_note}"
+        + (f" Неизвестны: {', '.join(gaps)}." if gaps else "")
+    )
+    extra["limitations"] = list(match.get("warnings") or [])
+    return extra
+
+
 def run_matching(
     robots: list[Any],
     object_params: dict,
     object_type_code: Optional[str] = None,
 ) -> list[dict[str, Any]]:
-    results = [
-        match_robot_to_project(r, object_params, object_type_code)
-        for r in robots
-        if not getattr(r, "archived", False)
-    ]
+    results = []
+    for r in robots:
+        if getattr(r, "archived", False):
+            continue
+        item = match_robot_to_project(r, object_params, object_type_code)
+        item.update(_fleet_and_story(r, object_params, item))
+        results.append(item)
     order = {"suitable": 0, "needs_review": 1, "excluded": 2}
     results.sort(key=lambda x: (order.get(x["status"], 9), -x["match_score"]))
     return results

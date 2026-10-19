@@ -54,6 +54,17 @@ def get_current_user_optional(
     user = get_user_by_email(db, email)
     if user and not user.is_active:
         return None
+    if user and user.expires_at:
+        exp = user.expires_at
+        if exp.tzinfo is not None:
+            from datetime import timezone as tz
+
+            now = datetime.now(tz.utc)
+            if exp < now:
+                return None
+        else:
+            if exp < datetime.now(timezone.utc).replace(tzinfo=None):
+                return None
     return user
 
 

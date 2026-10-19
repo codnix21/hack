@@ -391,6 +391,9 @@ def import_source_catalog(
         return report
 
     normalized_rows: list[dict[str, Any]] = []
+    # В одном проходе CSV несколько строк могут иметь один id (отрасль/сценарий) —
+    # до flush ORM их не видит в БД, поэтому держим карту в памяти.
+    seen_by_external_id: dict[str, Robot] = {}
 
     for idx, row in enumerate(rows):
         # CSV data rows start at line 2
@@ -431,6 +434,25 @@ def import_source_catalog(
             st = _resolve_solution_type(db, tip_display, podtip)
             conf, src_status = confirmation_for_row(name, company, price, tip_display, podtip)
 
+            variant = {
+                "source_row": source_row,
+                "scenario": scenario,
+                "industry": industry,
+                "region": region,
+                "subtype": podtip or tip_display or None,
+                "catalog_type": tip_raw or None,
+                "price_raw": (str(price_raw).strip() if price_raw is not None else None),
+            }
+            raw_row = {k: (None if v == "" else v) for k, v in row.items()}
+            raw_row["_field_origins"] = {
+                "price_rub": "source_csv" if price is not None else "unknown",
+                "payload_kg": "derived_from_name" if payload is not None else "unknown",
+                "country": "import_assumption",
+                "currency": "import_assumption_RUB",
+                "source_date": "unknown",  # дата проверки в CSV отсутствует — не подставляем now
+            }
+            raw_row["catalog_variants"] = [variant]
+
             data: dict[str, Any] = {
                 "name": name,
                 "manufacturer_id": manufacturer.id if manufacturer else None,
@@ -449,7 +471,8 @@ def import_source_catalog(
                 "source_sheet": None,
                 "source_row": source_row,
                 "source_column": None,
-                "source_date": utcnow(),
+                # Дата актуализации в CSV отсутствует — не имитировать «дату проверки»
+                "source_date": None,
                 "source_status": src_status,
                 "catalog_type_raw": tip_raw or None,
                 "subtype_raw": podtip or tip_display or None,
@@ -461,26 +484,56 @@ def import_source_catalog(
                 "region_raw": region,
                 "data_origin": "source",
                 "cases": [{"title": "Кейс из каталога", "result": cases_text}] if cases_text else None,
-                "raw_data": {k: (None if v == "" else v) for k, v in row.items()},
-                "country": "Россия",
+                "raw_data": raw_row,
+                "country": "Россия",  # допущение импорта; см. raw_data._field_origins
             }
             if region:
                 data["operating_conditions"] = {"region": region, "industry": industry}
 
-            existing = _find_existing(
-                db,
-                external_id,
-                name,
-                manufacturer.id if manufacturer else None,
-            )
+            existing = None
+            if external_id and external_id in seen_by_external_id:
+                existing = seen_by_external_id[external_id]
+            if existing is None:
+                existing = _find_existing(
+                    db,
+                    external_id,
+                    name,
+                    manufacturer.id if manufacturer else None,
+                )
             if existing:
-                # Do not demote demo→source overwrite of unrelated demo; if match by name
-                # on a demo robot without external_id, convert to source provenance.
+                # Сохраняем варианты отрасль/сценарий при повторных строках с тем же id
+                prev_raw = dict(existing.raw_data or {})
+                variants = list(prev_raw.get("catalog_variants") or [])
+                if not any(
+                    v.get("source_row") == source_row
+                    and v.get("scenario") == scenario
+                    and v.get("industry") == industry
+                    for v in variants
+                ):
+                    variants.append(variant)
+                industries = sorted({x.get("industry") for x in variants if x.get("industry")})
+                scenarios = sorted({x.get("scenario") for x in variants if x.get("scenario")})
+                merged_raw = {**prev_raw, **raw_row}
+                merged_raw["catalog_variants"] = variants
+                merged_raw["industries_all"] = industries
+                merged_raw["scenarios_all"] = scenarios
+                data["raw_data"] = merged_raw
+                # Не затираем более полный scenario/industry пустым; иначе — последнее + список в raw
+                if not industry and existing.industry_raw:
+                    data["industry_raw"] = existing.industry_raw
+                if not scenario and existing.scenario_raw:
+                    data["scenario_raw"] = existing.scenario_raw
                 for k, v in data.items():
                     setattr(existing, k, v)
+                if external_id:
+                    seen_by_external_id[external_id] = existing
                 report.updated += 1
             else:
-                db.add(Robot(**data))
+                robot = Robot(**data)
+                db.add(robot)
+                db.flush()
+                if external_id:
+                    seen_by_external_id[external_id] = robot
                 report.added += 1
 
             normalized_rows.append(

@@ -209,6 +209,28 @@ def test_suitable_match():
     assert r["status"] == "suitable"
     assert r["match_score"] > 50
     assert r["match_reasons"]
+    assert r.get("score_label")
+
+
+def test_incomplete_catalog_caps_perfect_score():
+    """При многих отсутствующих ТТХ балл не может оставаться 100."""
+    r = match_robot_to_project(
+        _robot(payload_kg=None, price_rub=None, productivity_ops_per_hour=None, speed_mps=None),
+        {
+            "required_payload_kg": 200,
+            "required_speed_mps": 1.2,
+            "required_navigation": "lidar",
+            "required_processes": ["transport"],
+            "peak_demand": 100,
+            "charging_stations": 2,
+            "work_mode": "2с",
+        },
+        "warehouse",
+    )
+    assert r["status"] == "needs_review"
+    assert r["missing_checks"]
+    assert r["match_score"] < 100
+    assert r["match_score"] <= 100 - 10 * min(len(r["missing_checks"]), 6)
 
 
 def test_run_matching_sorts():

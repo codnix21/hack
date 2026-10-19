@@ -19,19 +19,15 @@ export function Card({
   return (
     <div className={`page-surface ${className}`} {...props}>
       {(title || actions) && (
-        <div className="flex items-start justify-between gap-3 border-b border-steel-200 bg-steel-50/60 px-5 py-3.5">
-          <div>
-            {title && (
-              <h3 className="font-display text-lg font-semibold uppercase tracking-wide text-ink">
-                {title}
-              </h3>
-            )}
-            {subtitle && <p className="mt-0.5 text-sm text-steel-500">{subtitle}</p>}
+        <div className="flex items-start justify-between gap-2 border-b border-steel-100 px-3 py-2 sm:px-4">
+          <div className="min-w-0">
+            {title ? <h3 className="nc-title-sm text-base">{title}</h3> : null}
+            {subtitle ? <p className="nc-body mt-0.5 text-xs">{subtitle}</p> : null}
           </div>
           {actions}
         </div>
       )}
-      <div className={padding ? 'p-5' : ''}>{children}</div>
+      <div className={padding ? 'p-3 sm:p-4' : ''}>{children}</div>
     </div>
   )
 }

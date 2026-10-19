@@ -1,113 +1,150 @@
-import { Link } from 'react-router-dom'
-import { ArrowRight, Library, PlayCircle, Plus } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, PlayCircle, Plus } from 'lucide-react'
+import { useAuthStore } from '../store/authStore'
+import { projectsApi } from '../api/projects'
+import { catalogApi } from '../api/catalog'
+import { formatDate, PROJECT_STATUS_LABELS } from '../utils/format'
+import { SkeletonCards } from '../components/ui/Skeleton'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Badge } from '../components/ui/Badge'
+import { useMemo } from 'react'
 
-const steps = [
-  { n: '01', title: 'Параметры', text: 'Объект, Excel или CSV' },
-  { n: '02', title: 'Подбор', text: 'Модели и статусы пригодности' },
-  { n: '03', title: 'Экономика', text: 'CAPEX, OPEX, ROI, TCO' },
-  { n: '04', title: 'Схема', text: '2D-маршрут на объекте' },
-]
+function continueStep(p: { summary?: { robots_count?: number | null; capex?: number | null } | null }) {
+  if (p.summary?.capex != null) return 'report'
+  if (p.summary?.robots_count != null) return 'economics'
+  return 'object'
+}
 
+/** Рабочий обзор внутри /app (не публичная визитка — см. LandingPage). */
 export function HomePage() {
+  const navigate = useNavigate()
+  const token = useAuthStore((s) => s.token)
+
+  const projectsQuery = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+    enabled: !!token,
+  })
+
+  const typesQuery = useQuery({
+    queryKey: ['object-types'],
+    queryFn: () => catalogApi.objectTypes(),
+    enabled: !!token,
+  })
+
+  const typeMap = useMemo(() => {
+    const m = new Map<number, string>()
+    ;(typesQuery.data || []).forEach((o) => m.set(o.id, o.name_ru))
+    return m
+  }, [typesQuery.data])
+
+  const recent = useMemo(() => {
+    const list = [...(projectsQuery.data || [])]
+    list.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+    return list.slice(0, 6)
+  }, [projectsQuery.data])
+
+  const summaryLine = useMemo(() => {
+    const all = projectsQuery.data || []
+    if (!all.length) return null
+    const withCapex = all.filter((p) => p.summary?.capex != null).length
+    return `${all.length} проект(ов) · с расчётом: ${withCapex}`
+  }, [projectsQuery.data])
+
   return (
-    <div className="mx-auto max-w-6xl">
-      <section className="relative overflow-hidden rounded border border-steel-200 bg-ink text-white shadow-lift">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
-          aria-hidden
-          style={{
-            backgroundImage:
-              'linear-gradient(90deg, transparent 0, transparent 48px, rgba(240,115,22,0.12) 48px, rgba(240,115,22,0.12) 49px), linear-gradient(0deg, transparent 0, transparent 48px, rgba(255,255,255,0.04) 48px, rgba(255,255,255,0.04) 49px)',
-            backgroundSize: '96px 96px',
-            backgroundPosition: '12px 8px',
-          }}
-        />
-        <div
-          className="pointer-events-none absolute -right-8 bottom-0 top-0 w-[46%] max-w-md opacity-90"
-          aria-hidden
-        >
-          <svg viewBox="0 0 320 280" className="h-full w-full" fill="none">
-            <rect x="24" y="36" width="272" height="208" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
-            <rect x="48" y="60" width="52" height="160" fill="rgba(240,115,22,0.15)" stroke="rgba(240,115,22,0.45)" />
-            <rect x="120" y="60" width="52" height="160" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.18)" />
-            <rect x="192" y="60" width="52" height="160" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.18)" />
-            <path
-              d="M74 220 L74 100 L146 100 L146 180 L218 180 L218 80"
-              stroke="#f07316"
-              strokeWidth="2"
-              strokeDasharray="6 5"
-              className="animate-fade-in"
-            />
-            <circle cx="74" cy="220" r="5" fill="#f07316" />
-            <circle cx="218" cy="80" r="5" fill="#f07316" />
-            <text x="48" y="250" fill="rgba(255,255,255,0.35)" fontSize="11" fontFamily="IBM Plex Mono, monospace">
-              СКЛАД · ЗОНЫ С1–С3
-            </text>
-          </svg>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <section className="flex flex-wrap items-start justify-between gap-3 border-b border-steel-200 pb-4">
+        <div className="min-w-0 max-w-xl">
+          <p className="nc-section-label text-brand-700">NETCORE</p>
+          <h1 className="nc-title mt-1">Предынвестиционная оценка роботизации склада</h1>
+          <p className="nc-body mt-1.5">
+            От исходных данных к отчёту: планировка, подбор, экономика и демонстрационная модель.
+          </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/app/projects/new"
+            className="nc-focusable inline-flex h-9 items-center gap-1.5 rounded bg-brand-600 px-3.5 text-sm font-semibold text-white transition hover:bg-brand-500"
+          >
+            <Plus className="h-4 w-4" />
+            Создать проект
+          </Link>
+          <Link
+            to="/app/demo"
+            className="nc-focusable inline-flex h-9 items-center gap-1.5 rounded border border-steel-300 bg-white px-3.5 text-sm font-medium text-steel-800 transition hover:bg-steel-50"
+          >
+            <PlayCircle className="h-4 w-4" />
+            Открыть пример
+          </Link>
+        </div>
+      </section>
 
-        <div className="relative px-7 py-12 md:px-10 md:py-16">
-          <p className="animate-rise-in font-display text-5xl font-bold uppercase leading-none tracking-wide text-brand-400 md:text-6xl">
-            РобоПодбор
-          </p>
-          <div className="mt-4 h-0.5 w-16 origin-left animate-draw-line bg-brand-500 delay-1" />
-          <h1 className="animate-rise-in delay-1 mt-5 max-w-xl font-display text-2xl font-semibold uppercase leading-tight tracking-wide text-white md:text-3xl">
-            Подбор роботизированных решений
-          </h1>
-          <p className="animate-rise-in delay-2 mt-3 max-w-lg text-base text-steel-300">
-            Сравните модели, посчитайте экономический эффект и посмотрите работу на схеме объекта.
-          </p>
-          <div className="animate-rise-in delay-3 mt-8 flex flex-wrap gap-3">
-            <Link
-              to="/app/projects/new"
-              className="inline-flex h-11 items-center gap-2 rounded bg-brand-600 px-5 text-sm font-semibold text-white transition hover:bg-brand-500"
-            >
-              <Plus className="h-4 w-4" />
-              Создать проект
-            </Link>
-            <Link
-              to="/app/demo"
-              className="inline-flex h-11 items-center gap-2 rounded border border-white/25 bg-transparent px-5 text-sm font-medium text-white transition hover:border-white/50 hover:bg-white/5"
-            >
-              <PlayCircle className="h-4 w-4" />
-              Демонстрация
-            </Link>
-            <Link
-              to="/app/catalog"
-              className="inline-flex h-11 items-center gap-2 px-3 text-sm font-medium text-steel-300 transition hover:text-white"
-            >
-              <Library className="h-4 w-4" />
-              Каталог
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+      <section>
+        <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h2 className="nc-title-sm">Продолжить работу</h2>
+            {summaryLine ? (
+              <p className="mt-0.5 text-xs text-steel-500">{summaryLine}</p>
+            ) : (
+              <p className="nc-body mt-0.5 text-xs">Недавние проекты</p>
+            )}
           </div>
+          <Link to="/app/projects" className="text-sm font-medium text-brand-700 hover:underline">
+            Все проекты
+          </Link>
         </div>
+        {projectsQuery.isLoading && <SkeletonCards count={3} />}
+        {projectsQuery.isError && (
+          <p className="text-sm text-red-600">Не удалось загрузить проекты. Обновите страницу.</p>
+        )}
+        {!projectsQuery.isLoading && recent.length === 0 && (
+          <EmptyState
+            title="Проектов пока нет"
+            description="Создайте свой объект или откройте демонстрационный склад."
+            actionLabel="Создать проект"
+            onAction={() => navigate('/app/projects/new')}
+          />
+        )}
+        {recent.length > 0 && (
+          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {recent.map((p) => {
+              const step = continueStep(p)
+              return (
+                <li key={p.id}>
+                  <Link
+                    to={`/app/projects/${p.id}?step=${step}`}
+                    className="nc-panel nc-focusable flex items-center justify-between gap-3 px-3 py-2.5 transition hover:border-brand-300"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium text-ink">{p.name}</p>
+                        <Badge variant={p.is_demo ? 'warning' : 'default'}>
+                          {p.is_demo ? 'Демо' : PROJECT_STATUS_LABELS[p.status] || p.status}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-steel-500">
+                        {(p.object_type_id != null && typeMap.get(p.object_type_id)) ||
+                          'Тип не указан'}
+                        {' · '}
+                        {formatDate(p.updated_at)}
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-brand-700">
+                      Открыть
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </section>
 
-      <section className="mt-8">
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <h2 className="font-display text-xl font-semibold uppercase tracking-wide text-ink">
-            Рабочий контур
-          </h2>
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-steel-400">
-            четыре шага
-          </p>
-        </div>
-        <ol className="grid gap-px overflow-hidden rounded border border-steel-200 bg-steel-200 sm:grid-cols-4">
-          {steps.map((s) => (
-            <li key={s.n} className="bg-white p-4 transition hover:bg-brand-50/40">
-              <p className="font-mono text-xs text-brand-600">{s.n}</p>
-              <h3 className="mt-2 font-display text-base font-semibold uppercase tracking-wide text-ink">
-                {s.title}
-              </h3>
-              <p className="mt-1 text-sm text-steel-500">{s.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      <p className="mt-6 text-xs text-steel-400">
-        Каталог и демо-проекты включают демонстрационные данные для знакомства с платформой.
+      <p className="text-xs text-steel-400">
+        Гостевой проект сохраняется на срок сессии. Результат — предварительная оценка и требует
+        проверки на объекте.
       </p>
     </div>
   )

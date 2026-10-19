@@ -37,6 +37,7 @@ from app.schemas import (
     UserOut,
 )
 from app.services.audit import log_action
+from app.services.cleanup_guests import cleanup_expired_guests
 from app.services.economics import DEFAULT_ASSUMPTIONS, FORMULAS_RU
 from app.services.import_catalog import apply_import, preview_import, validate_mapped_rows, read_tabular
 from app.services.import_docx_examples import import_docx_examples
@@ -53,6 +54,17 @@ def list_users(
     admin: Annotated[User, Depends(require_admin)],
 ):
     return [UserOut.model_validate(u) for u in db.query(User).order_by(User.id).all()]
+
+
+@router.post("/cleanup/guests", summary="Очистка истёкших гостевых сессий")
+def cleanup_guests(
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+):
+    """Идемпотентно удаляет гостей с истёкшим expires_at и их проекты."""
+    stats = cleanup_expired_guests(db)
+    log_action(db, "admin.cleanup_guests", admin.id, "system", None, stats)
+    return stats
 
 
 @router.patch("/users/{user_id}", response_model=UserOut, summary="Изменить пользователя")

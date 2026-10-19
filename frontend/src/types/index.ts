@@ -7,6 +7,7 @@ export interface User {
   role: UserRole
   is_active: boolean
   created_at: string
+  expires_at?: string | null
 }
 
 export interface AuthTokens {
@@ -21,6 +22,37 @@ export interface AuthResponse extends AuthTokens {
 
 export type ProjectStatus = 'draft' | 'active' | 'archived' | 'completed' | string
 
+export interface ProjectSummary {
+  area_m2?: number | null
+  robots_count?: number | null
+  capex?: number | null
+  payback_years?: number | null
+  npv?: number | null
+}
+
+export interface LayoutObject {
+  id: string
+  kind: string
+  name: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation?: number
+  example?: boolean
+  from_dxf?: boolean
+}
+
+export interface WarehouseLayout {
+  version?: number
+  unit: string
+  width_m: number
+  length_m: number
+  objects: LayoutObject[]
+  source?: string
+  dxf_meta?: Record<string, unknown> | null
+}
+
 export interface Project {
   id: number
   owner_id?: number | null
@@ -32,11 +64,16 @@ export interface Project {
   work_mode?: string | null
   status: ProjectStatus
   object_params?: ProjectParams | null
+  layout?: WarehouseLayout | null
   is_demo: boolean
   is_archived: boolean
+  public_token?: string | null
+  published_at?: string | null
+  expires_at?: string | null
   created_at: string
   updated_at: string
   last_calc_at?: string | null
+  summary?: ProjectSummary | null
 }
 
 export interface ProjectCreatePayload {
@@ -199,12 +236,21 @@ export interface MatchingResultItem {
   robot_id: number
   selected?: boolean
   match_score?: number | null
+  score_label?: string | null
   match_reasons?: unknown
   exclusion_reasons?: unknown
   status: string
   robot_name?: string | null
   robot_payload_kg?: number | null
   robot_price_rub?: number | null
+  recommended_count?: number | null
+  recommendation_text?: string | null
+  estimated_capex?: number | null
+  estimated_payback_years?: number | null
+  utilization_estimate?: number | null
+  limitations?: string[]
+  missing_checks?: string[]
+  warnings?: string[]
 }
 
 export interface MatchingResultsResponse {
@@ -234,15 +280,89 @@ export interface EconomicsScenarioResult {
   scenario: string
   scenario_name_ru?: string
   robots_count: number
-  capex: { capex: number; breakdown?: Record<string, number>; formula?: string }
+  robots_count_detail?: {
+    robots_count?: number
+    coefficients?: Record<string, number>
+    formula?: string
+  }
+  fleet_capacity?: {
+    selected_robots?: number
+    recommended_robots?: number
+    robots_count_source?: string
+    fleet_capacity_ops_per_hour?: number
+    peak_coverage?: number | null
+    meets_peak_demand?: boolean
+    peak_is_estimate?: boolean
+    note?: string
+    warnings?: string[]
+    [key: string]: unknown
+  }
+  capex: {
+    capex: number
+    breakdown?: Record<string, number>
+    component_sources?: Record<string, { origin?: string; note?: string }>
+    breakdown_matches_total?: boolean
+    formula?: string
+  }
   opex: { opex_annual: number; breakdown?: Record<string, number>; formula?: string }
-  annual_effect: { annual_effect: number; components?: Record<string, number> }
-  payback: { payback_years?: number | null; [key: string]: unknown }
+  depreciation?: {
+    applicable?: boolean
+    enabled?: boolean
+    method?: string
+    method_label_ru?: string
+    depreciable_base?: number
+    salvage_value?: number
+    useful_life_years?: number
+    annual_depreciation?: number | null
+    schedule?: { year: number; amount: number; book_value_end?: number }[]
+    notes?: string[]
+    is_cash_outflow?: boolean
+    asset_label?: string
+    assumptions?: Record<string, unknown>
+  }
+  annual_effect: {
+    annual_effect: number
+    with_depreciation?: number | null
+    depreciation_deducted?: number | null
+    accounting_note?: string
+    gross_operating_effect?: number | null
+    net_annual_effect?: number | null
+    components?: Record<string, number>
+    note?: string
+    labor_reduction_share?: number
+    labor_reduction_is_assumption?: boolean
+  }
+  payback: { payback_years?: number | null; message?: string; [key: string]: unknown }
   roi: { roi_percent?: number | null; [key: string]: unknown }
-  tco: { tco: number; years?: number }
+  tco: {
+    tco: number
+    years?: number
+    tco_scope?: string
+    tco_note?: string
+    initial_investment?: number
+    opex_annual?: number
+    remaining_manual_labor_annual?: number
+    total_outlay_with_remaining_labor?: number
+    [key: string]: unknown
+  }
+  cost_comparison?: Record<string, unknown>
+  remaining_manual_labor_cost?: number | null
+  npv?: { npv?: number | null; discount_rate?: number; message?: string }
+  irr?: { irr?: number | null; message?: string }
+  cashflows?: Array<{
+    year: number
+    cashflow?: number
+    cumulative?: number
+    discounted?: number
+    [key: string]: unknown
+  }>
   assumptions?: Record<string, number | string | boolean>
+  assumption_flags?: Record<string, boolean>
   formulas?: Record<string, string>
   robot_id?: number | null
+  input_warnings?: string[]
+  model_warnings?: string[]
+  inputs?: Record<string, unknown>
   [key: string]: unknown
 }
 
@@ -299,6 +419,12 @@ export interface ImportPreview {
   suggested_mapping?: Record<string, string>
   parsed_params?: ProjectParams
   mode?: string
+  warnings?: string[]
+  errors?: string[]
+  filename?: string
+  file_size_bytes?: number
+  unrecognized_labels?: string[]
+  ignored_columns?: string[]
 }
 
 export interface ImportValidationError {
@@ -310,13 +436,23 @@ export interface ImportValidationError {
 
 export interface ImportValidateResponse {
   valid: boolean
-  mapping: Record<string, string>
+  mapping?: Record<string, string>
   row_count: number
+  errors?: string[]
+  warnings?: string[]
+  mode?: string | null
+  parsed_params?: ProjectParams
+  will_overwrite?: string[]
+  unmapped_columns?: string[]
+  unrecognized_labels?: string[]
 }
 
 export interface ImportConfirmResponse {
   message: string
   object_params: ProjectParams
+  updated_keys?: string[]
+  overwritten_keys?: string[]
+  warnings?: string[]
 }
 
 export interface CatalogImportResult {
@@ -351,6 +487,8 @@ export interface ImportBatch {
 export interface VisualizationLayout {
   width: number
   height: number
+  /** пикселей сцены на метр */
+  metersToPx?: number
   walls: { x1: number; y1: number; x2: number; y2: number }[]
   zones: {
     id: string
@@ -361,12 +499,37 @@ export interface VisualizationLayout {
     h: number
     color?: string
     type?: string
+    rotation?: number
   }[]
-  routes: { id: string; name?: string; points: { x: number; y: number }[] }[]
+  routes: {
+    id: string
+    name?: string
+    points: { x: number; y: number }[]
+    blocked?: boolean
+    blocked_reason?: string
+    length_m?: number
+    status?: string
+  }[]
+  tasks?: {
+    id: string
+    type: string
+    source_id?: string
+    destination_id?: string
+    source_name: string
+    destination_name: string
+    status: string
+    robot_id: string | null
+    blocked_reason?: string
+    route_id: string
+    length_m: number
+    blocked: boolean
+    points: { x: number; y: number }[]
+  }[]
   robots: {
     id: string
     name: string
     route_id: string
+    task_id?: string | null
     speed: number
     color?: string
     x?: number
@@ -390,7 +553,12 @@ export interface BackendLayout {
     type?: string
     color?: string
   }[]
-  routes?: { id: string; name?: string; points: { x: number; y: number }[] }[]
+  routes?: {
+    id: string
+    name?: string
+    points: { x: number; y: number }[]
+    blocked?: boolean
+  }[]
   charging_stations?: { id: string; name: string; x: number; y: number; type?: string }[]
   load_unload_points?: { id: string; name: string; x: number; y: number; type?: string }[]
   robots?: {
@@ -401,11 +569,19 @@ export interface BackendLayout {
     route_id?: string
     name?: string
   }[]
-  meta?: { robots_count?: number; object_kind?: string; [key: string]: unknown }
+  meta?: {
+    robots_count?: number
+    robots_spawned?: number
+    object_kind?: string
+    source?: string
+    route_warnings?: string[]
+    [key: string]: unknown
+  }
 }
 
 export interface CalculationSummary {
   robot_count: number
+  config_label?: string
   robots?: { id: string; name: string; quantity: number }[]
   metrics?: Record<string, number>
 }
@@ -442,27 +618,6 @@ export interface AuditLogEntry {
   entity_name?: string | null
 }
 
-export interface AnalyticsSummary {
-  robots_total: number
-  robots_by_type: { type: string; count: number }[]
-  projects_total: number
-  demo_projects: number
-  calculations_total: number
-  matching_by_status: Record<string, number>
-  manufacturers_total: number
-  industries_total: number
-  object_types_total: number
-  avg_robot_price_rub?: number | null
-  recent_actions: number
-  /** legacy aliases used by older UI */
-  projects_active?: number
-  catalog_size?: number
-  selections_total?: number
-  top_robots?: { name: string; count: number }[]
-  projects_by_type?: { type: string; label: string; count: number }[]
-  monthly_activity?: { month: string; projects: number; selections: number }[]
-}
-
 export interface ApiErrorBody {
   detail?:
     | string
@@ -471,6 +626,14 @@ export interface ApiErrorBody {
         loc?: (string | number)[]
         type?: string
       }[]
+    | {
+        code?: string
+        message?: string
+        capability?: string
+        errors?: { field?: string; code?: string; message?: string }[]
+        warnings?: unknown[]
+        checklist?: unknown[]
+      }
   message?: string
 }
 

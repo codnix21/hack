@@ -96,7 +96,7 @@ def _register_labels() -> None:
         for key, label, *_rest in rows:
             LABEL_TO_KEY[label.strip().lower()] = key
             LABEL_TO_KEY[key.strip().lower()] = key
-    # доп. алиасы
+    # доп. алиасы (в т.ч. русские заголовки датасета / Excel)
     extras = {
         "площадь": "area_m2",
         "ширина": "area_width_m",
@@ -104,9 +104,23 @@ def _register_labels() -> None:
         "грузоподъёмность": "required_payload_kg",
         "грузоподъемность": "required_payload_kg",
         "пиковый спрос": "peak_demand",
+        "пиковая нагрузка": "peak_demand",
         "число зон": "zones_count",
         "зарядных станций": "charging_stations",
         "стоимость персонала": "current_labor_cost_year",
+        "текущие затраты на труд": "current_labor_cost_year",
+        "годовые затраты на персонал": "staff_cost_year",
+        "затраты на персонал": "staff_cost_year",
+        "общая численность персонала склада": "staff_count",
+        "численность персонала": "staff_count",
+        "численность персонала склада": "staff_count",
+        "средняя з/п отборщика (gross)": "staff_salary_month",
+        "коэффициент начислений на фот (страховые взносы)": "payroll_tax_coef",
+        "количество рабочих смен в сутки": "shifts_count",
+        "продолжительность смены": "shift_hours",
+        "объём отбора (строк/сутки, всего)": "ops_count",
+        "объем отбора (строк/сутки, всего)": "ops_count",
+        "операций в сутки": "ops_count",
     }
     LABEL_TO_KEY.update(extras)
 

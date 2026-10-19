@@ -1,0 +1,21 @@
+# Локальная демо-среда без пересборки образов (Docker Hub/proxy недоступен).
+# Backend: актуальный Python-код с хоста.
+# Frontend: актуальный dist после `npm run build` в ./frontend.
+# Том pgdata НЕ затрагивается. Не используйте `docker compose down -v`.
+services:
+  backend:
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/scripts:/app/scripts
+      - ./backend/entrypoint.sh:/app/entrypoint.sh:ro
+      - ./backend/.wheels:/wheels:ro
+      - ./data:/data
+    environment:
+      # Offline wheels для ezdxf при старте, если пакет отсутствует в образе
+      EZDXF_WHEELS_DIR: /wheels
+
+  frontend:
+    volumes:
+      # Актуальная UI-сборка с хоста → nginx (порт 8910)
+      - ./frontend/dist:/usr/share/nginx/html:ro

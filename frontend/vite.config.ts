@@ -16,8 +16,9 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
+      // Docker backend по умолчанию на 8010 (см. docker-compose.yml BACKEND_PORT)
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_DEV_PROXY_TARGET || 'http://127.0.0.1:8010',
         changeOrigin: true,
       },
     },

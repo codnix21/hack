@@ -27,6 +27,13 @@ export function zoneFill(type?: string, fallback?: string) {
       return '#ffedd5'
     case 'unload':
       return '#dbeafe'
+    case 'charge':
+    case 'charging':
+      return '#dcfce7'
+    case 'start':
+      return '#ede9fe'
+    case 'obstacle':
+      return '#fecaca'
     case 'aisle':
     case 'corridor':
       return '#f1f3f6'
@@ -50,6 +57,13 @@ export function zoneStroke(type?: string) {
       return '#c2410c'
     case 'unload':
       return '#1d4ed8'
+    case 'charge':
+    case 'charging':
+      return '#15803d'
+    case 'start':
+      return '#6d28d9'
+    case 'obstacle':
+      return '#b91c1c'
     case 'storage':
       return '#475569'
     case 'aisle':
@@ -84,8 +98,8 @@ export function drawZoneLabel(
   if (zw < 14 || zh < 14) return
   const vertical = opts?.vertical ?? (zw < 70 && zh > zw * 1.4)
   ctx.font = vertical
-    ? '700 12px Barlow Condensed, Segoe UI, sans-serif'
-    : '600 11px Barlow, Segoe UI, sans-serif'
+    ? '700 12px Segoe UI, system-ui, sans-serif'
+    : '600 11px Segoe UI, system-ui, sans-serif'
 
   if (vertical) {
     const label = text.length <= 4 ? text : text.slice(0, 3)
@@ -232,14 +246,18 @@ export function drawAmrBody(
   }
 
   if (selected) {
-    ctx.strokeStyle = '#f07316'
-    ctx.lineWidth = 2.5
+    ctx.strokeStyle = 'rgba(20,23,28,0.35)'
+    ctx.lineWidth = 4
+    roundRect(ctx, -19, -13, 38, 26, 6)
+    ctx.stroke()
+    ctx.strokeStyle = '#d45a0a'
+    ctx.lineWidth = 2
     roundRect(ctx, -17, -11, 34, 22, 5)
     ctx.stroke()
   }
 
   ctx.fillStyle = '#fff'
-  ctx.font = '700 10px Barlow Condensed, Segoe UI, sans-serif'
+  ctx.font = '700 10px Segoe UI, system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, 0, 0.5)
@@ -256,7 +274,7 @@ export function drawStatusPill(
   canvasH: number,
 ) {
   const text = STATUS_SHORT_RU[status]
-  ctx.font = '600 9px Barlow, Segoe UI, sans-serif'
+  ctx.font = '600 9px Segoe UI, system-ui, sans-serif'
   const tw = ctx.measureText(text).width
   const bw = tw + 10
   const bh = 13

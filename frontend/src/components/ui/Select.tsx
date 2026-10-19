@@ -18,7 +18,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       {label && <span className="text-sm font-medium text-steel-700">{label}</span>}
       <select
         ref={ref}
-        className={`h-10 w-full rounded border bg-white px-3 text-sm text-steel-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-400/40 disabled:bg-steel-50 ${
+        className={`nc-control nc-focusable w-full border bg-white px-3 text-sm text-steel-900 focus:border-brand-500 focus:outline-none disabled:bg-steel-50 ${
           error ? 'border-red-400' : 'border-steel-300'
         } ${className}`}
         {...props}

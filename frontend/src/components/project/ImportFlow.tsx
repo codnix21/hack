@@ -1,33 +1,42 @@
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { Download, Upload } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Download, Upload, X } from 'lucide-react'
 import { importApi } from '../../api/import'
 import { projectsApi } from '../../api/projects'
 import { getFriendlyError } from '../../api/client'
-import type { ImportPreview } from '../../types'
+import type { ImportPreview, ImportValidateResponse } from '../../types'
 import { Button } from '../ui/Button'
 import { Select } from '../ui/Select'
 import { Table } from '../ui/Table'
+import { Callout } from '../ui/Callout'
 import { toastError, toastSuccess } from '../../store/toastStore'
 import { objectParamLabel } from '../../utils/labels'
+import { importMappedParamHint } from '../../utils/attention'
 
 const TARGET_FIELDS = [
-  { value: 'area_width_m', label: 'Ширина площадки' },
-  { value: 'area_length_m', label: 'Длина площадки' },
-  { value: 'aisle_width_mm', label: 'Ширина проходов' },
-  { value: 'required_payload_kg', label: 'Грузоподъёмность' },
-  { value: 'peak_demand', label: 'Пиковый спрос' },
+  { value: 'area_m2', label: 'Площадь, м²' },
+  { value: 'area_width_m', label: 'Ширина площадки, м' },
+  { value: 'area_length_m', label: 'Длина площадки, м' },
+  { value: 'aisle_width_mm', label: 'Ширина проходов, мм' },
+  { value: 'required_payload_kg', label: 'Грузоподъёмность, кг' },
+  { value: 'peak_demand', label: 'Пиковая нагрузка, оп/ч' },
+  { value: 'ops_count', label: 'Объём операций / сутки' },
   { value: 'zones_count', label: 'Число зон' },
   { value: 'charging_stations', label: 'Зарядных станций' },
-  { value: 'current_labor_cost_year', label: 'Затраты на труд / год' },
-  { value: 'temperature_min_c', label: 'Температура мин.' },
-  { value: 'temperature_max_c', label: 'Температура макс.' },
+  { value: 'staff_count', label: 'Численность персонала' },
+  { value: 'staff_salary_month', label: 'Зарплата, ₽/мес' },
+  { value: 'current_labor_cost_year', label: 'Затраты на труд, ₽/год' },
+  { value: 'payroll_tax_coef', label: 'Коэффициент начислений на ФОТ' },
+  { value: 'shifts_count', label: 'Смен в сутки' },
+  { value: 'shift_hours', label: 'Часов в смене' },
+  { value: 'temperature_min_c', label: 'Температура мин., °C' },
+  { value: 'temperature_max_c', label: 'Температура макс., °C' },
+  { value: 'humidity_max_pct', label: 'Влажность макс., %' },
   { value: 'storage_type', label: 'Тип хранения' },
   { value: 'floors_count', label: 'Этажность' },
-  { value: 'humidity_max_pct', label: 'Влажность макс.' },
   { value: 'zone_type', label: 'Тип зоны' },
   { value: 'facility_type', label: 'Тип учреждения' },
-  { value: 'ignore', label: 'Игнорировать' },
+  { value: 'ignore', label: 'Не импортировать' },
 ]
 
 interface ImportFlowProps {
@@ -40,13 +49,22 @@ type ParamSchema = {
   properties?: Record<string, { title?: string } | undefined>
 } | null
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} Б`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} КБ`
+  return `${(n / (1024 * 1024)).toFixed(1)} МБ`
+}
+
 export function ImportFlow({ projectId }: ImportFlowProps) {
+  const qc = useQueryClient()
   const [step, setStep] = useState<Step>('file')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [mapping, setMapping] = useState<Record<string, string>>({})
-  const [rowCount, setRowCount] = useState(0)
+  const [validation, setValidation] = useState<ImportValidateResponse | null>(null)
   const [importedKeys, setImportedKeys] = useState<string[]>([])
+  const [overwrittenKeys, setOverwrittenKeys] = useState<string[]>([])
+  const [doneWarnings, setDoneWarnings] = useState<string[]>([])
 
   const paramsQuery = useQuery({
     queryKey: ['project-params', projectId],
@@ -57,9 +75,23 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
   const isKeyValue = preview?.mode === 'key_value'
   const recognizedCount = useMemo(() => {
     if (importedKeys.length) return importedKeys.length
-    if (preview?.parsed_params) return Object.keys(preview.parsed_params).length
+    if (validation?.parsed_params) return Object.keys(validation.parsed_params).filter((k) => !k.startsWith('_')).length
+    if (preview?.parsed_params) {
+      return Object.keys(preview.parsed_params).filter((k) => !k.startsWith('_')).length
+    }
     return 0
-  }, [importedKeys, preview])
+  }, [importedKeys, preview, validation])
+
+  const resetAll = () => {
+    setStep('file')
+    setFile(null)
+    setPreview(null)
+    setMapping({})
+    setValidation(null)
+    setImportedKeys([])
+    setOverwrittenKeys([])
+    setDoneWarnings([])
+  }
 
   const previewMut = useMutation({
     mutationFn: (f: File) => importApi.preview(projectId, f),
@@ -68,6 +100,8 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
         ...data,
         sample_rows: data.sample_rows ?? (data as { preview?: Record<string, string>[] }).preview ?? [],
         total_rows: data.total_rows ?? (data as { row_count?: number }).row_count ?? 0,
+        filename: data.filename ?? file?.name,
+        file_size_bytes: data.file_size_bytes ?? file?.size,
       }
       setPreview(normalized)
       const suggested = normalized.suggested_mapping || {}
@@ -77,7 +111,11 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
       })
       setMapping(initial)
       setStep('preview')
-      toastSuccess('Файл загружен для предварительного просмотра')
+      if (normalized.errors?.length) {
+        toastError(normalized.errors[0])
+      } else {
+        toastSuccess('Файл загружен для предварительного просмотра')
+      }
     },
     onError: (e) => toastError(getFriendlyError(e)),
   })
@@ -88,9 +126,10 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
       return importApi.validate(projectId, mapping, file)
     },
     onSuccess: (data) => {
-      setRowCount(data.row_count)
+      setValidation(data)
       setStep('validation')
-      toastSuccess('Данные проверены')
+      if (data.valid) toastSuccess('Данные проверены — можно подтвердить импорт')
+      else toastError(data.errors?.[0] || 'Есть ошибки валидации')
     },
     onError: (e) => toastError(getFriendlyError(e)),
   })
@@ -101,9 +140,16 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
       return importApi.confirm(projectId, mapping, file)
     },
     onSuccess: (data) => {
-      setImportedKeys(Object.keys(data.object_params || {}))
+      const keys = data.updated_keys?.length
+        ? data.updated_keys
+        : Object.keys(data.object_params || {}).filter((k) => !k.startsWith('_'))
+      setImportedKeys(keys)
+      setOverwrittenKeys(data.overwritten_keys || [])
+      setDoneWarnings((data.warnings || []).map(String))
       setStep('done')
       void paramsQuery.refetch()
+      void qc.invalidateQueries({ queryKey: ['project', projectId] })
+      void qc.invalidateQueries({ queryKey: ['project-params', projectId] })
       toastSuccess(data.message || 'Параметры импортированы')
     },
     onError: (e) => toastError(getFriendlyError(e)),
@@ -116,15 +162,19 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
   })
 
   const sampleRows = useMemo(() => preview?.sample_rows ?? [], [preview])
+  const unmapped =
+    validation?.unmapped_columns?.length
+      ? validation.unmapped_columns
+      : preview?.ignored_columns || []
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-testid="import-flow">
       <ol className="flex flex-wrap gap-2 text-xs font-medium text-steel-500">
         {[
           ['file', 'Выбор файла'],
           ['preview', 'Просмотр и сопоставление'],
           ['validation', 'Проверка'],
-          ['done', 'Подтверждение'],
+          ['done', 'Готово'],
         ].map(([id, label]) => (
           <li
             key={id}
@@ -161,19 +211,27 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
             <Upload className="mx-auto mb-3 h-8 w-8 text-steel-400" />
             <p className="font-medium text-steel-900">2. Загрузите заполненный файл</p>
             <p className="mt-1 text-sm text-steel-600">
-              Excel по шаблону (лист «Параметры») или CSV/Excel с колонками параметров
+              Excel по шаблону (лист «Параметры») или CSV/Excel с колонками параметров. Максимум 10 МБ.
+              Форматы: .xlsx, .xls, .csv. DWG не поддерживается.
             </p>
             <input
               type="file"
               accept=".csv,.xlsx,.xls"
               className="mx-auto mt-4 block text-sm"
+              data-testid="import-file-input"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
               aria-label="Выберите файл для импорта"
             />
+            {file && (
+              <p className="mt-2 text-sm text-steel-700" data-testid="import-file-meta">
+                {file.name} · {formatBytes(file.size)} · {file.type || 'тип не указан'}
+              </p>
+            )}
             <Button
               className="mt-4"
               disabled={!file}
               loading={previewMut.isPending}
+              data-testid="import-preview-btn"
               onClick={() => file && previewMut.mutate(file)}
             >
               Загрузить и показать
@@ -184,106 +242,259 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
 
       {step === 'preview' && preview && (
         <>
-          <p className="text-sm text-steel-600">
-            Всего строк в файле: <strong>{preview.total_rows}</strong>
-            {preview.parsed_params && (
-              <> · распознано параметров: {Object.keys(preview.parsed_params).length}</>
-            )}
+          <div className="rounded border border-steel-200 bg-white px-3 py-2 text-sm text-steel-700">
+            <p data-testid="import-file-meta">
+              Файл: <strong>{preview.filename || file?.name}</strong>
+              {(preview.file_size_bytes != null || file?.size != null) && (
+                <> · {formatBytes(preview.file_size_bytes ?? file!.size)}</>
+              )}
+              <> · строк: {preview.total_rows}</>
+              {preview.parsed_params && (
+                <> · распознано: {Object.keys(preview.parsed_params).filter((k) => !k.startsWith('_')).length}</>
+              )}
+            </p>
             {isKeyValue && (
-              <span className="mt-1 block text-steel-500">
-                Формат «Параметр / Значение» — сопоставление колонок не требуется.
-              </span>
+              <p className="mt-1 text-steel-500">
+                Формат «Параметр / Значение» — сопоставление колонок не требуется. Неизвестные строки
+                не скрываются.
+              </p>
             )}
-          </p>
+          </div>
+
+          {(preview.warnings?.length || 0) > 0 && (
+            <Callout variant="warning" title="Предупреждения при разборе">
+              <ul className="list-disc pl-4">
+                {preview.warnings!.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+          {(preview.errors?.length || 0) > 0 && (
+            <Callout variant="danger" title="Ошибки разбора">
+              <ul className="list-disc pl-4">
+                {preview.errors!.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+
+          {preview.parsed_params && Object.keys(preview.parsed_params).length > 0 && (
+            <div className="rounded border border-steel-200 bg-steel-50/50 p-3">
+              <p className="mb-2 text-sm font-medium text-ink">Распознанные значения</p>
+              <ul className="grid gap-1 text-sm sm:grid-cols-2">
+                {Object.entries(preview.parsed_params)
+                  .filter(([k]) => !k.startsWith('_'))
+                  .slice(0, 24)
+                  .map(([k, v]) => (
+                    <li key={k} className="flex justify-between gap-2 border-b border-steel-100 py-0.5">
+                      <span className="text-steel-600">{objectParamLabel(k, paramSchema)}</span>
+                      <span className="font-mono text-ink">{String(v)}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {(preview.unrecognized_labels?.length || 0) > 0 && (
+            <Callout variant="info" title="Строки без точного сопоставления с моделью">
+              {preview.unrecognized_labels!.slice(0, 15).join(', ')}
+              {preview.unrecognized_labels!.length > 15 ? '…' : ''}
+            </Callout>
+          )}
+
           <div className="overflow-hidden rounded border border-steel-200">
+            <p className="border-b border-steel-100 bg-steel-50 px-3 py-1.5 text-xs text-steel-600">
+              В таблице — исходные имена колонок файла. Под ними — распознанный параметр NETCORE (если
+              сопоставлен).
+            </p>
             <Table
-              columns={preview.columns.map((c) => ({
-                key: c,
-                header: c,
-                render: (row: Record<string, string>) => row[c] ?? '—',
-              }))}
+              columns={preview.columns.map((c) => {
+                const mapped = mapping[c]
+                const hint = importMappedParamHint(mapped)
+                return {
+                  key: c,
+                  header: (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-medium text-ink">{c}</span>
+                      <span className="text-[11px] font-normal normal-case text-steel-500">
+                        {hint
+                          ? `→ ${hint}`
+                          : mapped === 'ignore'
+                            ? '→ не импортировать'
+                            : '→ не сопоставлено'}
+                      </span>
+                    </span>
+                  ),
+                  render: (row: Record<string, string>) => row[c] ?? '—',
+                }
+              })}
               rows={sampleRows.map((row, i) => ({ ...row, __i: String(i) }))}
               rowKey={(row) => row.__i}
             />
           </div>
+
           {!isKeyValue && (
-            <div className="grid gap-3 md:grid-cols-2">
-              {preview.columns.map((col) => (
-                <Select
-                  key={col}
-                  label={`Колонка «${col}»`}
-                  value={mapping[col] || 'ignore'}
-                  onChange={(e) => setMapping((m) => ({ ...m, [col]: e.target.value }))}
-                  options={TARGET_FIELDS}
-                />
-              ))}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-ink">Сопоставление столбцов</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                {preview.columns.map((col) => (
+                  <Select
+                    key={col}
+                    label={`Колонка «${col}»`}
+                    value={mapping[col] || 'ignore'}
+                    onChange={(e) => setMapping((m) => ({ ...m, [col]: e.target.value }))}
+                    options={TARGET_FIELDS}
+                  />
+                ))}
+              </div>
             </div>
           )}
-          <div className="flex gap-2">
+
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setStep('file')}>
               Назад
             </Button>
-            <Button loading={validateMut.isPending} onClick={() => validateMut.mutate()}>
+            <Button variant="ghost" onClick={resetAll} aria-label="Отменить импорт">
+              <X className="h-4 w-4" />
+              Отменить импорт
+            </Button>
+            <Button
+              loading={validateMut.isPending}
+              data-testid="import-validate-btn"
+              onClick={() => validateMut.mutate()}
+              disabled={(preview.errors?.length || 0) > 0}
+            >
               Проверить данные
             </Button>
           </div>
         </>
       )}
 
-      {(step === 'validation' || step === 'done') && (
+      {step === 'validation' && validation && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-steel-200 bg-white p-4">
               <p className="text-xs text-steel-500">Строк в файле</p>
-              <p className="mt-1 text-2xl font-semibold text-steel-900">
-                {rowCount || preview?.total_rows || 0}
-              </p>
+              <p className="mt-1 text-2xl font-semibold text-steel-900">{validation.row_count}</p>
             </div>
             <div className="rounded-lg border border-steel-200 bg-white p-4">
-              <p className="text-xs text-steel-500">
-                {isKeyValue ? 'Распознано параметров' : 'Сопоставленных колонок'}
-              </p>
+              <p className="text-xs text-steel-500">Распознано параметров</p>
+              <p className="mt-1 text-2xl font-semibold text-steel-900">{recognizedCount}</p>
+            </div>
+            <div className="rounded-lg border border-steel-200 bg-white p-4">
+              <p className="text-xs text-steel-500">Будут перезаписаны</p>
               <p className="mt-1 text-2xl font-semibold text-steel-900">
-                {isKeyValue
-                  ? recognizedCount
-                  : Object.values(mapping).filter((v) => v && v !== 'ignore').length}
+                {validation.will_overwrite?.length || 0}
               </p>
             </div>
           </div>
 
-          {step === 'validation' && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setStep('preview')}>
-                {isKeyValue ? 'Назад' : 'Исправить сопоставление'}
-              </Button>
-              <Button loading={confirmMut.isPending} onClick={() => confirmMut.mutate()}>
-                Подтвердить импорт
-              </Button>
+          {(validation.errors?.length || 0) > 0 && (
+            <Callout variant="danger" title="Ошибки — импорт нельзя подтвердить">
+              <ul className="list-disc pl-4">
+                {validation.errors!.map((e) => (
+                  <li key={e}>{e}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+          {(validation.warnings?.length || 0) > 0 && (
+            <Callout variant="warning" title="Предупреждения">
+              <ul className="list-disc pl-4">
+                {validation.warnings!.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+          {(validation.will_overwrite?.length || 0) > 0 && (
+            <Callout variant="warning" title="Перезапись существующих данных">
+              Следующие параметры уже заданы в проекте и будут заменены значениями из файла:{' '}
+              {validation.will_overwrite!.map((k) => objectParamLabel(k, paramSchema)).join(', ')}.
+              Подтверждение необратимо до ручного восстановления.
+            </Callout>
+          )}
+          {unmapped.length > 0 && (
+            <Callout variant="info" title="Столбцы не будут импортированы">
+              {unmapped.join(', ')}
+            </Callout>
+          )}
+
+          {validation.parsed_params && (
+            <div className="rounded border border-steel-200 p-3">
+              <p className="mb-2 text-sm font-medium">Итоговая сводка перед применением</p>
+              <ul className="grid gap-1 text-sm sm:grid-cols-2">
+                {Object.entries(validation.parsed_params)
+                  .filter(([k]) => !k.startsWith('_'))
+                  .map(([k, v]) => (
+                    <li key={k} className="flex justify-between gap-2">
+                      <span className="text-steel-600">{objectParamLabel(k, paramSchema)}</span>
+                      <span className="font-mono">{String(v)}</span>
+                    </li>
+                  ))}
+              </ul>
             </div>
           )}
-          {step === 'done' && (
-            <div className="space-y-3">
-              <p className="text-sm text-emerald-700">Параметры успешно импортированы в проект.</p>
-              {importedKeys.length > 0 && (
-                <div>
-                  <p className="mb-2 text-sm text-steel-600">
-                    Загружено параметров: {importedKeys.length}
-                  </p>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {importedKeys.map((k) => (
-                      <li
-                        key={k}
-                        className="rounded border border-steel-200 bg-steel-50 px-2 py-0.5 text-xs text-steel-800"
-                      >
-                        {objectParamLabel(k, paramSchema)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setStep('preview')}>
+              {isKeyValue ? 'Назад' : 'Исправить сопоставление'}
+            </Button>
+            <Button variant="ghost" onClick={resetAll}>
+              Отменить импорт
+            </Button>
+            <Button
+              loading={confirmMut.isPending}
+              disabled={!validation.valid}
+              data-testid="import-confirm-btn"
+              onClick={() => confirmMut.mutate()}
+            >
+              Подтвердить импорт
+            </Button>
+          </div>
         </>
+      )}
+
+      {step === 'done' && (
+        <div className="space-y-3">
+          <Callout variant="success" title="Параметры успешно импортированы">
+            Данные сохранены в проекте. Можно перейти к проверке полноты и подбору.
+          </Callout>
+          {importedKeys.length > 0 && (
+            <div>
+              <p className="mb-2 text-sm text-steel-600">Обновлено параметров: {importedKeys.length}</p>
+              <ul className="flex flex-wrap gap-1.5">
+                {importedKeys.map((k) => (
+                  <li
+                    key={k}
+                    className="rounded border border-steel-200 bg-steel-50 px-2 py-0.5 text-xs text-steel-800"
+                  >
+                    {objectParamLabel(k, paramSchema)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {overwrittenKeys.length > 0 && (
+            <Callout variant="info" title="Перезаписаны ранее сохранённые значения">
+              {overwrittenKeys.map((k) => objectParamLabel(k, paramSchema)).join(', ')}
+            </Callout>
+          )}
+          {doneWarnings.length > 0 && (
+            <Callout variant="warning" title="Допущения и предупреждения импорта">
+              <ul className="list-disc pl-4">
+                {doneWarnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
+          <Button variant="outline" onClick={resetAll}>
+            Импортировать другой файл
+          </Button>
+        </div>
       )}
     </div>
   )

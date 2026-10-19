@@ -41,11 +41,15 @@ def clone_demo(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    if user.role == "guest":
-        raise HTTPException(403, detail="Зарегистрируйтесь, чтобы клонировать демо-проект")
+    from datetime import timedelta
+
+    from app.config import get_settings
+    from app.models.user import utcnow
+
     src = db.query(Project).filter(Project.id == project_id, Project.is_demo.is_(True)).first()
     if not src:
         raise HTTPException(404, detail="Демо-проект не найден")
+    ttl = get_settings().GUEST_TTL_DAYS
     clone = Project(
         owner_id=user.id,
         name=f"{src.name} (мой проект)",
@@ -56,7 +60,9 @@ def clone_demo(
         work_mode=src.work_mode,
         status="draft",
         object_params=copy.deepcopy(src.object_params or {}),
+        layout=copy.deepcopy(src.layout) if src.layout else None,
         is_demo=False,
+        expires_at=(utcnow() + timedelta(days=ttl)) if user.role == "guest" else None,
     )
     db.add(clone)
     db.flush()

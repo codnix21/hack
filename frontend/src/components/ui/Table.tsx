@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 export interface Column<T> {
   key: string
-  header: string
+  header: ReactNode
   className?: string
   render?: (row: T) => ReactNode
 }
@@ -19,12 +19,12 @@ export function Table<T>({ columns, rows, rowKey, empty, onRowClick }: TableProp
   if (!rows.length && empty) return <>{empty}</>
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-steel-200 bg-steel-50 text-steel-600">
+    <div className="overflow-x-auto rounded border border-steel-100">
+      <table className="nc-table min-w-full text-left">
+        <thead className="border-b border-steel-200 bg-steel-50/80">
           <tr>
             {columns.map((c) => (
-              <th key={c.key} className={`px-4 py-3 font-medium ${c.className ?? ''}`}>
+              <th key={c.key} className={c.className ?? ''}>
                 {c.header}
               </th>
             ))}
@@ -35,10 +35,16 @@ export function Table<T>({ columns, rows, rowKey, empty, onRowClick }: TableProp
             <tr
               key={String(rowKey(row))}
               onClick={() => onRowClick?.(row)}
-              className={`border-b border-steel-100 ${onRowClick ? 'cursor-pointer hover:bg-brand-50/40' : ''}`}
+              className={`border-b border-steel-100 last:border-0 ${
+                onRowClick ? 'cursor-pointer hover:bg-steel-50' : ''
+              }`}
             >
               {columns.map((c) => (
-                <td key={c.key} className={`px-4 py-3 text-steel-800 ${c.className ?? ''}`}>
+                <td key={c.key} className={`max-w-[16rem] truncate ${c.className ?? ''}`} title={
+                  typeof (row as Record<string, unknown>)[c.key] === 'string'
+                    ? String((row as Record<string, unknown>)[c.key])
+                    : undefined
+                }>
                   {c.render
                     ? c.render(row)
                     : String((row as Record<string, unknown>)[c.key] ?? 'Нет данных')}

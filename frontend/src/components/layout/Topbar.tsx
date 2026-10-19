@@ -29,9 +29,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <p className="hidden font-mono text-[11px] uppercase tracking-[0.16em] text-steel-400 sm:block">
-          Подбор · расчёт · визуализация
-        </p>
+        <p className="hidden text-sm text-steel-500 lg:block">Рабочее пространство оценки</p>
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         {isGuest && <Badge variant="warning">Гостевой режим</Badge>}

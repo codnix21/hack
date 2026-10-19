@@ -1,8 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * E2E against Docker frontend (:3000) by default, or local Vite (:5173).
- * Override: E2E_BASE_URL=http://localhost:5173 npm run test:e2e
+ * E2E against demo UI on Docker nginx (:8910) by default.
+ * Dev Vite: E2E_BASE_URL=http://127.0.0.1:5173 npm run test:e2e
+ * Before :8910: npm run build:demo && docker compose up -d frontend
  * First time: npx playwright install chromium
  */
 export default defineConfig({
@@ -11,7 +12,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   use: {
-    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.E2E_BASE_URL || 'http://127.0.0.1:8910',
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

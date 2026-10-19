@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { VisualizationLayout } from '../../types'
 import type { LayerFlags, SimRobot, SimCollision } from '../../simulation/types'
+import { pointAlongPolyline } from '../../simulation/pathMath'
 import {
   drawAmrBody,
   drawStatusPill,
@@ -17,6 +18,7 @@ interface Warehouse2DProps {
   collisions: SimCollision[]
   layers: LayerFlags
   selectedRobotId: string | null
+  selectedRouteId?: string | null
   onSelectRobot: (id: string | null) => void
   heatSamples?: { x: number; y: number }[]
 }
@@ -27,6 +29,7 @@ export function Warehouse2D({
   collisions,
   layers,
   selectedRobotId,
+  selectedRouteId = null,
   onSelectRobot,
   heatSamples = [],
 }: Warehouse2DProps) {
@@ -87,9 +90,36 @@ export function Warehouse2D({
     })
 
     for (const z of zones) {
-      const isShelf = (z.type || '') === 'storage'
+      const t = (z.type || '').toLowerCase()
+      const isShelf = t === 'storage'
+      const isWall = t === 'wall'
       if (isShelf && !layers.shelves) continue
       if (!isShelf && !layers.zones) continue
+      if (isWall) {
+        // контур склада рисуется через layout.walls
+        continue
+      }
+      const rot = ((z.rotation || 0) * Math.PI) / 180
+      if (rot) {
+        const cx = z.x + z.w / 2
+        const cy = z.y + z.h / 2
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate(rot)
+        if (isShelf) {
+          drawStorageRack(ctx, -z.w / 2, -z.h / 2, z.w, z.h, z.name)
+        } else {
+          ctx.fillStyle = zoneFill(z.type, z.color)
+          roundRect(ctx, -z.w / 2, -z.h / 2, z.w, z.h, 2)
+          ctx.fill()
+          ctx.strokeStyle = zoneStroke(z.type)
+          ctx.lineWidth = 1.25
+          ctx.stroke()
+          drawZoneLabel(ctx, z.name, -z.w / 2, -z.h / 2, z.w, z.h)
+        }
+        ctx.restore()
+        continue
+      }
       if (isShelf) {
         drawStorageRack(ctx, z.x, z.y, z.w, z.h, z.name)
         continue
@@ -103,34 +133,68 @@ export function Warehouse2D({
       drawZoneLabel(ctx, z.name, z.x, z.y, z.w, z.h)
     }
 
-    if (layers.routes) {
-      for (const route of layout.routes || []) {
-        if (!route.points?.length) continue
-        const selectedRoute = robots.find((r) => r.id === selectedRobotId)?.routeId === route.id
-        const dim = selectedRobotId && !selectedRoute
+    const hasZoneType = (pred: (t: string) => boolean) =>
+      (layout.zones || []).some((z) => pred((z.type || '').toLowerCase()))
 
-        // soft lane
-        ctx.lineJoin = 'round'
-        ctx.lineCap = 'round'
-        ctx.strokeStyle = dim ? 'rgba(51,65,85,0.05)' : 'rgba(51,65,85,0.1)'
-        ctx.lineWidth = 16
+    if (layers.routes) {
+      // заблокированные — тонкая красная пунктирная (не «успешный» оранжевый)
+      for (const route of layout.routes || []) {
+        if (!route.blocked || !route.points?.length) continue
+        ctx.strokeStyle = 'rgba(185, 28, 28, 0.55)'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([4, 5])
         ctx.beginPath()
         ctx.moveTo(route.points[0].x, route.points[0].y)
         route.points.slice(1).forEach((p) => ctx.lineTo(p.x, p.y))
         ctx.stroke()
+        ctx.setLineDash([])
+      }
 
-        // route path
-        ctx.strokeStyle = dim ? 'rgba(240,115,22,0.18)' : '#f07316'
-        ctx.lineWidth = selectedRoute ? 3 : 2
-        ctx.setLineDash(selectedRoute ? [] : [8, 6])
+      for (const route of layout.routes || []) {
+        if (!route.points?.length || route.blocked) continue
+        const owner = robots.find((r) => r.routeId === route.id)
+        const selectedRoute =
+          route.id === selectedRouteId ||
+          (selectedRobotId != null && owner?.id === selectedRobotId)
+        const dim = Boolean((selectedRobotId || selectedRouteId) && !selectedRoute)
+
+        ctx.lineJoin = 'round'
+        ctx.lineCap = 'round'
+        // planned (dim or full)
+        ctx.strokeStyle = dim ? 'rgba(100, 116, 139, 0.22)' : 'rgba(240, 115, 22, 0.35)'
+        ctx.lineWidth = selectedRoute ? 2.5 : 1.5
+        ctx.setLineDash(selectedRoute ? [] : [7, 5])
         ctx.beginPath()
         ctx.moveTo(route.points[0].x, route.points[0].y)
         route.points.slice(1).forEach((p) => ctx.lineTo(p.x, p.y))
         ctx.stroke()
         ctx.setLineDash([])
 
+        // traveled segment for selected robot on this route
+        if (selectedRoute && owner && owner.routeDistPx > 0) {
+          const along = pointAlongPolyline(route.points, owner.routeDistPx)
+          ctx.strokeStyle = '#c2410c'
+          ctx.lineWidth = 3
+          ctx.beginPath()
+          ctx.moveTo(route.points[0].x, route.points[0].y)
+          let acc = 0
+          for (let i = 1; i < route.points.length; i++) {
+            const a = route.points[i - 1]
+            const b = route.points[i]
+            const seg = Math.hypot(b.x - a.x, b.y - a.y)
+            if (acc + seg >= owner.routeDistPx) {
+              ctx.lineTo(along.x, along.y)
+              break
+            }
+            ctx.lineTo(b.x, b.y)
+            acc += seg
+          }
+          ctx.stroke()
+        }
+
         if (layers.directions && !dim) {
-          for (let i = 1; i < route.points.length; i += 2) {
+          const step = selectedRoute ? 1 : 2
+          for (let i = 1; i < route.points.length; i += step) {
             const a = route.points[i - 1]
             const b = route.points[i]
             const ang = Math.atan2(b.y - a.y, b.x - a.x)
@@ -139,35 +203,47 @@ export function Warehouse2D({
             ctx.save()
             ctx.translate(mx, my)
             ctx.rotate(ang)
-            ctx.fillStyle = selectedRoute ? '#d45a0a' : '#f07316'
+            ctx.fillStyle = selectedRoute ? '#9a3412' : 'rgba(240,115,22,0.7)'
             ctx.beginPath()
-            ctx.moveTo(7, 0)
-            ctx.lineTo(-4, -4)
-            ctx.lineTo(-4, 4)
+            ctx.moveTo(6, 0)
+            ctx.lineTo(-3.5, -3.5)
+            ctx.lineTo(-3.5, 3.5)
             ctx.closePath()
             ctx.fill()
             ctx.restore()
           }
         }
+
+        // destination marker for selected route
+        if (selectedRoute) {
+          const last = route.points[route.points.length - 1]
+          ctx.fillStyle = '#ea580c'
+          ctx.beginPath()
+          ctx.arc(last.x, last.y, 5, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.strokeStyle = '#fff'
+          ctx.lineWidth = 1.5
+          ctx.stroke()
+        }
       }
     }
 
-    if (layers.zones) {
+    // Точечные маркеры — только если зоны-прямоугольники ещё не пришли из сохранённого плана
+    if (layers.zones && !hasZoneType((t) => t === 'charge' || t === 'charging')) {
       for (const p of layout.charging_stations || []) {
         const cx = Math.max(22, Math.min(w - 22, p.x))
         const cy = Math.max(22, Math.min(h - 22, p.y))
         ctx.fillStyle = '#15803d'
         roundRect(ctx, cx - 16, cy - 10, 32, 20, 2)
         ctx.fill()
-        ctx.fillStyle = 'rgba(255,255,255,0.2)'
-        roundRect(ctx, cx - 16, cy - 10, 32, 7, 2)
-        ctx.fill()
         ctx.fillStyle = '#fff'
-        ctx.font = '700 10px Barlow Condensed, sans-serif'
+        ctx.font = '700 10px Segoe UI, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText('ЗС', cx, cy + 1)
       }
+    }
+    if (layers.zones && !hasZoneType((t) => t === 'load' || t === 'unload')) {
       for (const p of layout.load_unload_points || []) {
         const load = (p.type || '').includes('load') && !(p.type || '').includes('unload')
         const cx = Math.max(12, Math.min(w - 12, p.x))
@@ -226,7 +302,7 @@ export function Warehouse2D({
         }
       }
     }
-  }, [layout, robots, collisions, layers, selectedRobotId, heatSamples])
+  }, [layout, robots, collisions, layers, selectedRobotId, selectedRouteId, heatSamples])
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current

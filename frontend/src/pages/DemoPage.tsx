@@ -61,7 +61,7 @@ export function DemoPage() {
         title="Демонстрационные проекты"
         subtitle="Готовые сценарии для быстрого знакомства с платформой (демонстрационные данные)"
         crumbs={[
-          { label: 'Панель управления', to: '/app' },
+          { label: 'Обзор', to: '/app' },
           { label: 'Демонстрация' },
         ]}
       />
@@ -102,20 +102,18 @@ export function DemoPage() {
                   {p.description || 'Готовый демонстрационный сценарий'}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => navigate(`/app/projects/${p.id}?step=params`)}>
+                  <Button onClick={() => navigate(`/app/projects/${p.id}?step=object`)}>
                     <PlayCircle className="h-4 w-4" />
                     Открыть
                   </Button>
-                  {!isGuest && (
-                    <Button
-                      variant="outline"
-                      loading={cloneMut.isPending}
-                      onClick={() => cloneMut.mutate(p.id)}
-                    >
-                      <Copy className="h-4 w-4" />
-                      Клонировать
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    loading={cloneMut.isPending}
+                    onClick={() => cloneMut.mutate(p.id)}
+                  >
+                    <Copy className="h-4 w-4" />
+                    {isGuest ? 'Копия для редактирования' : 'Клонировать'}
+                  </Button>
                 </div>
               </article>
             ))}

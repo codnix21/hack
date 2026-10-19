@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Annotated, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -13,7 +14,8 @@ from app.deps import (
     hash_password,
     verify_password,
 )
-from app.models.user import User
+from app.config import get_settings
+from app.models.user import User, utcnow
 from app.schemas import GuestContinueResponse, TokenResponse, UserLogin, UserOut, UserRegister
 from app.services.audit import log_action
 
@@ -74,23 +76,30 @@ def me(user: Annotated[User, Depends(get_current_user)]):
 @router.post("/guest-continue", response_model=GuestContinueResponse, summary="Продолжить как гость")
 @router.post("/guest", response_model=GuestContinueResponse, summary="Продолжить как гость", include_in_schema=False)
 def guest_continue(db: Annotated[Session, Depends(get_db)]):
-    email = "guest@demo.local"
-    user = get_user_by_email(db, email)
-    if not user:
-        user = User(
-            email=email,
-            password_hash=hash_password("Guest123!"),
-            full_name="Гость",
-            role="guest",
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    token = create_access_token(user.email, {"role": user.role})
+    """Уникальная гостевая сессия: свои проекты, без доступа к чужим."""
+    ttl = get_settings().GUEST_TTL_DAYS
+    sid = uuid4().hex[:16]
+    email = f"guest-{sid}@session.local"
+    expires = utcnow() + timedelta(days=ttl)
+    user = User(
+        email=email,
+        password_hash=hash_password(uuid4().hex),
+        full_name="Гость",
+        role="guest",
+        expires_at=expires,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = create_access_token(user.email, {"role": user.role, "guest": True})
     return GuestContinueResponse(
         access_token=token,
         user=UserOut.model_validate(user),
-        message="Продолжение как гость: доступны демо-проекты и каталог",
+        expires_at=expires,
+        message=(
+            f"Гостевая сессия: можно создавать и менять свои проекты {ttl} дней. "
+            "Зарегистрируйтесь, чтобы хранить проекты постоянно. Общий каталог недоступен для правки."
+        ),
     )
 
 

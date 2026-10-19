@@ -395,7 +395,7 @@ export function Warehouse3D(props: Props) {
   }
 
   return (
-    <div className="h-[min(58vh,500px)] min-h-[340px] w-full overflow-hidden rounded-sm bg-[#e8ebf0] ring-1 ring-steel-200/80">
+    <div className="h-[min(62vh,560px)] min-h-[360px] w-full overflow-hidden rounded-sm bg-[#e8ebf0] ring-1 ring-steel-200/80">
       <Canvas shadows camera={{ position: [18, 16, 18], fov: 42 }} dpr={[1, 1.75]}>
         <Suspense fallback={null}>
           <SceneContent {...props} />

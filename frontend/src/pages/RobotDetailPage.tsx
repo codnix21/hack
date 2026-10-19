@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { GitCompare, FolderPlus } from 'lucide-react'
 import { catalogApi } from '../api/catalog'
 import { getFriendlyError } from '../api/client'
@@ -12,7 +12,8 @@ import { SkeletonRows } from '../components/ui/Skeleton'
 import { Modal } from '../components/ui/Modal'
 import { Select } from '../components/ui/Select'
 import { projectsApi } from '../api/projects'
-import { toastSuccess } from '../store/toastStore'
+import { matchingApi } from '../api/economics'
+import { toastError, toastSuccess } from '../store/toastStore'
 import {
   formatCurrency,
   formatDate,
@@ -106,6 +107,25 @@ export function RobotDetailPage() {
     queryKey: ['projects-lite'],
     queryFn: () => projectsApi.list(),
     enabled: projectModal,
+  })
+
+  const attachMut = useMutation({
+    mutationFn: async () => {
+      const pid = Number(projectId)
+      const rid = Number(id)
+      if (!pid || !rid) throw new Error('Выберите проект')
+      return matchingApi.selectForEconomics(pid, rid)
+    },
+    onSuccess: (data) => {
+      setProjectModal(false)
+      toastSuccess(
+        data.robot_name
+          ? `«${data.robot_name}» назначено для расчёта в проекте`
+          : 'Решение назначено для расчёта',
+      )
+      navigate(`/app/projects/${projectId}?step=economics`)
+    },
+    onError: (e) => toastError(getFriendlyError(e)),
   })
 
   const manufacturerName = useMemo(() => {
@@ -277,20 +297,45 @@ export function RobotDetailPage() {
         },
         { label: 'Колонка источника', value: r.source_column || NO_SOURCE_DATA },
         {
-          label: 'Дата источника',
-          value: r.source_date ? formatDate(r.source_date) : NO_SOURCE_DATA,
+          label: 'Дата актуализации в источнике',
+          value: r.source_date
+            ? formatDate(r.source_date)
+            : 'Нет данных в исходных материалах (не подставляется автоматически)',
         },
         { label: 'Статус источника', value: r.source_status || NO_SOURCE_DATA },
         { label: 'Источник', value: r.source || NO_SOURCE_DATA },
         { label: 'Ссылка на источник', value: r.source_url || NO_SOURCE_DATA },
         { label: 'Происхождение данных', value: dataOriginLabel(r.data_origin) },
+        {
+          label: 'Валюта цены',
+          value:
+            (r.raw_data as { _field_origins?: { currency?: string } } | null)?._field_origins
+              ?.currency === 'import_assumption_RUB'
+              ? '₽ — допущение импорта (в CSV валюта не указана)'
+              : r.price_rub != null
+                ? '₽'
+                : NO_SOURCE_DATA,
+        },
       ],
     },
     {
-      title: 'Дата актуализации',
-      rows: [{ label: 'Обновлено', value: formatDate(r.updated_at) }],
+      title: 'Дата обновления карточки в системе',
+      rows: [{ label: 'Обновлено в БД', value: formatDate(r.updated_at) }],
     },
   ]
+
+  const variants = (
+    r.raw_data as { catalog_variants?: { scenario?: string; industry?: string; region?: string }[] } | null
+  )?.catalog_variants
+  if (variants && variants.length > 1) {
+    blocks.push({
+      title: 'Варианты отрасли / сценария из каталога',
+      rows: variants.map((v, i) => ({
+        label: `Вариант ${i + 1}`,
+        value: [v.industry, v.scenario, v.region].filter(Boolean).join(' · ') || '—',
+      })),
+    })
+  }
 
   if (docx) {
     const fieldRows = Object.entries(docx.fields || {}).map(([k, v]) => ({
@@ -358,7 +403,7 @@ export function RobotDetailPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
         {manufacturerName && <Badge variant="info">{manufacturerName}</Badge>}
         {solutionName && <Badge>{solutionName}</Badge>}
         <Badge variant="warning">{confirmationLevelLabel(r.confirmation_level)}</Badge>
@@ -371,19 +416,68 @@ export function RobotDetailPage() {
         {r.data_confidence && <Badge variant="info">{r.data_confidence}</Badge>}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {blocks.map((b) => (
-          <Card key={b.title} title={b.title}>
-            <dl className="space-y-2 text-sm">
-              {b.rows.map((row) => (
-                <div key={row.label} className="flex justify-between gap-4 border-b border-steel-100 py-1.5">
-                  <dt className="text-steel-500">{row.label}</dt>
-                  <dd className="text-right font-medium text-steel-800 break-words">{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
+      <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: 'Грузоподъёмность', value: ttxOrMissing(r.payload_kg, formatKg(r.payload_kg)) },
+          { label: 'Цена покупки', value: ttxOrMissing(r.price_rub, formatCurrency(r.price_rub)) },
+          {
+            label: 'Производительность',
+            value: ttxOrMissing(
+              r.productivity_ops_per_hour,
+              r.productivity_ops_per_hour != null
+                ? `${formatNumber(r.productivity_ops_per_hour, 0)} оп/ч`
+                : undefined,
+            ),
+          },
+          { label: 'Скорость', value: ttxOrMissing(r.speed_mps, formatMps(r.speed_mps)) },
+        ].map((k) => (
+          <div key={k.label} className="nc-panel px-3 py-2">
+            <p className="text-[11px] text-steel-500">{k.label}</p>
+            <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{k.value}</p>
+          </div>
         ))}
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {blocks.map((b) => {
+          const filled = b.rows.filter((row) => row.value !== NO_SOURCE_DATA)
+          const missing = b.rows.filter((row) => row.value === NO_SOURCE_DATA)
+          if (filled.length === 0 && missing.length === 0) return null
+          return (
+            <Card key={b.title} title={b.title}>
+              {filled.length > 0 ? (
+                <dl className="space-y-1 text-sm">
+                  {filled.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex justify-between gap-3 border-b border-steel-100 py-1"
+                    >
+                      <dt className="text-steel-500">{row.label}</dt>
+                      <dd className="text-right font-medium text-steel-800 break-words">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-sm text-steel-500">Нет заполненных полей в этой группе.</p>
+              )}
+              {missing.length > 0 && (
+                <details className="mt-2 rounded border border-steel-100 bg-steel-50/60 px-2 py-1.5">
+                  <summary className="cursor-pointer text-xs font-medium text-steel-600">
+                    Нет данных: {missing.length}{' '}
+                    {missing.length === 1 ? 'поле' : 'полей'}
+                  </summary>
+                  <ul className="mt-1.5 space-y-0.5 text-xs text-steel-500">
+                    {missing.map((row) => (
+                      <li key={row.label}>
+                        {row.label} — {NO_SOURCE_DATA}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </Card>
+          )
+        })}
       </div>
 
       <Modal
@@ -396,14 +490,11 @@ export function RobotDetailPage() {
               Отмена
             </Button>
             <Button
-              disabled={!projectId}
-              onClick={() => {
-                setProjectModal(false)
-                navigate(`/app/projects/${projectId}?step=selection`)
-                toastSuccess('Переход к проекту выполнен')
-              }}
+              disabled={!projectId || attachMut.isPending}
+              loading={attachMut.isPending}
+              onClick={() => attachMut.mutate()}
             >
-              Продолжить
+              Использовать для расчёта
             </Button>
           </>
         }
@@ -421,7 +512,11 @@ export function RobotDetailPage() {
             options={projectsQuery.data.map((p) => ({ value: p.id, label: p.name }))}
           />
         )}
-        <p className="mt-3 text-sm text-steel-500">
+        <p className="mt-3 text-sm text-steel-600">
+          Решение будет базой CAPEX/OPEX в выбранном проекте. Затем откроется экономика — нажмите
+          «Рассчитать».
+        </p>
+        <p className="mt-2 text-sm text-steel-500">
           Нет нужного проекта?{' '}
           <Link to="/app/projects/new" className="text-brand-700 hover:underline">
             Создать проект

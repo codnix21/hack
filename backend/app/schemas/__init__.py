@@ -33,6 +33,7 @@ class UserOut(ORMModel):
     role: str
     is_active: bool
     created_at: datetime
+    expires_at: Optional[datetime] = None
 
 
 class GuestContinueResponse(BaseModel):
@@ -40,6 +41,7 @@ class GuestContinueResponse(BaseModel):
     token_type: str = "bearer"
     user: UserOut
     message: str = "Продолжение как гость"
+    expires_at: Optional[datetime] = None
 
 
 # --- Catalog ---
@@ -288,6 +290,14 @@ class ProjectUpdate(BaseModel):
     object_params: Optional[dict] = None
 
 
+class ProjectSummary(BaseModel):
+    area_m2: Optional[float] = None
+    robots_count: Optional[int] = None
+    capex: Optional[float] = None
+    payback_years: Optional[float] = None
+    npv: Optional[float] = None
+
+
 class ProjectOut(ORMModel):
     id: int
     owner_id: Optional[int] = None
@@ -299,11 +309,16 @@ class ProjectOut(ORMModel):
     work_mode: Optional[str] = None
     status: str
     object_params: Optional[dict] = None
+    layout: Optional[dict] = None
     is_demo: bool
     is_archived: bool
+    public_token: Optional[str] = None
+    published_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     last_calc_at: Optional[datetime] = None
+    summary: Optional[ProjectSummary] = None
 
 
 class ProjectParamsUpdate(BaseModel):
@@ -364,6 +379,19 @@ class SensitivityRequest(BaseModel):
     base: EconomicsRequest
     parameter: str
     values: list[float]
+
+
+class FleetCompareRequest(BaseModel):
+    counts: list[int] = Field(default_factory=lambda: [4, 6, 8])
+    robot_id: Optional[int] = None
+    peak_demand: Optional[float] = None
+    productivity: Optional[float] = None
+    utilization: float = 0.85
+    availability: float = 0.95
+    reserve: float = 0.1
+    years: int = 5
+    overrides: Optional[dict] = None
+    persist: bool = True  # сохранить в scenarios fleet_* без изменения purchase
 
 
 # --- Admin ---

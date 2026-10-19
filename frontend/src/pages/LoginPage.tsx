@@ -60,9 +60,9 @@ export function LoginPage() {
           }}
         />
         <div className="relative">
-          <span className="brand-mark">РП</span>
+          <span className="brand-mark">NC</span>
           <p className="mt-8 font-display text-5xl font-bold uppercase leading-none tracking-wide text-brand-400">
-            РобоПодбор
+            NETCORE
           </p>
           <p className="mt-4 max-w-sm text-base text-steel-300">
             Промышленная платформа подбора AMR/AGV, расчёта эффекта и схемы работы на объекте.
@@ -87,9 +87,9 @@ export function LoginPage() {
       <div className="flex flex-col justify-center bg-steel-50 px-6 py-12 sm:px-10">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <span className="brand-mark">РП</span>
+            <span className="brand-mark">NC</span>
             <p className="mt-3 font-display text-3xl font-bold uppercase tracking-wide text-brand-600">
-              РобоПодбор
+              NETCORE
             </p>
           </div>
           <h1 className="font-display text-3xl font-semibold uppercase tracking-wide text-ink">

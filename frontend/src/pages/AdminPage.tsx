@@ -357,7 +357,7 @@ export function AdminPage() {
                       : u.role === 'guest'
                         ? 'Гость'
                         : u.role === 'vendor'
-                          ? 'Вендор'
+                          ? 'Поставщик'
                           : 'Пользователь'}
                   </Badge>
                 ),

@@ -18,8 +18,12 @@ class Project(Base):
     work_mode = Column(String(64), nullable=True)  # 1с|2с|3с|24/7
     status = Column(String(64), default="draft", nullable=False)
     object_params = Column(JSON, nullable=True)
+    layout = Column(JSON, nullable=True)  # геометрия склада в метрах
     is_demo = Column(Boolean, default=False, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
+    public_token = Column(String(64), nullable=True, unique=True, index=True)
+    published_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)  # гостевые проекты
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     last_calc_at = Column(DateTime, nullable=True)

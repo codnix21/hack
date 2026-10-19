@@ -137,21 +137,19 @@ export function ProjectsPage() {
   return (
     <div>
       <PageHeader
-        title="Мои проекты"
+        title="Проекты"
         subtitle="Управление проектами подбора роботизированных решений"
         crumbs={[
           { label: 'Панель управления', to: '/app' },
           { label: 'Мои проекты' },
         ]}
         actions={
-          !isGuest ? (
-            <Link to="/app/projects/new">
-              <Button>
-                <Plus className="h-4 w-4" />
-                Создать проект
-              </Button>
-            </Link>
-          ) : undefined
+          <Link to="/app/projects/new">
+            <Button>
+              <Plus className="h-4 w-4" />
+              {isGuest ? 'Создать гостевой проект' : 'Создать проект'}
+            </Button>
+          </Link>
         }
       />
 
@@ -204,14 +202,10 @@ export function ProjectsPage() {
       {!query.isLoading && !query.isError && pageItems.length === 0 && (
         <div className="page-surface">
           <EmptyState
-            title={isGuest ? 'Нет доступных проектов' : 'Проектов пока нет'}
-            description={
-              isGuest
-                ? 'В гостевом режиме доступны только демонстрационные сценарии.'
-                : 'Создайте первый проект или откройте демонстрационный сценарий.'
-            }
-            actionLabel={isGuest ? 'К демонстрации' : 'Создать проект'}
-            onAction={() => navigate(isGuest ? '/app/demo' : '/app/projects/new')}
+            title="Проектов пока нет"
+            description="Создайте проект склада или откройте демонстрационный сценарий и сделайте копию."
+            actionLabel="Создать проект"
+            onAction={() => navigate('/app/projects/new')}
           />
         </div>
       )}
@@ -229,6 +223,22 @@ export function ProjectsPage() {
                         'Тип не задан'}{' '}
                       · обновлён {formatDate(p.updated_at)}
                     </p>
+                    {(p.summary?.area_m2 != null ||
+                      p.summary?.robots_count != null ||
+                      p.summary?.capex != null) && (
+                      <p className="mt-1 text-xs text-steel-600">
+                        {p.summary.area_m2 != null ? `${p.summary.area_m2} м²` : null}
+                        {p.summary.robots_count != null
+                          ? ` · ${p.summary.robots_count} роботов`
+                          : null}
+                        {p.summary.capex != null
+                          ? ` · CAPEX ${Math.round(p.summary.capex / 1e6)} млн ₽`
+                          : null}
+                        {p.summary.payback_years != null
+                          ? ` · окупаемость ${p.summary.payback_years} лет`
+                          : null}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     {p.is_demo && (
@@ -251,22 +261,20 @@ export function ProjectsPage() {
                   <Button size="sm" onClick={() => navigate(`/app/projects/${p.id}`)}>
                     Открыть
                   </Button>
-                  {!isGuest && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/app/projects/${p.id}/edit`)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Изменить
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => copyMut.mutate(p.id)}>
-                        <Copy className="h-3.5 w-3.5" />
-                        Копировать
-                      </Button>
-                    </>
+                  {!p.is_demo && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/app/projects/${p.id}/edit`)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Изменить
+                    </Button>
                   )}
+                  <Button size="sm" variant="ghost" onClick={() => copyMut.mutate(p.id)}>
+                    <Copy className="h-3.5 w-3.5" />
+                    Копировать
+                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
@@ -298,7 +306,7 @@ export function ProjectsPage() {
                   >
                     <FileSpreadsheet className="h-3.5 w-3.5" />
                   </Button>
-                  {!isGuest && (
+                  {!p.is_demo && (
                     <>
                       <Button
                         size="sm"

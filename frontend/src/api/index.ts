@@ -9,7 +9,6 @@ export {
   matchingApi,
   selectionApi,
   visualizationApi,
-  analyticsApi,
 } from './economics'
 export { importApi } from './import'
 export { adminApi } from './admin'

@@ -46,8 +46,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
         aria-modal="true"
         className={`relative z-10 w-full ${sizes[size]} rounded border border-steel-200 bg-white shadow-lift`}
       >
-        <div className="flex items-center justify-between border-b border-steel-200 bg-steel-50/70 px-5 py-3.5">
-          <h2 className="font-display text-lg font-semibold uppercase tracking-wide text-ink">{title}</h2>
+        <div className="flex items-center justify-between border-b border-steel-100 px-5 py-3.5">
+          <h2 className="nc-title-sm">{title}</h2>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Закрыть">
             <X className="h-4 w-4" />
           </Button>

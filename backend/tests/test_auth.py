@@ -53,3 +53,29 @@ def test_catalog_accessible(client):
     r = client.get("/api/catalog?page=1&page_size=5")
     assert r.status_code == 200
     assert r.json()["total"] >= 20
+
+
+def test_admin_requires_admin_role(client):
+    """Гость и обычный user не получают доступ к /api/admin (SQLite-тест)."""
+    guest = client.post("/api/auth/guest-continue")
+    assert guest.status_code == 200
+    gh = {"Authorization": f"Bearer {guest.json()['access_token']}"}
+    r_guest = client.get("/api/admin/users", headers=gh)
+    assert r_guest.status_code == 403
+    assert "админ" in str(r_guest.json().get("detail", "")).lower() or "прав" in str(
+        r_guest.json().get("detail", "")
+    ).lower()
+
+    user_tok = client.post(
+        "/api/auth/login",
+        json={"email": "user@demo.local", "password": "User123!"},
+    ).json()["access_token"]
+    r_user = client.get("/api/admin/users", headers={"Authorization": f"Bearer {user_tok}"})
+    assert r_user.status_code == 403
+
+    admin_tok = client.post(
+        "/api/auth/login",
+        json={"email": "admin@demo.local", "password": "Admin123!"},
+    ).json()["access_token"]
+    r_admin = client.get("/api/admin/users", headers={"Authorization": f"Bearer {admin_tok}"})
+    assert r_admin.status_code == 200

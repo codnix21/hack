@@ -33,6 +33,7 @@ SHEET_TO_OBJECT = {
 }
 
 # Stable aliases: Russian title (lower) → existing schema key
+# Включает фактические заголовки Датасеты_хакатон.xlsx (Склад / Аэропорт / Мед).
 PARAM_ALIASES: dict[str, str] = {
     "общая площадь склада": "area_m2",
     "площадь активной (роботизируемой) зоны": "active_area_m2",
@@ -44,8 +45,27 @@ PARAM_ALIASES: dict[str, str] = {
     "количество рабочих смен в сутки": "shifts_count",
     "продолжительность смены": "shift_hours",
     "пиковый коэффициент нагрузки": "peak_factor",
+    # Персонал (реальные названия датасета + legacy)
+    "общая численность персонала склада": "staff_count",
+    "численность персонала склада": "staff_count",
     "численность персонала склада (логистика)": "staff_count",
+    "численность персонала": "staff_count",
+    "средняя з/п отборщика (gross)": "staff_salary_month",
+    "средняя з/п оператора погрузчика (gross)": "forklift_salary_month",
+    "коэффициент начислений на фот (страховые взносы)": "payroll_tax_coef",
     "средняя годовая стоимость 1 сотрудника (с начислениями)": "staff_cost_per_person_year",
+    "годовые затраты на персонал": "staff_cost_year",
+    "затраты на персонал": "staff_cost_year",
+    "стоимость персонала": "current_labor_cost_year",
+    # Операции
+    "объём отбора (строк/сутки, всего)": "ops_count",
+    "объем отбора (строк/сутки, всего)": "ops_count",
+    "объём приёмки (поддоны/сутки)": "inbound_pallets_per_day",
+    "объем приемки (поддоны/сутки)": "inbound_pallets_per_day",
+    "объём отгрузки (поддоны/сутки)": "outbound_pallets_per_day",
+    "объем отгрузки (поддоны/сутки)": "outbound_pallets_per_day",
+    "пиковый спрос": "peak_demand",
+    "пиковая нагрузка": "peak_demand",
     "суммарная площадь терминала (ов)": "area_m2",
     "площадь перрона и технических зон": "apron_area_m2",
     "количество терминалов": "terminals_count",
@@ -167,11 +187,30 @@ def resolve_datasets_path(explicit: Optional[str | Path] = None) -> Optional[Pat
     return None
 
 
+def _normalize_alias_key(name: str) -> str:
+    """Нижний регистр, ё→е, схлопывание пробелов/пунктуации для алиасов."""
+    s = (name or "").strip().lower().replace("ё", "е")
+    s = s.replace("\u00a0", " ")
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+
+# Lookup after ё→е so «Объём…» / «Объем…» из датасета совпадают с алиасами.
+_NORMALIZED_ALIASES: dict[str, str] = {
+    _normalize_alias_key(k): v for k, v in PARAM_ALIASES.items()
+}
+
+
 def slugify_param(name: str) -> str:
-    low = (name or "").strip().lower()
-    if low in PARAM_ALIASES:
-        return PARAM_ALIASES[low]
-    # normalize punctuation
+    low = _normalize_alias_key(name)
+    if low in _NORMALIZED_ALIASES:
+        return _NORMALIZED_ALIASES[low]
+    # без скобочных уточнений: «Общая численность персонала склада (логистика)»
+    no_paren = re.sub(r"\([^)]*\)", "", low).strip()
+    no_paren = re.sub(r"\s+", " ", no_paren)
+    if no_paren in _NORMALIZED_ALIASES:
+        return _NORMALIZED_ALIASES[no_paren]
+    # normalize punctuation → latin slug
     s = low
     for ch, lat in _TRANSLIT.items():
         s = s.replace(ch, lat)
@@ -303,15 +342,35 @@ def base_params_dict(params: list[DatasetParam]) -> dict[str, Any]:
     if "shifts_count" in out:
         shifts = out["shifts_count"]
         out.setdefault("work_mode", f"{int(shifts)}с" if shifts else "2с")
-    if "staff_count" in out and "staff_cost_per_person_year" in out:
-        try:
-            out.setdefault(
-                "current_labor_cost_year",
-                float(out["staff_count"]) * float(out["staff_cost_per_person_year"]),
-            )
-            out.setdefault("staff_cost_year", out["current_labor_cost_year"])
-        except (TypeError, ValueError):
-            pass
+    from app.services.labor_cost import estimate_peak_from_daily_ops, resolve_current_labor_cost
+
+    labor = resolve_current_labor_cost(out, assumption_default=0.0)
+    if labor["labor_cost_origin"] != "model_assumption" and labor["current_labor_cost_year"] > 0:
+        # Не затираем явное значение; setdefault только если пусто
+        if out.get("current_labor_cost_year") in (None, "", 0, "0"):
+            out["current_labor_cost_year"] = labor["current_labor_cost_year"]
+        out.setdefault("staff_cost_year", labor["current_labor_cost_year"])
+        if labor["warnings"]:
+            out.setdefault("_import_warnings", [])
+            if isinstance(out["_import_warnings"], list):
+                out["_import_warnings"].extend(labor["warnings"])
+    elif labor["warnings"] and labor["labor_cost_origin"] != "model_assumption":
+        out.setdefault("_import_warnings", [])
+        if isinstance(out["_import_warnings"], list):
+            out["_import_warnings"].extend(labor["warnings"])
+
+    if out.get("peak_demand") in (None, "", 0, "0"):
+        peak, how = estimate_peak_from_daily_ops(out)
+        if peak:
+            out["peak_demand"] = peak
+            out["peak_demand_is_estimate"] = True
+            out.setdefault("_import_warnings", [])
+            if isinstance(out["_import_warnings"], list):
+                out["_import_warnings"].append(
+                    f"Пиковая нагрузка оценена из суточного объёма отбора ({how}) = {peak} оп/ч — "
+                    "это оценка, не измеренный пик; единица — строки отбора/ч, не паллеты."
+                )
+
     if "aisle_width_m" in out and "aisle_width_mm" not in out:
         try:
             out["aisle_width_mm"] = float(out["aisle_width_m"]) * 1000

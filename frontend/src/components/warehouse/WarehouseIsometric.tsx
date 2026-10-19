@@ -138,7 +138,7 @@ export function WarehouseIsometric({
       for (const p of layout.charging_stations || []) {
         drawBox(ctx, ox, oy, p.x * scale - 10, p.y * scale - 10, 20, 20, 14, '#15803d', false)
         ctx.fillStyle = '#fff'
-        ctx.font = '700 9px Barlow Condensed, sans-serif'
+        ctx.font = '700 9px Segoe UI, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         const top = isoProject(p.x * scale, p.y * scale, 14, ox, oy)
@@ -220,7 +220,7 @@ export function WarehouseIsometric({
         ctx.fill()
 
         ctx.fillStyle = '#fff'
-        ctx.font = '700 9px Barlow Condensed, sans-serif'
+        ctx.font = '700 9px Segoe UI, system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText(r.label, top.x, top.y + 0.5)

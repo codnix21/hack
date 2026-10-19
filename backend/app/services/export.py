@@ -32,9 +32,31 @@ _FONT_NAME = "Helvetica"
 PLATFORM_NAME = "Платформа подбора роботизированных решений"
 
 STATUS_LABELS_RU = {
-    "suitable": "Подходит",
+    "suitable": "Предварительно подходит",
     "needs_review": "Требует проверки",
     "excluded": "Не подходит",
+}
+
+METRIC_LABELS_RU = {
+    "capex": "Капитальные затраты (CAPEX)",
+    "opex": "Эксплуатационные расходы (OPEX)",
+    "opex_annual": "Эксплуатационные расходы (OPEX)",
+    "roi": "Рентабельность инвестиций (ROI)",
+    "roi_percent": "Рентабельность инвестиций (ROI)",
+    "tco": "Совокупная стоимость владения (TCO)",
+    "npv": "Чистая приведённая стоимость (NPV)",
+    "irr": "Внутренняя норма доходности (IRR)",
+    "payback": "Срок окупаемости",
+    "annual_effect": "Годовой экономический эффект",
+    "cf": "Денежный поток",
+    "straight_line": "Линейный метод",
+}
+
+WORK_MODE_LABELS_RU = {
+    "1shift": "1 смена",
+    "2shift": "2 смены",
+    "24x7": "Круглосуточно (24/7)",
+    "24/7": "Круглосуточно (24/7)",
 }
 
 ASSUMPTION_LABELS_RU = {
@@ -54,12 +76,12 @@ ASSUMPTION_LABELS_RU = {
     "ops_staff_per_10_robots": "Персонал на 10 роботов",
     "ops_staff_salary_year": "Зарплата персонала",
     "license_share_of_software": "Доля лицензий от ПО",
-    "current_labor_cost_year": "Текущие затраты на труд",
-    "labor_reduction_share": "Доля снижения затрат на труд",
+    "current_labor_cost_year": "Годовые затраты на персонал",
+    "labor_reduction_share": "Ожидаемая доля сокращения трудозатрат",
     "additional_revenue": "Дополнительная выручка",
     "raas_monthly_per_robot": "Аренда (RaaS) в месяц на робота",
-    "unit_price": "Цена единицы",
-    "peak_demand": "Пиковый спрос",
+    "unit_price": "Стоимость единицы оборудования",
+    "peak_demand": "Пиковая нагрузка",
     "productivity": "Производительность",
     "robots_count": "Количество роботов",
     "software_cost": "Стоимость ПО",
@@ -159,7 +181,7 @@ ECONOMICS_DESCRIPTIONS = {
     "annual_effect": "Ожидаемый чистый эффект за год",
     "payback_years": "Ориентировочный период возврата инвестиций",
     "roi_percent": "Возврат инвестиций относительно CAPEX",
-    "tco": "Совокупная стоимость владения за горизонт анализа",
+    "tco": "TCO роботизации (CAPEX + OPEX роботов × горизонт; без оставшегося ручного труда)",
 }
 
 BREAKDOWN_LABELS_RU = {
@@ -188,7 +210,14 @@ FORMULA_LABELS_RU = {
     "annual_effect": "Годовой эффект",
     "payback": "Срок окупаемости",
     "roi": "Рентабельность инвестиций (ROI)",
-    "tco": "Совокупная стоимость владения (TCO)",
+    "roi_horizon": "Рентабельность за горизонт анализа (ROI)",
+    "tco": "TCO роботизации (без оставшегося ручного труда)",
+    "npv": "Чистая приведённая стоимость (NPV)",
+    "irr": "Внутренняя норма доходности (IRR)",
+    "gross_effect": "Валовой операционный эффект",
+    "net_effect": "Чистый годовой эффект",
+    "depreciation": "Амортизация CAPEX",
+    "annual_effect_with_depreciation": "Годовой эффект с учётом амортизации",
 }
 
 PROJECT_STATUS_RU = {
@@ -252,14 +281,21 @@ def _scenario_metrics(results: Any) -> dict[str, Any]:
     payback = results.get("payback") if isinstance(results.get("payback"), dict) else {}
     roi = results.get("roi") if isinstance(results.get("roi"), dict) else {}
     tco = results.get("tco") if isinstance(results.get("tco"), dict) else {}
+    npv = results.get("npv") if isinstance(results.get("npv"), dict) else {}
+    irr = results.get("irr") if isinstance(results.get("irr"), dict) else {}
     return {
         "robots_count": results.get("robots_count"),
         "capex": capex.get("capex") if capex else results.get("capex"),
         "opex_annual": opex.get("opex_annual") if opex else results.get("opex_annual"),
         "annual_effect": effect.get("annual_effect") if effect else results.get("annual_effect"),
+        "gross_operating_effect": effect.get("gross_operating_effect"),
+        "net_annual_effect": effect.get("net_annual_effect") or effect.get("annual_effect"),
         "payback_years": payback.get("payback_years") if payback else results.get("payback_years"),
         "roi_percent": roi.get("roi_percent") if roi else results.get("roi_percent"),
         "tco": tco.get("tco") if tco else results.get("tco"),
+        "npv": npv.get("npv") if npv else results.get("npv"),
+        "irr": irr.get("irr") if irr else results.get("irr"),
+        "cashflows": results.get("cashflows") if isinstance(results.get("cashflows"), list) else [],
         "scenario_name_ru": results.get("scenario_name_ru") or results.get("scenario"),
     }
 
@@ -383,6 +419,16 @@ def _reasons_text(items: Optional[list], limit: int = 3) -> str:
     if more > 0:
         cleaned.append(f"• … ещё {more}")
     return "\n".join(cleaned) if cleaned else "—"
+
+
+def _metric_ru(key: str, fallback: Optional[str] = None) -> str:
+    return METRIC_LABELS_RU.get(key, fallback or key)
+
+
+def _work_mode_ru(value: Optional[str]) -> str:
+    if not value:
+        return "Нет данных"
+    return WORK_MODE_LABELS_RU.get(str(value), str(value))
 
 
 def _status_ru(status: Optional[str]) -> str:
@@ -714,11 +760,11 @@ def export_project_excel(
         ("Дата формирования", today),
         ("Статус проекта", "Демонстрационный проект" if is_demo else "Рабочий проект"),
         ("Регион", _dash(getattr(project, "region", None))),
-        ("Режим работы", _dash(getattr(project, "work_mode", None))),
+        ("Режим работы", _work_mode_ru(getattr(project, "work_mode", None))),
         ("", ""),
         ("Результаты подбора", ""),
         ("Всего рассмотрено решений", counts["total"]),
-        ("Подходит", counts["suitable"]),
+        ("Предварительно подходит", counts["suitable"]),
         ("Требует проверки", counts["needs_review"]),
         ("Не подходит", counts["excluded"]),
     ]
@@ -727,12 +773,32 @@ def export_project_excel(
             [
                 ("", ""),
                 ("Ключевые показатели экономики", ""),
-                ("CAPEX", f"{_money_label(_econ_value(economics, 'capex'))} ₽"),
-                ("OPEX", f"{_money_label(_econ_value(economics, 'opex_annual'))} ₽/год"),
-                ("TCO", f"{_money_label(_econ_value(economics, 'tco'))} ₽"),
-                ("ROI", f"{_dash(_econ_value(economics, 'roi_percent'))} %"),
                 (
-                    "Срок окупаемости",
+                    _metric_ru("capex"),
+                    f"{_money_label(_econ_value(economics, 'capex'))} ₽",
+                ),
+                (
+                    f"{_metric_ru('opex')} роботизации",
+                    f"{_money_label(_econ_value(economics, 'opex_annual'))} ₽/год",
+                ),
+                (
+                    f"{_metric_ru('tco')} роботизации",
+                    f"{_money_label(_econ_value(economics, 'tco'))} ₽",
+                ),
+                (
+                    "Полный выход (с оставшимся трудом)",
+                    f"{_money_label((economics.get('tco') or {}).get('total_outlay_with_remaining_labor') if isinstance(economics.get('tco'), dict) else None)} ₽",
+                ),
+                (
+                    _metric_ru("npv"),
+                    f"{_money_label((economics.get('npv') or {}).get('npv') if isinstance(economics.get('npv'), dict) else None)} ₽",
+                ),
+                (
+                    _metric_ru("roi"),
+                    f"{_dash(_econ_value(economics, 'roi_percent'))} %",
+                ),
+                (
+                    _metric_ru("payback"),
                     f"{_dash(_econ_value(economics, 'payback_years'))} лет",
                 ),
             ]
@@ -766,8 +832,8 @@ def export_project_excel(
             ws_title.cell(r, 1).font = Font(bold=True, color="1F4E79")
     _set_col_widths(ws_title, {"A": 34, "B": 62})
 
-    # 2. Проект
-    ws_proj = wb.create_sheet("Проект")
+    # 2. Объект (проект + ключевые параметры)
+    ws_proj = wb.create_sheet("Объект")
     ws_proj.append(["Параметр", "Значение"])
     for label, value in [
         ("Название", project_name),
@@ -782,7 +848,7 @@ def export_project_excel(
     _style_table(ws_proj, wrap_cols={2}, auto_filter=False)
     _set_col_widths(ws_proj, {"A": 28, "B": 70})
 
-    # 3. Параметры объекта
+    # 3. Параметры объекта (детализация)
     ws_params = wb.create_sheet("Параметры объекта")
     ws_params.append(["Параметр", "Значение", "Единица", "Источник"])
     params = project.object_params if isinstance(getattr(project, "object_params", None), dict) else {}
@@ -808,7 +874,7 @@ def export_project_excel(
     _set_col_widths(ws_params, {"A": 40, "B": 28, "C": 12, "D": 22})
 
     # 4. Подобранные решения — сначала подходящие/проверка, короткие причины
-    ws_sols = wb.create_sheet("Подобранные решения")
+    ws_sols = wb.create_sheet("Роботы")
     ws_sols.append(
         [
             "№",
@@ -885,6 +951,68 @@ def export_project_excel(
         widths[get_column_letter(i)] = 18
     _set_col_widths(ws_cmp, widths)
 
+    # 5b. Симуляция — метрики из последнего расчёта / fleet (без фиктивных значений)
+    ws_sim = wb.create_sheet("Симуляция")
+    ws_sim.append(["Показатель", "Значение", "Примечание"])
+    sim_note = (
+        "Дискретно-событийная демонстрационная модель по сохранённому плану; "
+        "не полноценная физическая симуляция."
+    )
+    robots_n = _econ_value(economics, "robots_count") if economics else None
+    ws_sim.append(["Количество роботов (активный сценарий)", _dash(robots_n), sim_note])
+    fleet_rows = [
+        sc
+        for sc in (scenarios or [])
+        if str(sc.get("code") or "").startswith("fleet_")
+    ]
+    if fleet_rows:
+        ws_sim.append(["Сценарии парка", "", ""])
+        ws_sim.append(
+            [
+                "Конфигурация",
+                "Роботов",
+                "Покрытие пика / загрузка / простой (оценка)",
+            ]
+        )
+        for sc in fleet_rows:
+            res = sc.get("results") if isinstance(sc.get("results"), dict) else {}
+            ops = res.get("operations") if isinstance(res.get("operations"), dict) else {}
+            m = _scenario_metrics(res)
+            cov = ops.get("peak_coverage")
+            util = ops.get("utilization_estimate")
+            idle = ops.get("idle_estimate")
+            detail = (
+                f"покрытие={_dash(cov)}; загрузка={_dash(util)}; простой={_dash(idle)}"
+                + ("; оценочно" if ops.get("estimated") else "")
+            )
+            if ops.get("note"):
+                detail = f"{detail}; {ops.get('note')}"
+            ws_sim.append(
+                [
+                    _dash(sc.get("name_ru") or sc.get("code")),
+                    _dash(m.get("robots_count") or res.get("robots_count")),
+                    detail or "Нет данных симуляции",
+                ]
+            )
+    else:
+        ws_sim.append(
+            [
+                "Сценарии парка",
+                "Нет данных",
+                "Запустите сравнение конфигураций (4/6/8) в интерфейсе",
+            ]
+        )
+    ws_sim.append(
+        [
+            "Ограничение модели",
+            "—",
+            "Метрики производительности и узких мест берутся из модели маршрутов/спроса; "
+            "при отсутствии данных ячейка содержит «Нет данных», а не подстановку.",
+        ]
+    )
+    _style_table(ws_sim, wrap_cols={3}, auto_filter=False)
+    _set_col_widths(ws_sim, {"A": 36, "B": 14, "C": 64})
+
     # 6. Экономика
     ws_econ = wb.create_sheet("Экономика")
     ws_econ.append(["Показатель", "Значение", "Единица", "Описание"])
@@ -897,16 +1025,145 @@ def export_project_excel(
     ws_econ.append(["Сценарий", _dash(scenario_name), "—", "Активный сценарий расчёта"])
     for key, title, unit in [
         ("robots_count", "Количество роботов", "шт"),
-        ("capex", "CAPEX", "₽"),
-        ("opex_annual", "OPEX", "₽/год"),
-        ("annual_effect", "Годовой эффект", "₽/год"),
-        ("tco", "TCO", "₽"),
-        ("roi_percent", "ROI", "%"),
-        ("payback_years", "Срок окупаемости", "лет"),
+        ("capex", _metric_ru("capex"), "₽"),
+        ("opex_annual", f"{_metric_ru('opex')} роботизации", "₽/год"),
+        ("annual_effect", _metric_ru("annual_effect"), "₽/год"),
+        ("tco", f"{_metric_ru('tco')} роботизации", "₽"),
+        ("roi_percent", _metric_ru("roi"), "%"),
+        ("payback_years", _metric_ru("payback"), "лет"),
     ]:
         raw = _econ_value(economics, key)
         value = _format_money(raw) if unit in {"₽", "₽/год"} else _dash(raw)
         ws_econ.append([title, value, unit, ECONOMICS_DESCRIPTIONS.get(key, "")])
+    if economics:
+        tco_block = economics.get("tco") if isinstance(economics.get("tco"), dict) else {}
+        outlay = tco_block.get("total_outlay_with_remaining_labor")
+        rem = tco_block.get("remaining_manual_labor_annual")
+        if rem is not None:
+            ws_econ.append(
+                [
+                    "Оставшийся ручной труд",
+                    _format_money(rem),
+                    "₽/год",
+                    "Не входит в TCO роботизации",
+                ]
+            )
+        if outlay is not None:
+            ws_econ.append(
+                [
+                    "Полный денежный выход",
+                    _format_money(outlay),
+                    "₽",
+                    "TCO + оставшийся труд × горизонт",
+                ]
+            )
+        years = (economics.get("inputs") or {}).get("years") if isinstance(economics.get("inputs"), dict) else tco_block.get("years")
+        discount = None
+        if isinstance(economics.get("npv"), dict):
+            discount = economics["npv"].get("discount_rate")
+        if years is not None:
+            ws_econ.append(
+                [
+                    "Горизонт анализа",
+                    _dash(years),
+                    "лет",
+                    "Годы для TCO / NPV / денежного потока",
+                ]
+            )
+        if discount is not None:
+            ws_econ.append(
+                [
+                    "Ставка дисконтирования",
+                    f"{float(discount) * 100:.1f}",
+                    "%",
+                    "Допущение модели для NPV",
+                ]
+            )
+        npv_v = economics.get("npv", {}).get("npv") if isinstance(economics.get("npv"), dict) else None
+        irr_v = economics.get("irr", {}).get("irr") if isinstance(economics.get("irr"), dict) else None
+        ws_econ.append(
+            [
+                _metric_ru("npv"),
+                _format_money(npv_v) if npv_v is not None else "Нет данных",
+                "₽",
+                "Дисконтированные денежные потоки",
+            ]
+        )
+        ws_econ.append(
+            [
+                _metric_ru("irr"),
+                _dash(irr_v),
+                "%",
+                "При невозможности расчёта — «Нет данных»",
+            ]
+        )
+        dep = economics.get("depreciation") if isinstance(economics.get("depreciation"), dict) else {}
+        if dep.get("applicable") and dep.get("annual_depreciation") is not None:
+            ws_econ.append(["Амортизация CAPEX (бухгалтерская)", "", "", ""])
+            method_raw = dep.get("method_label_ru") or dep.get("method") or "straight_line"
+            method_label = METRIC_LABELS_RU.get(str(method_raw), method_raw)
+            ws_econ.append(
+                [
+                    "Метод",
+                    method_label,
+                    "",
+                    "Допущение команды; не денежный отток",
+                ]
+            )
+            ws_econ.append(
+                [
+                    "Срок службы",
+                    _dash(dep.get("useful_life_years")),
+                    "лет",
+                    "Допущение (в ТЗ число не задано)",
+                ]
+            )
+            ws_econ.append(
+                [
+                    "База",
+                    _format_money(dep.get("depreciable_base")),
+                    "₽",
+                    str(dep.get("asset_label") or _metric_ru("capex")),
+                ]
+            )
+            ws_econ.append(
+                [
+                    "Амортизация / год",
+                    _format_money(dep.get("annual_depreciation")),
+                    "₽/год",
+                    "Не входит в денежный поток / NPV / IRR",
+                ]
+            )
+            effect = economics.get("annual_effect") if isinstance(economics.get("annual_effect"), dict) else {}
+            if effect.get("with_depreciation") is not None:
+                ws_econ.append(
+                    [
+                        "Годовой эффект с амортизацией",
+                        _format_money(effect.get("with_depreciation")),
+                        "₽/год",
+                        "Денежный эффект − амортизация (бухгалтерский вид)",
+                    ]
+                )
+        cfs = economics.get("cashflows") if isinstance(economics.get("cashflows"), list) else []
+        if cfs:
+            ws_econ.append(["Денежные потоки", "", "", ""])
+            ws_econ.append(
+                ["Год", "Денежный поток (CF)", "Накоплено", "Амортизация (бух., не в CF)"]
+            )
+            for row in cfs:
+                if isinstance(row, dict):
+                    ws_econ.append(
+                        [
+                            row.get("year"),
+                            _format_money(row.get("cashflow")),
+                            _format_money(row.get("cumulative")),
+                            (
+                                _format_money(row.get("depreciation_accounting"))
+                                if row.get("depreciation_accounting") is not None
+                                else ""
+                            ),
+                        ]
+                    )
 
     # section: CAPEX breakdown
     if economics:
@@ -914,15 +1171,33 @@ def export_project_excel(
         breakdown = capex_block.get("breakdown") or {}
         if breakdown:
             ws_econ.append(["Состав CAPEX", "", "", ""])
+            sources = capex_block.get("component_sources") or {}
             for k, v in breakdown.items():
                 if k == "ops_staff_count":
                     continue
+                src = sources.get(str(k)) if isinstance(sources, dict) else None
+                origin = (src or {}).get("origin") if isinstance(src, dict) else None
+                note = (src or {}).get("note") if isinstance(src, dict) else None
+                desc = "Статья капитальных затрат"
+                if origin == "model_assumption":
+                    desc = f"Допущение модели: {note or 'доля/норматив'}"
+                elif note:
+                    desc = str(note)
                 ws_econ.append(
                     [
                         BREAKDOWN_LABELS_RU.get(str(k), str(k)),
                         _format_money(v),
                         "₽",
-                        "Статья капитальных затрат",
+                        desc,
+                    ]
+                )
+            if capex_block.get("breakdown_matches_total") is False:
+                ws_econ.append(
+                    [
+                        "⚠ Сумма статей ≠ CAPEX",
+                        _format_money(capex_block.get("breakdown_sum")),
+                        "₽",
+                        "Внутренняя проверка не пройдена",
                     ]
                 )
         opex_block = economics.get("opex") if isinstance(economics.get("opex"), dict) else {}
@@ -981,6 +1256,7 @@ def export_project_excel(
             "Окупаемость, лет",
             "ROI, %",
             "TCO, ₽",
+            "NPV, ₽",
         ]
     )
     for sc in scenarios or []:
@@ -995,12 +1271,13 @@ def export_project_excel(
                 _dash(m.get("payback_years")),
                 _dash(m.get("roi_percent")),
                 _format_money(m.get("tco")),
+                _format_money(m.get("npv")),
             ]
         )
     if not scenarios:
-        ws_sc.append(["Нет сохранённых сценариев", "—", "—", "—", "—", "—", "—", "—"])
-    _style_table(ws_sc, money_cols={3, 4, 5, 8}, percent_cols={7})
-    _set_col_widths(ws_sc, {"A": 26, "B": 10, "C": 14, "D": 14, "E": 16, "F": 14, "G": 10, "H": 14})
+        ws_sc.append(["Нет сохранённых сценариев", "—", "—", "—", "—", "—", "—", "—", "—"])
+    _style_table(ws_sc, money_cols={3, 4, 5, 8, 9}, percent_cols={7})
+    _set_col_widths(ws_sc, {"A": 26, "B": 10, "C": 14, "D": 14, "E": 16, "F": 14, "G": 10, "H": 14, "I": 14})
 
     # 9. Что если
     ws_wi = wb.create_sheet("Что если")
@@ -1095,15 +1372,28 @@ def export_project_excel(
     _style_table(ws_ass, wrap_cols={1}, money_cols={2})
     _set_col_widths(ws_ass, {"A": 42, "B": 14, "C": 10, "D": 30})
 
-    # 11. Источники
-    ws_src = wb.create_sheet("Источники")
-    ws_src.append(["Источник", "Тип данных", "Файл / ссылка", "Комментарий"])
+    # 11. Источники и допущения (сводка + ссылки)
+    ws_src = wb.create_sheet("Источники и допущения")
+    ws_src.append(["Раздел", "Наименование", "Значение / ссылка", "Комментарий"])
+    if isinstance(assum, dict) and assum:
+        for k, v in assum.items():
+            key = str(k)
+            if not _is_model_assumption(key):
+                continue
+            ws_src.append(
+                [
+                    "Допущение",
+                    _assumption_label(key),
+                    _format_share_or_number(key, v),
+                    "Допущение модели расчёта",
+                ]
+            )
     for src in sources or []:
         if isinstance(src, dict):
             ws_src.append(
                 [
+                    "Источник",
                     _dash(src.get("name")),
-                    "Справочник",
                     _dash(src.get("url")),
                     _dash(src.get("description")),
                 ]
@@ -1111,8 +1401,8 @@ def export_project_excel(
         else:
             ws_src.append(
                 [
+                    "Источник",
                     _dash(getattr(src, "name", None)),
-                    "Справочник",
                     _dash(getattr(src, "url", None)),
                     _dash(getattr(src, "description", None)),
                 ]
@@ -1125,25 +1415,25 @@ def export_project_excel(
             row_no = s.get("source_row")
             ws_src.append(
                 [
+                    "Каталог",
                     sf,
-                    _origin_label(s.get("data_origin")),
                     f"Строка {row_no}" if row_no is not None else "—",
-                    "Файл исходных материалов каталога",
+                    _origin_label(s.get("data_origin")),
                 ]
             )
     if is_demo:
         ws_src.append(
             [
+                "Источник",
                 "Демонстрационные данные платформы",
-                "Демонстрационные данные",
                 "—",
                 "Используются для показа возможностей, не заменяют исходные материалы",
             ]
         )
     if ws_src.max_row == 1:
-        ws_src.append(["Нет данных", "—", "—", "—"])
+        ws_src.append(["—", "Нет данных", "—", "—"])
     _style_table(ws_src, wrap_cols={4})
-    _set_col_widths(ws_src, {"A": 40, "B": 24, "C": 22, "D": 48})
+    _set_col_widths(ws_src, {"A": 14, "B": 40, "C": 22, "D": 48})
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1160,6 +1450,7 @@ def export_project_pdf(
     what_if: Optional[dict] = None,
 ) -> bytes:
     font_name = _register_cyrillic_font()
+    project_name = getattr(project, "name", None) or "Без названия"
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -1168,6 +1459,10 @@ def export_project_pdf(
         rightMargin=15 * mm,
         topMargin=16 * mm,
         bottomMargin=18 * mm,
+        title=f"Отчёт — {project_name}"[:180],
+        author="Платформа подбора робототехники",
+        creator="NETCORE",
+        subject="Отчёт по проекту роботизации",
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
@@ -1290,15 +1585,51 @@ def export_project_pdf(
     resume_rows = [
         ["Показатель", "Значение"],
         ["Всего решений", counts["total"]],
-        ["Подходит", counts["suitable"]],
+        ["Предварительно подходит", counts["suitable"]],
         ["Требует проверки", counts["needs_review"]],
         ["Не подходит", counts["excluded"]],
-        ["Капитальные затраты (CAPEX)", _dash(_econ_value(economics, "capex"))],
-        ["Эксплуатационные затраты (OPEX)", _dash(_econ_value(economics, "opex_annual"))],
-        ["Совокупная стоимость владения (TCO)", _dash(_econ_value(economics, "tco"))],
-        ["Рентабельность инвестиций (ROI), %", _dash(_econ_value(economics, "roi_percent"))],
-        ["Окупаемость, лет", _dash(_econ_value(economics, "payback_years"))],
-        ["Роботов", _dash(_econ_value(economics, "robots_count"))],
+        [_metric_ru("capex"), _dash(_econ_value(economics, "capex"))],
+        [
+            f"{_metric_ru('opex')} роботизации",
+            _dash(_econ_value(economics, "opex_annual")),
+        ],
+        [
+            f"{_metric_ru('tco')} роботизации (без оставшегося ручного труда)",
+            _dash(_econ_value(economics, "tco")),
+        ],
+        [
+            "Полный денежный выход (TCO + оставшийся труд × горизонт)",
+            _dash(
+                (economics or {}).get("tco", {}).get("total_outlay_with_remaining_labor")
+                if isinstance((economics or {}).get("tco"), dict)
+                else None
+            ),
+        ],
+        [
+            f"{_metric_ru('roi')}, %",
+            _dash(_econ_value(economics, "roi_percent")),
+        ],
+        [
+            f"{_metric_ru('payback')}, лет",
+            _dash(_econ_value(economics, "payback_years")),
+        ],
+        [
+            _metric_ru("npv"),
+            _dash(
+                (economics or {}).get("npv", {}).get("npv")
+                if isinstance((economics or {}).get("npv"), dict)
+                else None
+            ),
+        ],
+        [
+            f"{_metric_ru('irr')}, %",
+            _dash(
+                (economics or {}).get("irr", {}).get("irr")
+                if isinstance((economics or {}).get("irr"), dict)
+                else None
+            ),
+        ],
+        ["Количество роботов", _dash(_econ_value(economics, "robots_count"))],
     ]
     story.append(
         section(
@@ -1381,6 +1712,34 @@ def export_project_pdf(
                 ECONOMICS_DESCRIPTIONS.get(desc_key, ""),
             ]
         )
+    dep = economics.get("depreciation") if isinstance(economics.get("depreciation"), dict) else {}
+    if dep.get("applicable") and dep.get("annual_depreciation") is not None:
+        econ_data.append(
+            [
+                "Амортизация CAPEX / год",
+                _dash(dep.get("annual_depreciation")),
+                "₽/год",
+                "Бухгалтерский расход; не денежный отток",
+            ]
+        )
+        econ_data.append(
+            [
+                "Срок амортизации",
+                _dash(dep.get("useful_life_years")),
+                "лет",
+                "Допущение команды (в ТЗ число не задано)",
+            ]
+        )
+        effect = economics.get("annual_effect") if isinstance(economics.get("annual_effect"), dict) else {}
+        if effect.get("with_depreciation") is not None:
+            econ_data.append(
+                [
+                    "Годовой эффект с амортизацией",
+                    _dash(effect.get("with_depreciation")),
+                    "₽/год",
+                    "Денежный эффект − амортизация; не используется в NPV/IRR",
+                ]
+            )
     story.append(
         section(
             "Экономика",
@@ -1401,9 +1760,49 @@ def export_project_pdf(
         how_items.append(p("Рассчитано платформой", normal_style))
     story.append(section("Как рассчитано", how_items))
 
+    # Денежные потоки
+    cfs = (economics or {}).get("cashflows") if isinstance(economics, dict) else None
+    if isinstance(cfs, list) and cfs:
+        cf_data = [["Год", "Денежный поток", "Накоплено", "Дисконтированный"]]
+        for row in cfs:
+            if not isinstance(row, dict):
+                continue
+            cf_data.append(
+                [
+                    _dash(row.get("year")),
+                    _dash(row.get("cashflow")),
+                    _dash(row.get("cumulative")),
+                    _dash(row.get("discounted")),
+                ]
+            )
+        story.append(
+            section(
+                "Денежные потоки",
+                [make_table(cf_data, col_widths=[25 * mm, 45 * mm, 45 * mm, 45 * mm])],
+            )
+        )
+    else:
+        story.append(
+            section(
+                "Денежные потоки",
+                [p("Нет данных: выполните расчёт экономики с горизонтом планирования.", normal_style)],
+            )
+        )
+
     # Сценарии (if provided)
     if scenarios:
-        sc_data = [["Сценарий", "Роботы", "Капзатраты", "OPEX", "ROI, %", "TCO"]]
+        sc_data = [
+            [
+                "Сценарий",
+                "Роботы",
+                "CAPEX, ₽",
+                "OPEX, ₽/год",
+                "Годовой эффект, ₽",
+                "ROI, %",
+                "Окупаемость, лет",
+                "NPV, ₽",
+            ]
+        ]
         code_map = {
             "baseline": "Без роботизации",
             "purchase": "Покупка оборудования",
@@ -1419,14 +1818,35 @@ def export_project_pdf(
                     _dash(m.get("robots_count")),
                     _dash(m.get("capex")),
                     _dash(m.get("opex_annual")),
+                    _dash(m.get("annual_effect")),
                     _dash(m.get("roi_percent")),
-                    _dash(m.get("tco")),
+                    _dash(m.get("payback_years")),
+                    _dash(m.get("npv")),
                 ]
             )
         story.append(
             section(
-                "Сценарии",
-                [make_table(sc_data, col_widths=[50 * mm, 18 * mm, 28 * mm, 28 * mm, 18 * mm, 28 * mm])],
+                "Сравнение сценариев",
+                [
+                    make_table(
+                        sc_data,
+                        col_widths=[
+                            32 * mm,
+                            14 * mm,
+                            22 * mm,
+                            22 * mm,
+                            22 * mm,
+                            14 * mm,
+                            14 * mm,
+                            20 * mm,
+                        ],
+                    ),
+                    p(
+                        "Увеличение числа роботов не всегда даёт пропорциональный рост "
+                        "производительности: ограничивают проходы, узкие места маршрутов и спрос.",
+                        normal_style,
+                    ),
+                ],
             )
         )
 

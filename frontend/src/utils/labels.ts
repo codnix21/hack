@@ -10,7 +10,7 @@ export const CONFIRMATION_LEVEL_LABELS: Record<string, string> = {
 }
 
 export const MATCH_STATUS_LABELS: Record<string, string> = {
-  suitable: 'Подходит',
+  suitable: 'Предварительно подходит',
   needs_review: 'Требует проверки',
   excluded: 'Не подходит',
 }
@@ -49,13 +49,21 @@ export const ASSUMPTION_LABELS: Record<string, string> = {
   ops_staff_per_10_robots: 'Персонал на 10 роботов',
   ops_staff_salary_year: 'Зарплата персонала, ₽/год',
   license_share_of_software: 'Доля лицензий от ПО',
-  current_labor_cost_year: 'Текущие затраты на труд, ₽/год',
-  labor_reduction_share: 'Доля снижения затрат на труд',
+  current_labor_cost_year: 'Годовые затраты на персонал, ₽/год',
+  labor_reduction_share: 'Ожидаемая доля сокращения трудозатрат (допущение)',
   additional_revenue: 'Дополнительная выручка, ₽/год',
   raas_monthly_per_robot: 'Аренда (RaaS) в месяц на робота, ₽',
-  unit_price: 'Цена единицы, ₽',
-  peak_demand: 'Пиковый спрос, оп/ч',
+  unit_price: 'Стоимость единицы оборудования, ₽',
+  unit_price_assumed: 'Допущение цены (assumed_unit_price)',
+  unit_price_origin: 'Источник цены',
+  unit_price_assumed_note: 'Пояснение к допущению цены',
+  unit_price_note: 'Пояснение к цене',
+  peak_demand: 'Пиковая нагрузка, оп/ч',
   productivity: 'Производительность, оп/ч',
+  productivity_ops_per_hour: 'Производительность в расчёте, оп/ч',
+  productivity_origin: 'Источник производительности',
+  productivity_model_fallback: 'Производительность — допущение модели (50 оп/ч)',
+  productivity_model_fallback_note: 'Пояснение к fallback производительности',
   robots_count: 'Количество роботов',
   software_cost: 'Стоимость ПО, ₽',
   maintenance_year: 'Обслуживание, ₽/год',
@@ -76,8 +84,10 @@ export const BREAKDOWN_LABELS: Record<string, string> = {
   connectivity: 'Связь',
   consumables: 'Расходники',
   repair: 'Ремонт',
-  ops_staff: 'Эксплуатационный персонал',
+  ops_staff: 'Эксплуатационный персонал (₽/год)',
   ops_staff_count: 'Численность эксплуатационного персонала',
+  charging_stations: 'Зарядные станции',
+  charging_stations_count: 'Число зарядных станций',
   current_labor: 'Текущие затраты на труд',
   current_cost_reduction: 'Снижение текущих затрат',
   incremental_opex: 'Прирост OPEX',
@@ -88,11 +98,97 @@ export const FORMULA_LABELS: Record<string, string> = {
   robots_count: 'Количество роботов',
   количество_роботов: 'Количество роботов',
   capex: 'Капитальные затраты (CAPEX)',
-  opex: 'Эксплуатационные затраты (OPEX)',
-  annual_effect: 'Годовой эффект',
+  opex: 'Эксплуатационные расходы (OPEX)',
+  opex_annual: 'Эксплуатационные расходы (OPEX), ₽/год',
+  annual_effect: 'Годовой экономический эффект',
+  net_annual_effect: 'Чистый годовой экономический эффект',
+  gross_operating_effect: 'Валовой операционный эффект',
+  gross_effect: 'Валовой операционный эффект',
+  net_effect: 'Чистый годовой эффект',
+  payback: 'Срок окупаемости',
+  payback_years: 'Срок окупаемости',
+  roi: 'Рентабельность инвестиций (ROI)',
+  roi_percent: 'Рентабельность инвестиций (ROI)',
+  roi_horizon: 'Рентабельность за горизонт анализа (ROI)',
+  tco: 'Совокупная стоимость владения в границах модели (TCO)',
+  npv: 'Чистая приведённая стоимость (NPV)',
+  irr: 'Внутренняя норма доходности (IRR)',
+  depreciation: 'Амортизация',
+  annual_effect_with_depreciation: 'Годовой эффект с учётом амортизации',
+  fleet_capacity: 'Расчётная пропускная способность парка',
+  cashflow: 'Денежный поток',
+  cf: 'Денежный поток',
+}
+
+/** Краткие KPI-подписи для карточек (с расшифровкой акронима). */
+export const METRIC_LABELS: Record<string, string> = {
+  capex: 'Капитальные затраты (CAPEX)',
+  opex: 'Эксплуатационные расходы (OPEX)',
+  opex_year: 'Эксплуатационные расходы (OPEX) / год',
+  annual_effect: 'Годовой экономический эффект',
   payback: 'Срок окупаемости',
   roi: 'Рентабельность инвестиций (ROI)',
   tco: 'Совокупная стоимость владения (TCO)',
+  npv: 'Чистая приведённая стоимость (NPV)',
+  irr: 'Внутренняя норма доходности (IRR)',
+  robots_count: 'Количество роботов',
+  depreciation: 'Амортизация',
+  fleet_capacity: 'Пропускная способность парка',
+}
+
+export const WORK_MODE_LABELS: Record<string, string> = {
+  '1shift': '1 смена',
+  '2shift': '2 смены',
+  '24x7': 'Круглосуточно (24/7)',
+  '24/7': 'Круглосуточно (24/7)',
+}
+
+export const ROBOTS_COUNT_SOURCE_LABELS: Record<string, string> = {
+  user_or_fixed: 'сценарий / фиксированная конфигурация',
+  calculated: 'формула потребности',
+  catalog: 'каталог',
+}
+
+export const DEPRECIATION_METHOD_LABELS: Record<string, string> = {
+  straight_line: 'Линейный метод',
+  linear: 'Линейный метод',
+}
+
+export const DXF_ENTITY_TYPE_LABELS: Record<string, string> = {
+  LINE: 'Отрезок',
+  CIRCLE: 'Окружность',
+  ARC: 'Дуга',
+  LWPOLYLINE: 'Полилиния',
+  POLYLINE: 'Полилиния',
+  INSERT: 'Вставка блока',
+  TEXT: 'Текст',
+  MTEXT: 'Многострочный текст',
+  POINT: 'Точка',
+  HATCH: 'Штриховка',
+  DIMENSION: 'Размер',
+  SPLINE: 'Сплайн',
+  ELLIPSE: 'Эллипс',
+}
+
+export function dxfEntityTypeLabel(dxftype?: string | null): string {
+  if (!dxftype) return NO_DATA
+  const key = String(dxftype).toUpperCase()
+  return DXF_ENTITY_TYPE_LABELS[key] || 'Элемент чертежа'
+}
+
+export const MISSING_CHECK_LABELS: Record<string, string> = {
+  object_type: 'Тип объекта',
+  payload_kg: 'Грузоподъёмность',
+  width_mm: 'Ширина робота',
+  operating_conditions: 'Условия эксплуатации',
+  floor_type: 'Тип пола',
+  price_rub: 'Цена',
+  productivity_ops_per_hour: 'Производительность',
+  speed_mps: 'Скорость',
+  supported_processes: 'Поддерживаемые процессы',
+  navigation: 'Навигация',
+  autonomy_hours: 'Автономность',
+  missing_checks: 'Что необходимо проверить',
 }
 
 export const OBJECT_PARAM_LABELS: Record<string, string> = {
@@ -109,9 +205,9 @@ export const OBJECT_PARAM_LABELS: Record<string, string> = {
   staff_cost_year: 'Затраты на персонал',
   staff_cost_per_person_year: 'Стоимость сотрудника',
   ops_count: 'Операций в сутки',
-  peak_demand: 'Пиковый спрос',
-  peak_ops_per_hour: 'Пиковый спрос',
-  avg_demand: 'Средний спрос',
+  peak_demand: 'Пиковая нагрузка',
+  peak_ops_per_hour: 'Пиковая нагрузка',
+  avg_demand: 'Средняя нагрузка',
   peak_factor: 'Пиковый коэффициент',
   sku_count: 'Число SKU',
   required_payload_kg: 'Требуемая грузоподъёмность',
@@ -132,7 +228,7 @@ export const OBJECT_PARAM_LABELS: Record<string, string> = {
   layout_constraints: 'Ограничения планировки',
   area_width_m: 'Ширина площадки',
   area_length_m: 'Длина площадки',
-  current_labor_cost_year: 'Текущие затраты на труд',
+  current_labor_cost_year: 'Годовые затраты на персонал',
   required_processes: 'Требуемые процессы',
   indoor: 'Работа в помещении',
   required_navigation: 'Требуемая навигация',
@@ -152,6 +248,11 @@ export const OBJECT_PARAM_LABELS: Record<string, string> = {
   terminals_count: 'Число терминалов',
   gates_count: 'Число гейтов',
   elevators: 'Число лифтов',
+  staff_salary_month: 'Средняя зарплата, ₽/мес.',
+  payroll_tax_coef: 'Коэффициент начислений на ФОТ',
+  shifts_per_day: 'Число смен в сутки',
+  hours_per_shift: 'Часов в смене',
+  estimated: 'Расчётная оценка',
   // параметры из Датасеты_хакатон (транслит-ключи)
   rovnost_pola_otklonenie: 'Ровность пола (отклонение)',
   rabochih_dney_v_godu: 'Рабочих дней в году',
@@ -279,9 +380,26 @@ export const VALUE_SOURCE_LABELS: Record<string, string> = {
   override: 'Задано пользователем',
 }
 
+/** Безопасная подпись для неизвестного ключа — без утечки snake_case пользователю. */
+export function unknownFieldLabel(key?: string | null): string {
+  if (!key) return NO_DATA
+  if (import.meta.env?.DEV) {
+    // eslint-disable-next-line no-console
+    console.warn(`[labels] нет русской подписи для ключа: ${key}`)
+  }
+  return 'Параметр без подписи'
+}
+
+function resolveLabel(maps: Record<string, string>[], key: string): string {
+  for (const m of maps) {
+    if (m[key]) return m[key]
+  }
+  return unknownFieldLabel(key)
+}
+
 export function confirmationLevelLabel(value?: string | null): string {
   if (!value) return NO_DATA
-  return CONFIRMATION_LEVEL_LABELS[value] || value
+  return CONFIRMATION_LEVEL_LABELS[value] || unknownFieldLabel(value)
 }
 
 export function dataOriginLabel(value?: string | null): string {
@@ -303,45 +421,72 @@ export function dataOriginTooltip(value?: string | null): string {
 
 export function matchStatusLabel(value?: string | null): string {
   if (!value) return NO_DATA
-  return MATCH_STATUS_LABELS[value] || value
+  return MATCH_STATUS_LABELS[value] || unknownFieldLabel(value)
 }
 
 export function importBatchStatusLabel(value?: string | null): string {
   if (!value) return NO_DATA
-  return IMPORT_BATCH_STATUS_LABELS[value] || value
+  return IMPORT_BATCH_STATUS_LABELS[value] || unknownFieldLabel(value)
 }
 
 export function projectStatusLabel(value?: string | null): string {
   if (!value) return NO_DATA
-  return PROJECT_STATUS_LABELS[value] || value
+  return PROJECT_STATUS_LABELS[value] || unknownFieldLabel(value)
 }
 
 export function assumptionLabel(key: string): string {
-  return ASSUMPTION_LABELS[key] || BREAKDOWN_LABELS[key] || FORMULA_LABELS[key] || key
+  return resolveLabel([ASSUMPTION_LABELS, BREAKDOWN_LABELS, FORMULA_LABELS, METRIC_LABELS], key)
 }
 
 export function breakdownLabel(key: string): string {
-  return BREAKDOWN_LABELS[key] || ASSUMPTION_LABELS[key] || key
+  return resolveLabel([BREAKDOWN_LABELS, ASSUMPTION_LABELS, FORMULA_LABELS], key)
 }
 
 export function formulaLabel(key: string): string {
-  return FORMULA_LABELS[key] || ASSUMPTION_LABELS[key] || key
+  return resolveLabel([FORMULA_LABELS, METRIC_LABELS, ASSUMPTION_LABELS], key)
+}
+
+export function metricLabel(key: string): string {
+  return resolveLabel([METRIC_LABELS, FORMULA_LABELS, ASSUMPTION_LABELS], key)
 }
 
 export function objectParamLabel(key: string, schema?: ParamSchemaLike): string {
+  // Словарь — источник истины для UX; schema.title только если ключа ещё нет в словаре
+  if (OBJECT_PARAM_LABELS[key]) return OBJECT_PARAM_LABELS[key]
+  if (ASSUMPTION_LABELS[key]) return ASSUMPTION_LABELS[key]
   const fromSchema = schema?.properties?.[key]?.title
   if (fromSchema) return cleanParamTitle(String(fromSchema))
-  return OBJECT_PARAM_LABELS[key] || ASSUMPTION_LABELS[key] || key
+  return resolveLabel([FORMULA_LABELS], key)
+}
+
+export function workModeLabel(value?: string | null): string {
+  if (!value) return NO_DATA
+  return WORK_MODE_LABELS[value] || WORK_MODE_LABELS[value.toLowerCase()] || String(value)
+}
+
+export function robotsCountSourceLabel(value?: string | null): string {
+  if (!value) return 'расчёт'
+  return ROBOTS_COUNT_SOURCE_LABELS[value] || 'расчёт'
+}
+
+export function depreciationMethodLabel(value?: string | null): string {
+  if (!value) return NO_DATA
+  return DEPRECIATION_METHOD_LABELS[value] || unknownFieldLabel(value)
+}
+
+export function missingCheckLabel(value?: string | null): string {
+  if (!value) return NO_DATA
+  return MISSING_CHECK_LABELS[value] || objectParamLabel(value)
 }
 
 export function availabilityStatusLabel(value?: string | null): string {
   if (!value) return NO_SOURCE_DATA
-  return AVAILABILITY_STATUS_LABELS[value] || value
+  return AVAILABILITY_STATUS_LABELS[value] || unknownFieldLabel(value)
 }
 
 export function acquisitionModelLabel(value?: string | null): string {
   if (!value) return NO_SOURCE_DATA
-  return ACQUISITION_MODEL_LABELS[value] || value
+  return ACQUISITION_MODEL_LABELS[value] || unknownFieldLabel(value)
 }
 
 export function catalogTypeLabel(value?: string | null): string {
@@ -352,20 +497,56 @@ export function catalogTypeLabel(value?: string | null): string {
 
 export function auditActionLabel(value?: string | null): string {
   if (!value) return NO_DATA
-  return AUDIT_ACTION_LABELS[value] || value
+  return AUDIT_ACTION_LABELS[value] || 'Действие журнала'
 }
 
 export function entityTypeLabel(value?: string | null): string {
   if (!value) return ''
-  return ENTITY_TYPE_LABELS[value] || value
+  return ENTITY_TYPE_LABELS[value] || 'Объект'
 }
+
+export function userRoleLabel(value?: string | null): string {
+  if (!value) return NO_DATA
+  const roles: Record<string, string> = {
+    admin: 'Администратор',
+    user: 'Пользователь',
+    guest: 'Гость',
+    vendor: 'Поставщик',
+    viewer: 'Наблюдатель',
+  }
+  return roles[value] || 'Пользователь'
+}
+
+/** Известные пользовательские ключи (для тестов покрытия). */
+export const KNOWN_USER_FACING_KEYS = [
+  'current_labor_cost_year',
+  'labor_reduction_share',
+  'peak_demand',
+  'unit_price',
+  'robots_count',
+  'capex',
+  'opex',
+  'payback',
+  'annual_effect',
+  'npv',
+  'irr',
+  'tco',
+  'depreciation',
+  'fleet_capacity',
+  'needs_review',
+  'suitable',
+  'excluded',
+  'missing_checks',
+  'available',
+  'estimated',
+] as const
 
 const AUDIT_DETAIL_KEY_LABELS: Record<string, string> = {
   version: 'Версия расчёта',
   from: 'Исходный проект',
   keys: 'Параметры',
   total: 'Всего',
-  suitable: 'Подходит',
+  suitable: 'Предварительно подходит',
   added: 'Добавлено',
   updated: 'Обновлено',
   skipped: 'Пропущено',
@@ -484,4 +665,35 @@ export function isMissingDataWarning(text: string): boolean {
     t.includes('нет данных') ||
     t.includes('не указаны')
   )
+}
+
+/** Убирает технические ключи API из пользовательских предупреждений (в т.ч. уже сохранённых). */
+const WARNING_KEY_REPLACEMENTS: [RegExp, string][] = [
+  [/\bcurrent_labor_cost_year\b/gi, 'годовые затраты на персонал'],
+  [/\bstaff_cost_per_person_year\b/gi, 'годовая ставка на сотрудника'],
+  [/\bstaff_cost_year\b/gi, 'затраты на персонал'],
+  [/\bstaff_count\b/gi, 'численность'],
+  [/\bstaff_salary_month\b/gi, 'з/п в месяц'],
+  [/\bpayroll_tax_coef\b/gi, 'коэф. ФОТ'],
+  [/\bpeak_demand\b/gi, 'пиковая нагрузка'],
+  [/\bpeak_factor\b/gi, 'пиковый коэффициент'],
+  [/\bops_count\b/gi, 'операций в сутки'],
+  [/\bunit_price_assumed\b/gi, 'допущение цены'],
+  [/\bunit_price\b/gi, 'цена единицы'],
+  [/\bassumed_unit_price\b/gi, 'принятая цена'],
+  [/суточный_объём/gi, 'суточный объём'],
+  [/пик_коэффициент/gi, 'пиковый коэффициент'],
+  [/з\/п_мес/gi, 'з/п в месяц'],
+  [/коэф_ФОТ/gi, 'коэф. ФОТ'],
+]
+
+export function localizeUserFacingWarning(text: string): string {
+  if (!text) return text
+  let out = text
+  for (const [re, ru] of WARNING_KEY_REPLACEMENTS) {
+    out = out.replace(re, ru)
+  }
+  // «помечено допущение цены» → естественнее
+  out = out.replace(/\(помечено\s+допущение цены\)/gi, '(цена принята как допущение модели)')
+  return out
 }

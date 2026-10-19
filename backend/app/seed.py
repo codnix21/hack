@@ -200,22 +200,27 @@ def _ensure_demo_projects_labeled(db: Session) -> None:
             p.description = ((p.description or "").rstrip() + f" {note}").strip()
 
 
+# Демонстрационные пароли только для хакатон/локального seed.
+# Не использовать в ENVIRONMENT=production. Значения известны из README / тестов.
+DEMO_SEED_PASSWORDS_ARE_PUBLIC = True
+
+
 def seed_all(db: Session, import_sources: bool = True) -> None:
     admin = User(
         email="admin@demo.local",
-        password_hash=hash_password("Admin123!"),
+        password_hash=hash_password("Admin123!"),  # DEMO ONLY
         full_name="Администратор",
         role="admin",
     )
     user = User(
         email="user@demo.local",
-        password_hash=hash_password("User123!"),
+        password_hash=hash_password("User123!"),  # DEMO ONLY
         full_name="Демо Пользователь",
         role="user",
     )
     guest = User(
         email="guest@demo.local",
-        password_hash=hash_password("Guest123!"),
+        password_hash=hash_password("Guest123!"),  # DEMO ONLY
         full_name="Гость",
         role="guest",
     )
@@ -431,8 +436,13 @@ def seed_all(db: Session, import_sources: bool = True) -> None:
         "labor_reduction_share": ("Доля сокращения труда", "доля", "Оценка проектов"),
         "additional_revenue": ("Доп. выручка", "руб/год", "Демо"),
         "raas_monthly_per_robot": ("RaaS в месяц на робота", "руб/мес", "Рыночные предложения"),
+        "salvage_value": ("Ликвидационная стоимость (амортизация)", "руб", "Допущение модели"),
+        "depreciation_years": ("Срок амортизации CAPEX", "лет", "Допущение команды (в ТЗ не задан)"),
     }
     for code, value in DEFAULT_ASSUMPTIONS.items():
+        # Строковые флаги/методы (например depreciation_method) в Normative.value не кладём
+        if value is None or isinstance(value, bool) or isinstance(value, str):
+            continue
         meta = norm_meta.get(code, (code, "", "Модель economics-v1.0"))
         db.add(
             Normative(

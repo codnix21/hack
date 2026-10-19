@@ -36,7 +36,7 @@ def layout(
     if n is None and calc and calc.results:
         n = calc.results.get("robots_count")
     n = int(n or (project.object_params or {}).get("robots_count") or 3)
-    return generate_layout(project.object_params or {}, n)
+    return generate_layout(project.object_params or {}, n, saved_layout=project.layout)
 
 
 @router.get("/{project_id}/simulation", summary="Конфигурация симуляции")
@@ -44,6 +44,7 @@ def simulation(
     project_id: int,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[Optional[User], Depends(get_current_user_optional)] = None,
+    robots_count: Optional[int] = None,
 ):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -56,12 +57,18 @@ def simulation(
         .order_by(Calculation.version.desc())
         .first()
     )
-    n = 3
+    n = robots_count
     prod = None
     economics = None
     if calc and calc.results:
-        n = int(calc.results.get("robots_count") or 3)
+        if n is None:
+            n = int(calc.results.get("robots_count") or 3)
         economics = calc.results
         inputs = calc.inputs or {}
         prod = inputs.get("productivity")
-    return generate_simulation_config(project.object_params or {}, n, prod, economics)
+    n = int(n or (project.object_params or {}).get("robots_count") or 3)
+    if n < 0 or n > 200:
+        raise HTTPException(400, detail="Некорректное количество роботов")
+    return generate_simulation_config(
+        project.object_params or {}, n, prod, economics, saved_layout=project.layout
+    )

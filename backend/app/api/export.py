@@ -11,10 +11,45 @@ from app.models.misc import Calculation, DataSource
 from app.models.project import Project, ProjectSolution, Scenario
 from app.models.robot import Robot
 from app.models.user import User
+from app.schemas import EconomicsRequest
 from app.services.export import export_project_excel, export_project_pdf
 from app.services.matching import run_matching
 
 router = APIRouter(prefix="/export", tags=["Экспорт"])
+
+
+def _raise_if_economics_stale(db: Session, project: Project) -> None:
+    """Не отдаём отчёт с устаревшей экономикой после изменения обязательных входов."""
+    from app.api.economics import _economics_input_mismatches, _resolve_inputs
+
+    calc = (
+        db.query(Calculation)
+        .filter(Calculation.project_id == project.id)
+        .order_by(Calculation.version.desc())
+        .first()
+    )
+    if not calc or not isinstance(calc.inputs, dict):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "economics_not_calculated",
+                "message": "Сначала выполните расчёт экономики — в отчёте нет актуальных KPI.",
+            },
+        )
+    current = _resolve_inputs(db, project, EconomicsRequest(scenario="purchase"))
+    mismatches = _economics_input_mismatches(calc.inputs, current)
+    if mismatches:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "economics_stale",
+                "message": (
+                    "Экономика устарела после изменения исходных данных. "
+                    "Пересчитайте экономику перед экспортом."
+                ),
+                "mismatches": mismatches,
+            },
+        )
 
 
 def _solutions_from_db(db: Session, project_id: int) -> list[dict]:
@@ -134,6 +169,7 @@ def export_excel(
         raise HTTPException(404, detail="Проект не найден")
     if not can_access_project(user, project):
         raise HTTPException(403, detail="Нет доступа")
+    _raise_if_economics_stale(db, project)
     bundle = _export_bundle(db, project)
     data = export_project_excel(
         project,
@@ -162,6 +198,7 @@ def export_pdf(
         raise HTTPException(404, detail="Проект не найден")
     if not can_access_project(user, project):
         raise HTTPException(403, detail="Нет доступа")
+    _raise_if_economics_stale(db, project)
     bundle = _export_bundle(db, project)
     data = export_project_pdf(
         project,

@@ -211,14 +211,12 @@ export function ComparePage() {
         }
       />
 
-      <div className="mb-5 rounded border border-steel-200 bg-white p-4 shadow-panel">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 nc-panel px-3 py-2.5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-steel-400">
-              Выбрано для сравнения
-            </p>
-            <p className="mt-0.5 text-sm text-steel-600">
-              {ids.length} из {MAX_COMPARE} · минимум 2 решения
+            <p className="text-xs font-medium text-steel-700">
+              Выбрано: {ids.length} из {MAX_COMPARE}
+              <span className="font-normal text-steel-500"> · минимум 2</span>
             </p>
           </div>
           {ids.length > 0 && (
@@ -299,22 +297,23 @@ export function ComparePage() {
         )}
 
       {orderedRobots.length >= 2 && (
-        <div className="page-surface overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="nc-panel overflow-x-auto">
+          <table className="nc-table min-w-full text-sm">
             <thead>
-              <tr className="border-b border-steel-200 bg-steel-50">
-                <th className="px-4 py-3 text-left font-medium text-steel-600">Параметр</th>
+              <tr>
+                <th className="sticky left-0 z-10 bg-steel-50 px-3 py-2 text-left">Параметр</th>
                 {orderedRobots.map((r) => (
-                  <th key={r.id} className="min-w-[160px] px-4 py-3 text-left font-medium text-steel-800">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
+                  <th key={r.id} className="min-w-[140px] px-3 py-2 text-left font-medium text-steel-800">
+                    <div className="flex items-start justify-between gap-1.5">
+                      <div className="min-w-0">
                         <Link
                           to={`/app/catalog/${r.id}`}
-                          className="text-brand-700 hover:underline"
+                          className="line-clamp-2 text-brand-700 hover:underline"
+                          title={r.name}
                         >
                           {r.name}
                         </Link>
-                        <div className="mt-1">
+                        <div className="mt-0.5">
                           <Badge
                             variant={r.data_origin === 'source' ? 'success' : 'warning'}
                             title={dataOriginTooltip(r.data_origin)}
@@ -325,7 +324,7 @@ export function ComparePage() {
                       </div>
                       <button
                         type="button"
-                        className="rounded p-1 text-steel-400 hover:bg-steel-100 hover:text-steel-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                        className="shrink-0 rounded p-1 text-steel-400 hover:bg-steel-100 hover:text-steel-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                         aria-label={`Убрать ${r.name}`}
                         onClick={() => removeId(r.id)}
                       >
@@ -337,16 +336,28 @@ export function ComparePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.label} className="border-b border-steel-100">
-                  <td className="px-4 py-3 text-steel-500">{row.label}</td>
-                  {orderedRobots.map((r) => (
-                    <td key={`${row.label}-${r.id}`} className="px-4 py-3 text-steel-800">
-                      {row.get(r)}
+              {rows.map((row) => {
+                const values = orderedRobots.map((r) => row.get(r))
+                const differs =
+                  values.length > 1 && values.some((v) => String(v) !== String(values[0]))
+                return (
+                  <tr key={row.label} className={differs ? 'bg-amber-50/40' : undefined}>
+                    <td className="sticky left-0 z-10 bg-inherit px-3 py-1.5 text-steel-500">
+                      {row.label}
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {orderedRobots.map((r, i) => (
+                      <td
+                        key={`${row.label}-${r.id}`}
+                        className={`px-3 py-1.5 text-steel-800 ${
+                          String(values[i]) === NO_SOURCE_DATA ? 'text-steel-400' : ''
+                        }`}
+                      >
+                        {values[i]}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

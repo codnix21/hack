@@ -51,6 +51,61 @@ export function formatPercent(value?: number | null, digits = 1): string {
   return `${formatNumber(value, digits)} %`
 }
 
+/** Форматирование строки CAPEX/OPEX breakdown с корректными единицами */
+export function formatBreakdownValue(key: string, value: unknown): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return value == null ? MISSING_VALUE : String(value)
+  }
+  if (key === 'ops_staff_count') {
+    return `${formatNumber(value, 0)} чел.`
+  }
+  if (
+    key === 'charging_stations_count' ||
+    key === 'robots_count' ||
+    key === 'stations' ||
+    (key.endsWith('_count') && key !== 'ops_staff_count')
+  ) {
+    return `${formatNumber(value, 0)} шт.`
+  }
+  return formatCurrency(value)
+}
+
+/** Окупаемость: месяцы при сроке < 1 года, иначе годы; не показывать «0,0 лет» */
+export function formatPayback(
+  payback?: {
+    payback_years?: number | null
+    payback_months?: number | null
+    payback_display?: string | null
+    message?: string | null
+    simple_payback_years?: number | null
+    horizon_years?: number | null
+  } | null,
+): string {
+  if (!payback) return MISSING_VALUE
+  const y = payback.payback_years
+  if (y != null && !Number.isNaN(y)) {
+    if (payback.payback_display) return payback.payback_display
+    if (y < 1 / 12) return 'менее 1 месяца'
+    if (y < 1) {
+      const months = payback.payback_months ?? y * 12
+      return `${formatNumber(months, 1)} мес.`
+    }
+    const digits = y < 0.1 ? 3 : y < 10 ? 2 : 1
+    return `${formatNumber(y, digits)} лет`
+  }
+  // CF за горизонт не вышли в плюс — расчёт выполнен; показываем простую оценку, если есть.
+  const simple = payback.simple_payback_years
+  if (simple != null && !Number.isNaN(Number(simple))) {
+    const horizon = payback.horizon_years
+    const prefix = horizon != null ? `> ${horizon} лет` : 'За горизонтом'
+    return `${prefix} · ≈ ${formatNumber(Number(simple), 1)} лет (CAPEX / годовой эффект)`
+  }
+  if (payback.message && /эффект\s*≤\s*0/i.test(payback.message)) {
+    return 'Не определена (эффект ≤ 0)'
+  }
+  return payback.message ? 'Не достигнута на горизонте' : 'Не окупается на горизонте'
+}
+
 export function formatDate(value?: string | Date | null): string {
   if (!value) return MISSING_VALUE
   const d = typeof value === 'string' ? new Date(value) : value

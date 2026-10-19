@@ -29,6 +29,9 @@ Thumbs.db
 data/imported/*
 !data/imported/.gitkeep
 
+# Локальные wheels для установки в Docker без PyPI
+backend/.wheels/
+
 # Случайные локальные выгрузки отчётов в корне
 /Автоматизация*.xlsx
 /*_readable.xlsx

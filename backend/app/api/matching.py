@@ -1,6 +1,7 @@
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -11,9 +12,69 @@ from app.models.robot import Robot
 from app.models.user import User, utcnow
 from app.schemas import ProjectSolutionOut
 from app.services.audit import log_action
-from app.services.matching import run_matching
+from app.services.matching import match_robot_to_project, run_matching
 
 router = APIRouter(prefix="/matching", tags=["Подбор"])
+
+
+class SelectSolutionRequest(BaseModel):
+    robot_id: int = Field(..., description="ID решения каталога для экономики проекта")
+
+
+def _project_writable(user: User, project: Project) -> bool:
+    """Свой не-демо проект (или admin). Общие демо — только просмотр."""
+    if user.role == "admin":
+        return True
+    if project.owner_id != user.id:
+        return False
+    return not bool(project.is_demo)
+
+
+def _apply_economics_robot(db: Session, project: Project, robot_id: int) -> ProjectSolution:
+    """Пометить одно решение как базу экономики; остальные selected=false."""
+    robot = db.query(Robot).filter(Robot.id == robot_id, Robot.archived.is_(False)).first()
+    if not robot:
+        raise HTTPException(404, detail="Решение не найдено в каталоге")
+
+    object_type_code = None
+    if project.object_type_id:
+        ot = db.query(ObjectType).filter(ObjectType.id == project.object_type_id).first()
+        object_type_code = ot.code if ot else None
+
+    row = (
+        db.query(ProjectSolution)
+        .filter(ProjectSolution.project_id == project.id, ProjectSolution.robot_id == robot_id)
+        .first()
+    )
+    if not row:
+        matched = match_robot_to_project(robot, project.object_params or {}, object_type_code)
+        row = ProjectSolution(
+            project_id=project.id,
+            robot_id=robot_id,
+            selected=True,
+            match_score=matched.get("match_score"),
+            match_reasons=matched.get("match_reasons"),
+            exclusion_reasons=matched.get("exclusion_reasons"),
+            status=matched.get("status") or "needs_review",
+        )
+        db.add(row)
+    else:
+        row.selected = True
+
+    others = (
+        db.query(ProjectSolution)
+        .filter(ProjectSolution.project_id == project.id, ProjectSolution.robot_id != robot_id)
+        .all()
+    )
+    for o in others:
+        o.selected = False
+
+    params = dict(project.object_params or {})
+    params["economics_robot_id"] = int(robot_id)
+    project.object_params = params
+    project.updated_at = utcnow()
+    db.flush()
+    return row
 
 
 @router.post("/{project_id}/run", summary="Запустить подбор для проекта")
@@ -44,8 +105,28 @@ def run_match(
     suitable = [r for r in results if r["status"] == "suitable"]
     top_ids = {r["robot_id"] for r in suitable[:select_top]}
 
-    # Гость — только просмотр: подбор в ответ API, без записи в БД
-    read_only = user.role == "guest"
+    # Демо общие — без записи; свои проекты (в т.ч. гостевые) сохраняются
+    read_only = bool(project.is_demo and project.owner_id != user.id)
+    if user.role == "guest" and project.is_demo:
+        read_only = True
+    preferred_id = None
+    if isinstance(project.object_params, dict):
+        raw_pref = project.object_params.get("economics_robot_id")
+        if raw_pref not in (None, "", 0, "0"):
+            try:
+                preferred_id = int(raw_pref)
+            except (TypeError, ValueError):
+                preferred_id = None
+
+    # Если «подходит» пусто — автовыбор топа «требует проверки», иначе экономика без базы цены
+    auto_ids = set(top_ids)
+    if not auto_ids:
+        review = [r for r in results if r["status"] == "needs_review"]
+        auto_ids = {r["robot_id"] for r in review[:select_top]}
+
+    if preferred_id is not None:
+        auto_ids = {preferred_id}
+
     if not read_only:
         db.query(ProjectSolution).filter(ProjectSolution.project_id == project_id).delete()
         for r in results:
@@ -53,13 +134,15 @@ def run_match(
                 ProjectSolution(
                     project_id=project_id,
                     robot_id=r["robot_id"],
-                    selected=r["robot_id"] in top_ids,
+                    selected=r["robot_id"] in auto_ids,
                     match_score=r["match_score"],
                     match_reasons=r["match_reasons"],
                     exclusion_reasons=r["exclusion_reasons"],
                     status=r["status"],
                 )
             )
+        if preferred_id is not None and preferred_id not in {r["robot_id"] for r in results}:
+            _apply_economics_robot(db, project, preferred_id)
         project.updated_at = utcnow()
         db.commit()
         log_action(
@@ -75,7 +158,7 @@ def run_match(
     for r in results:
         robot = next((x for x in robots if x.id == r["robot_id"]), None)
         item = dict(r)
-        item["selected"] = r["robot_id"] in top_ids
+        item["selected"] = r["robot_id"] in auto_ids
         item["id"] = r["robot_id"]
         item["project_id"] = project_id
         item["robot_name"] = robot.name if robot else None
@@ -91,6 +174,46 @@ def run_match(
         "excluded": len([x for x in out if x["status"] == "excluded"]),
         "read_only": read_only,
         "results": out,
+    }
+
+
+@router.post("/{project_id}/select", summary="Выбрать решение для расчёта экономики")
+def select_solution(
+    project_id: int,
+    body: SelectSolutionRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(404, detail="Проект не найден")
+    if not can_access_project(user, project):
+        raise HTTPException(403, detail="Нет доступа")
+    if not _project_writable(user, project):
+        raise HTTPException(
+            403,
+            detail="Демонстрационный проект только для просмотра. Создайте копию, чтобы выбрать решение.",
+        )
+
+    row = _apply_economics_robot(db, project, body.robot_id)
+    db.commit()
+    robot = db.query(Robot).filter(Robot.id == body.robot_id).first()
+    log_action(
+        db,
+        "matching.select",
+        user.id,
+        "project",
+        project_id,
+        {"robot_id": body.robot_id, "status": row.status},
+    )
+    return {
+        "project_id": project_id,
+        "robot_id": body.robot_id,
+        "robot_name": robot.name if robot else None,
+        "robot_price_rub": robot.price_rub if robot else None,
+        "status": row.status,
+        "selected": True,
+        "message": "Решение выбрано для расчёта экономики. Пересчитайте экономику.",
     }
 
 
