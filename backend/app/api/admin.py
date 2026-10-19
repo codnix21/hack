@@ -455,6 +455,20 @@ async def import_source_catalog_endpoint(
     return payload
 
 
+@router.post("/seed/demo-showcase", summary="Дозаполнить демо-витрину (проекты, подбор, окупаемость)")
+def seed_demo_showcase(
+    db: Annotated[Session, Depends(get_db)],
+    admin: Annotated[User, Depends(require_admin)],
+    force_recalc: bool = Query(False, description="Пересчитать экономику даже если уже есть"),
+):
+    """Идемпотентно создаёт демо-проекты с разными профилями окупаемости."""
+    from app.services.demo_showcase import ensure_demo_showcase
+
+    report = ensure_demo_showcase(db, force_recalc=force_recalc)
+    log_action(db, "admin.seed_demo_showcase", admin.id, "project", None, report)
+    return report
+
+
 @router.post("/import/source-datasets", summary="Импорт датасетов объектов из материалов проекта")
 async def import_source_datasets_endpoint(
     db: Annotated[Session, Depends(get_db)],

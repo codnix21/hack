@@ -292,7 +292,7 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
 
       <Card title="План склада" subtitle="Вид сверху по сохранённой геометрии">
         {layoutQuery.data ? (
-          <div className="overflow-auto rounded border border-steel-100 bg-steel-50 p-2">
+          <div className="overflow-hidden rounded border border-steel-100 bg-steel-50 p-3">
             <MiniPlan layout={layoutQuery.data} />
           </div>
         ) : (
@@ -395,34 +395,52 @@ function Kpi({ label, value }: { label: string; value: string }) {
 }
 
 function MiniPlan({ layout }: { layout: { width: number; height: number; zones: { x: number; y: number; w: number; h: number; color?: string }[]; routes: { points: { x: number; y: number }[] }[] } }) {
-  const scale = Math.min(640 / layout.width, 320 / layout.height)
-  const w = layout.width * scale
-  const h = layout.height * scale
+  // Толщина линий в координатах плана — доля от диагонали, чтобы не плыла при любом размере
+  const unit = Math.max(layout.width, layout.height) / 400
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${layout.width} ${layout.height}`} className="max-w-full bg-white">
-      <rect x={0} y={0} width={layout.width} height={layout.height} fill="#f8fafc" stroke="#cbd5e1" />
-      {layout.zones.map((z, i) => (
+    <div className="flex min-h-[280px] w-full items-center justify-center">
+      <svg
+        width={layout.width}
+        height={layout.height}
+        viewBox={`0 0 ${layout.width} ${layout.height}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="h-auto max-h-[min(70vh,520px)] w-auto max-w-full bg-white shadow-sm"
+        role="img"
+        aria-label="План склада"
+      >
         <rect
-          key={i}
-          x={z.x}
-          y={z.y}
-          width={z.w}
-          height={z.h}
-          fill={z.color || '#cbd5e1'}
-          opacity={0.85}
-          stroke="#64748b"
+          x={0}
+          y={0}
+          width={layout.width}
+          height={layout.height}
+          fill="#f8fafc"
+          stroke="#cbd5e1"
+          strokeWidth={unit}
         />
-      ))}
-      {layout.routes.map((r, i) => (
-        <polyline
-          key={i}
-          fill="none"
-          stroke="#ea580c"
-          strokeWidth={2 / scale}
-          strokeDasharray={`${6 / scale} ${4 / scale}`}
-          points={r.points.map((p) => `${p.x},${p.y}`).join(' ')}
-        />
-      ))}
-    </svg>
+        {layout.zones.map((z, i) => (
+          <rect
+            key={i}
+            x={z.x}
+            y={z.y}
+            width={z.w}
+            height={z.h}
+            fill={z.color || '#cbd5e1'}
+            opacity={0.85}
+            stroke="#64748b"
+            strokeWidth={unit * 0.8}
+          />
+        ))}
+        {layout.routes.map((r, i) => (
+          <polyline
+            key={i}
+            fill="none"
+            stroke="#ea580c"
+            strokeWidth={unit * 2}
+            strokeDasharray={`${unit * 6} ${unit * 4}`}
+            points={r.points.map((p) => `${p.x},${p.y}`).join(' ')}
+          />
+        ))}
+      </svg>
+    </div>
   )
 }

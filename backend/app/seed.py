@@ -180,6 +180,9 @@ def seed_if_empty(db: Session) -> bool:
         # Existing DB: still try to load source materials without wiping demos
         _maybe_import_sources(db)
         _ensure_demo_projects_labeled(db)
+        from app.services.demo_showcase import ensure_demo_showcase
+
+        ensure_demo_showcase(db)
         db.commit()
     return created
 
@@ -463,151 +466,10 @@ def seed_all(db: Session, import_sources: bool = True) -> None:
         ]
     )
 
-    demos = [
-        Project(
-            owner_id=None,
-            name="Автоматизация склада",
-            industry_id=industries[0].id,
-            object_type_id=object_types[0].id,
-            description=(
-                "Демонстрационный проект: подбор AMR и штабелёров для склада. "
-                "Параметры из Датасеты_хакатон.xlsx"
-            ),
-            region="Москва",
-            work_mode="3с",
-            status="demo",
-            is_demo=True,
-            object_params={
-                "area_m2": 9600,
-                "zones_count": 6,
-                "work_mode": "3с",
-                "shifts_count": 3,
-                "staff_count": 45,
-                "staff_cost_year": 18_000_000,
-                "ops_count": 3200,
-                "peak_demand": 400,
-                "avg_demand": 220,
-                "sku_count": 12000,
-                "required_payload_kg": 200,
-                "cargo_length_mm": 1200,
-                "cargo_width_mm": 800,
-                "cargo_height_mm": 1500,
-                "aisle_width_mm": 1500,
-                "route_length_m": 850,
-                "floor_type": "бетон",
-                "temperature_min_c": 5,
-                "temperature_max_c": 30,
-                "charging_stations": 4,
-                "load_points": 8,
-                "unload_points": 6,
-                "layout_constraints": "Узкие проходы в зоне комплектации",
-                "area_width_m": 80,
-                "area_length_m": 120,
-                "current_labor_cost_year": 18_000_000,
-                # Явная цена для демо (не скрытая подстановка при расчёте)
-                "unit_price": 5_150_000,
-                "required_processes": ["transport", "picking"],
-                "indoor": True,
-                "required_navigation": "SLAM",
-            },
-        ),
-        Project(
-            owner_id=None,
-            name="Автоматизация аэропортового объекта",
-            industry_id=industries[1].id,
-            object_type_id=object_types[1].id,
-            description=(
-                "Демонстрационный проект: тягачи и AMR для перрона и терминала. "
-                "Параметры из Датасеты_хакатон.xlsx"
-            ),
-            region="Санкт-Петербург",
-            work_mode="24/7",
-            status="demo",
-            is_demo=True,
-            object_params={
-                "passenger_flow": 45000,
-                "cargo_flow": 320,
-                "ops_count": 1800,
-                "peak_demand": 250,
-                "avg_demand": 140,
-                "zones_count": 4,
-                "route_length_m": 1200,
-                "required_payload_kg": 500,
-                "cargo_length_mm": 1600,
-                "cargo_width_mm": 1200,
-                "cargo_height_mm": 1400,
-                "work_mode": "24/7",
-                "shifts_count": 3,
-                "staff_count": 60,
-                "access_constraints": "Зона авиационной безопасности, пропуска",
-                "security_requirements": "Контроль доступа, видеонаблюдение",
-                "area_width_m": 100,
-                "area_length_m": 200,
-                "aisle_width_mm": 2500,
-                "charging_stations": 3,
-                "indoor": False,
-                "temperature_min_c": -20,
-                "temperature_max_c": 35,
-                "current_labor_cost_year": 25_000_000,
-                "unit_price": 8_500_000,
-                "required_processes": ["towing", "transport"],
-                "zone_type": "перрон",
-                "floor_type": "асфальт",
-                "required_navigation": "SLAM",
-            },
-        ),
-        Project(
-            owner_id=None,
-            name="Роботизация медицинского учреждения",
-            industry_id=industries[2].id,
-            object_type_id=object_types[2].id,
-            description=(
-                "Демонстрационный проект: внутрибольничная логистика и клининг. "
-                "Параметры из Датасеты_хакатон.xlsx"
-            ),
-            region="Казань",
-            work_mode="2с",
-            status="demo",
-            is_demo=True,
-            object_params={
-                "area_m2": 2400,
-                "floors_count": 5,
-                "ops_count": 600,
-                "transport_count": 420,
-                "meds_share": 35,
-                "meals_share": 25,
-                "linen_share": 20,
-                "waste_share": 20,
-                "route_length_m": 480,
-                "elevators": 4,
-                "sanitary_constraints": "Разделение чистых и грязных потоков",
-                "work_mode": "2с",
-                "staff_count": 28,
-                "security_requirements": "Контроль доступа в proceduralные зоны",
-                "area_width_m": 40,
-                "area_length_m": 60,
-                "aisle_width_mm": 1200,
-                "required_payload_kg": 30,
-                "peak_demand": 80,
-                "charging_stations": 2,
-                "humidity_max_pct": 70,
-                "facility_type": "многопрофильный стационар",
-                "current_labor_cost_year": 9_000_000,
-                "unit_price": 2_200_000,
-                "required_processes": ["delivery", "cleaning"],
-                "indoor": True,
-                "temperature_min_c": 18,
-                "temperature_max_c": 26,
-                "floor_type": "плитка",
-                "required_navigation": "SLAM",
-            },
-        ),
-    ]
-    db.add_all(demos)
-    db.flush()
-    for p in demos:
-        for code, name in [("baseline", "Без роботизации"), ("purchase", "Покупка оборудования"), ("raas", "Роботы как услуга")]:
-            db.add(Scenario(project_id=p.id, code=code, name_ru=name, params={}, results={}))
+    # Демо-витрина: проекты + планировки + подбор + экономика с окупаемостью
+    from app.services.demo_showcase import ensure_demo_showcase
+
+    ensure_demo_showcase(db)
 
     # personal sample project for user
     user_project = Project(
@@ -642,3 +504,40 @@ def seed_all(db: Session, import_sources: bool = True) -> None:
 
     if import_sources:
         _maybe_import_sources(db)
+
+
+if __name__ == "__main__":
+    import argparse
+    import json
+
+    from app.database import SessionLocal
+    from app.services.demo_showcase import ensure_demo_showcase
+
+    parser = argparse.ArgumentParser(description="Seed / демо-витрина NETCORE")
+    parser.add_argument("--showcase-only", action="store_true", help="Только ensure_demo_showcase")
+    parser.add_argument("--force-recalc", action="store_true", help="Пересчитать экономику демо")
+    parser.add_argument("--full", action="store_true", help="Полный seed_all (с нуля)")
+    args = parser.parse_args()
+
+    db = SessionLocal()
+    try:
+        if args.full:
+            seed_all(db, import_sources=True)
+            print("seed_all done")
+        elif args.showcase_only:
+            report = ensure_demo_showcase(db, force_recalc=args.force_recalc)
+            print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        else:
+            created = seed_if_empty(db)
+            report = ensure_demo_showcase(db, force_recalc=args.force_recalc)
+            print(
+                json.dumps(
+                    {"seed_if_empty_created": created, **report},
+                    ensure_ascii=False,
+                    indent=2,
+                    default=str,
+                )
+            )
+    finally:
+        db.close()
+
