@@ -341,10 +341,7 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
                       {formatCurrency(r.economics.annual_effect?.annual_effect)}
                     </td>
                     <td className="px-2 py-1.5">
-                      {r.economics.payback?.payback_years != null ||
-                      r.economics.payback?.payback_display
-                        ? formatPayback(r.economics.payback)
-                        : '—'}
+                      {formatPayback(r.economics.payback)}
                     </td>
                   </tr>
                 ))}

@@ -100,6 +100,7 @@ def _project_summary(db: Session, project: Project) -> ProjectSummary:
     capex = None
     payback = None
     npv = None
+    unit_price = None
     if calc and isinstance(calc.results, dict):
         robots = calc.results.get("robots_count")
         c = calc.results.get("capex")
@@ -111,12 +112,20 @@ def _project_summary(db: Session, project: Project) -> ProjectSummary:
         n = calc.results.get("npv")
         if isinstance(n, dict):
             npv = n.get("npv")
+    if calc and isinstance(calc.inputs, dict):
+        try:
+            up = float(calc.inputs.get("unit_price"))
+            if up > 0:
+                unit_price = up
+        except (TypeError, ValueError):
+            unit_price = None
     return ProjectSummary(
         area_m2=area,
         robots_count=int(robots) if robots is not None else None,
         capex=float(capex) if capex is not None else None,
         payback_years=float(payback) if payback is not None else None,
         npv=float(npv) if npv is not None else None,
+        unit_price=float(unit_price) if unit_price is not None else None,
     )
 
 

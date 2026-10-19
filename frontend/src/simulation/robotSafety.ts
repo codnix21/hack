@@ -6,8 +6,17 @@
 import { pointAlongPolyline } from './pathMath'
 
 export const DEMO_ROBOT_RADIUS_PX = 14
+/** Legacy fixed radius (тесты / мелкий canvas). На реальном плане используйте conflictRadiusMeters. */
 export const CONFLICT_RADIUS_PX = DEMO_ROBOT_RADIUS_PX * 2
+/** Радиус конфликта в метрах склада — не зависит от масштаба px. */
+export const CONFLICT_RADIUS_M = 1.8
 export const MAX_WAIT_SEC = 8
+
+export function conflictRadiusPxForScale(metersToPx: number, radiusM = CONFLICT_RADIUS_M): number {
+  const px = radiusM * Math.max(metersToPx, 0.01)
+  // не меньше визуального «корпуса», не больше ~4 м в пикселях при крупном масштабе
+  return Math.min(Math.max(px, DEMO_ROBOT_RADIUS_PX), DEMO_ROBOT_RADIUS_PX * 4)
+}
 
 export interface SafetyRobot {
   id: string

@@ -113,8 +113,20 @@ function kpiValue(
   if (key === 'annual_effect') return r.annual_effect?.annual_effect ?? null
   if (key === 'tco') return r.tco?.tco ?? null
   if (key === 'roi') return r.roi?.roi_percent ?? null
-  if (key === 'payback_years') return r.payback?.payback_years ?? null
+  if (key === 'payback_years') {
+    // По CF за горизонт может быть null — тогда берём простую оценку CAPEX/эффект
+    const y = r.payback?.payback_years
+    if (y != null && !Number.isNaN(Number(y))) return Number(y)
+    const simple = r.payback?.simple_payback_years
+    if (simple != null && !Number.isNaN(Number(simple))) return Number(simple)
+    return null
+  }
   return null
+}
+
+function kpiPaybackDisplay(r: EconomicsScenarioResult | null): string {
+  if (!r) return '—'
+  return formatPayback(r.payback)
 }
 
 function scenarioRow(r: EconomicsScenarioResult) {
@@ -1286,19 +1298,32 @@ export function EconomicsPanel({
                         ['Годовой эффект', 'annual_effect', true],
                         ['TCO', 'tco', true],
                         ['ROI', 'roi', false],
-                        ['Окупаемость, лет', 'payback_years', false],
+                        ['Окупаемость', 'payback_years', false],
                       ] as const
                     ).map(([title, key, money]) => {
                       const b = kpiValue(basePurchase, key)
                       const n = kpiValue(altPurchase || basePurchase, key)
+                      const isPayback = key === 'payback_years'
                       return (
                         <tr key={key} className="border-t border-steel-100">
                           <td className="px-3 py-2 text-steel-700">{title}</td>
                           <td className="px-3 py-2 font-medium">
-                            {b == null ? '—' : money ? formatCurrency(b) : formatNumber(b, 1)}
+                            {isPayback
+                              ? kpiPaybackDisplay(basePurchase)
+                              : b == null
+                                ? '—'
+                                : money
+                                  ? formatCurrency(b)
+                                  : formatNumber(b, 1)}
                           </td>
                           <td className="px-3 py-2 font-medium">
-                            {n == null ? '—' : money ? formatCurrency(n) : formatNumber(n, 1)}
+                            {isPayback
+                              ? kpiPaybackDisplay(altPurchase || basePurchase)
+                              : n == null
+                                ? '—'
+                                : money
+                                  ? formatCurrency(n)
+                                  : formatNumber(n, 1)}
                           </td>
                           <td className="px-3 py-2">{deltaPct(b, n)}</td>
                         </tr>

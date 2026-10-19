@@ -10,7 +10,11 @@ import type {
   TaskStatusCode,
 } from './types'
 import { DEFAULT_LAYERS } from './types'
-import { applySafetyStep, CONFLICT_RADIUS_PX, MAX_WAIT_SEC } from './robotSafety'
+import {
+  applySafetyStep,
+  conflictRadiusPxForScale,
+  MAX_WAIT_SEC,
+} from './robotSafety'
 import { computeSimMetrics, emptyMetrics, isExecutableRoute, isTerminalTask } from './simMetrics'
 
 const KPI_THROTTLE_MS = 200
@@ -18,6 +22,11 @@ const MAX_VISIBLE_ROBOTS = 6
 const MAX_EVENTS = 24
 /** Демо-скорость AMR, м/с — оценка без задержек погрузки. */
 const DEMO_SPEED_MPS = 1.2
+/**
+ * Ускорение времени демо-показа: на больших складах (мало px/м) без этого
+ * роботы «ползут». KPI-метка м/с на карточке остаётся DEMO_SPEED_MPS.
+ */
+const DEMO_TIME_SCALE = 5
 
 function clockLabel(elapsedSec: number) {
   const total = Math.floor(elapsedSec) % 86400
@@ -70,7 +79,7 @@ export function useWarehouseSimulation({
   scenarioId,
 }: UseWarehouseSimulationArgs) {
   const [play, setPlay] = useState<SimPlayState>('idle')
-  const [speed, setSpeed] = useState(1)
+  const [speed, setSpeed] = useState(2)
   const [selectedRobotId, setSelectedRobotId] = useState<string | null>(null)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [followRobot, setFollowRobot] = useState(false)
@@ -79,7 +88,7 @@ export function useWarehouseSimulation({
   const [layoutStale, setLayoutStale] = useState(false)
 
   const playRef = useRef<SimPlayState>('idle')
-  const speedRef = useRef(1)
+  const speedRef = useRef(2)
   const elapsedRef = useRef(0)
   const rafRef = useRef(0)
   const lastTs = useRef(0)
@@ -347,9 +356,9 @@ export function useWarehouseSimulation({
         const { robots: stepped, collisions } = applySafetyStep({
           robots: safetyIn,
           dtSec: dt,
-          simSpeed: speedRef.current,
+          simSpeed: speedRef.current * DEMO_TIME_SCALE,
           metersToPx,
-          conflictRadiusPx: CONFLICT_RADIUS_PX,
+          conflictRadiusPx: conflictRadiusPxForScale(metersToPx),
           maxWaitSec: MAX_WAIT_SEC,
         })
 

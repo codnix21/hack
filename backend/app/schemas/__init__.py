@@ -296,6 +296,7 @@ class ProjectSummary(BaseModel):
     capex: Optional[float] = None
     payback_years: Optional[float] = None
     npv: Optional[float] = None
+    unit_price: Optional[float] = None
 
 
 class ProjectOut(ORMModel):

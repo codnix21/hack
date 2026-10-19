@@ -28,6 +28,8 @@ export interface ProjectSummary {
   capex?: number | null
   payback_years?: number | null
   npv?: number | null
+  /** Цена из последнего расчёта (вход), если задана */
+  unit_price?: number | null
 }
 
 export interface LayoutObject {

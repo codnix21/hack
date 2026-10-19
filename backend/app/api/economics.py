@@ -48,6 +48,24 @@ def _robot_for_project(db: Session, project: Project, req: EconomicsRequest) -> 
     return robot
 
 
+def _unit_price_from_last_calc(db: Session, project_id: int) -> float | None:
+    """Цена из последнего сохранённого расчёта — не скрытая подстановка, а уже зафиксированный вход."""
+    calc = (
+        db.query(Calculation)
+        .filter(Calculation.project_id == project_id)
+        .order_by(Calculation.version.desc())
+        .first()
+    )
+    if not calc or not isinstance(calc.inputs, dict):
+        return None
+    raw = calc.inputs.get("unit_price")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 def _raise_inputs_incomplete(validation: dict) -> None:
     raise HTTPException(
         status_code=400,
@@ -66,6 +84,8 @@ def _ensure_economics_inputs(db: Session, project: Project, req: EconomicsReques
     """Блокирует расчёт при недостаточных входах (единая модель required_inputs)."""
     robot = _robot_for_project(db, project, req)
     robot_price = float(robot.price_rub) if robot and robot.price_rub else None
+    if robot_price is None:
+        robot_price = _unit_price_from_last_calc(db, project.id)
     selected = (
         db.query(ProjectSolution)
         .filter(ProjectSolution.project_id == project.id, ProjectSolution.selected.is_(True))
@@ -75,7 +95,9 @@ def _ensure_economics_inputs(db: Session, project: Project, req: EconomicsReques
         project.object_params or {},
         robot_price=robot_price,
         has_selected_robot=bool(
-            selected or (project.object_params or {}).get("economics_robot_id")
+            selected
+            or (project.object_params or {}).get("economics_robot_id")
+            or robot_price
         ),
         req_peak=req.peak_demand,
     )
@@ -153,9 +175,15 @@ def _resolve_inputs(db: Session, project: Project, req: EconomicsRequest) -> dic
         price_assumed = True
         price_origin = "assumed_unit_price"
     else:
-        unit_price = 0.0
-        price_assumed = True
-        price_origin = "missing"
+        last_up = _unit_price_from_last_calc(db, project.id)
+        if last_up is not None:
+            unit_price = last_up
+            price_assumed = False
+            price_origin = "last_calculation"
+        else:
+            unit_price = 0.0
+            price_assumed = True
+            price_origin = "missing"
     software = float(robot.software_cost_rub) if robot and robot.software_cost_rub else 0.0
     maintenance = float(robot.maintenance_cost_year_rub) if robot and robot.maintenance_cost_year_rub else 0.0
     impl = float(robot.implementation_cost_rub) if robot and robot.implementation_cost_rub else 0.0

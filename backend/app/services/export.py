@@ -517,6 +517,8 @@ def _strip_dataset_prefix(key: str) -> str:
 
 
 def _param_label(key: str) -> str:
+    from app.services.dataset_param_labels import DATASET_PARAM_LABELS_RU
+
     for candidate in (key, _strip_dataset_prefix(key)):
         if candidate in OBJECT_PARAM_META:
             return OBJECT_PARAM_META[candidate][0]
@@ -528,6 +530,8 @@ def _param_label(key: str) -> str:
             return BREAKDOWN_LABELS_RU[candidate]
         if candidate in METRIC_LABELS_RU:
             return METRIC_LABELS_RU[candidate]
+        if candidate in DATASET_PARAM_LABELS_RU:
+            return DATASET_PARAM_LABELS_RU[candidate]
     # Не отдаём snake_case комиссии — нейтральная подпись
     base = _strip_dataset_prefix(key)
     if base != key:
