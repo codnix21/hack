@@ -1125,7 +1125,8 @@ export function ProjectWorkspacePage() {
                                             <ul className="list-disc space-y-1 pl-5 text-sm text-steel-700">
                                               {matchOnly.map((m) => (
                                                 <li key={m}>
-                                                  <span className="text-emerald-600">✓</span> {m}
+                                                  <span className="text-emerald-600">✓</span>{' '}
+                                                  {m.replace(/^[✓✔]\s*/, '')}
                                                 </li>
                                               ))}
                                             </ul>

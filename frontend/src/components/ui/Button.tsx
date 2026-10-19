@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes, forwardRef } from 'react'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'outlineOnDark'
 type Size = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -16,6 +16,9 @@ const variants: Record<Variant, string> = {
   danger: 'bg-red-700 text-white hover:bg-red-800',
   outline:
     'border border-steel-300 bg-white text-steel-800 hover:border-steel-400 hover:bg-steel-50',
+  /** Контур на тёмном фоне (hero) — без конфликта bg-white + text-white */
+  outlineOnDark:
+    'border border-white/40 bg-transparent text-white hover:border-white/70 hover:bg-white/10',
 }
 
 const sizes: Record<Size, string> = {

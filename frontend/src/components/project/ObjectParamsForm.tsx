@@ -109,7 +109,7 @@ const WAREHOUSE_FIELDS: FieldDef[] = [
     type: 'number',
     group: 'ops',
     required: true,
-    hint: 'Обязательно для экономики: число роботов и CAPEX',
+    hint: 'От неё зависят число роботов и CAPEX.',
     example: '6800',
   },
   {
@@ -118,7 +118,7 @@ const WAREHOUSE_FIELDS: FieldDef[] = [
     unit: '₽',
     type: 'number',
     group: 'ops',
-    hint: 'Условно обязательно: если решение ещё не выбрано в каталоге',
+    hint: 'Не нужна, если в подборе уже выбрано решение с ценой.',
     example: '4500000',
   },
   {
@@ -193,6 +193,44 @@ const WAREHOUSE_FIELDS: FieldDef[] = [
   },
 ]
 
+/** Общие поля экономики — нужны для всех типов объектов (не только склада). */
+const SHARED_ECONOMICS_FIELDS: FieldDef[] = [
+  {
+    key: 'unit_price',
+    label: 'Цена решения (если не из каталога)',
+    unit: '₽',
+    type: 'number',
+    group: 'ops',
+    hint: 'Не нужна, если в подборе уже выбрано решение с ценой.',
+    example: '4500000',
+  },
+  {
+    key: 'staff_salary_month',
+    label: 'Средняя зарплата, ₽/мес.',
+    unit: '₽/мес',
+    type: 'number',
+    group: 'staff',
+    hint: 'Для производного расчёта годовых затрат вместе с численностью',
+    example: '100000',
+  },
+  {
+    key: 'area_width_m',
+    label: 'Ширина площадки',
+    unit: 'м',
+    type: 'number',
+    group: 'area',
+    hint: 'Габарит по ширине для планировки',
+  },
+  {
+    key: 'area_length_m',
+    label: 'Длина площадки',
+    unit: 'м',
+    type: 'number',
+    group: 'area',
+    hint: 'Габарит по длине для планировки',
+  },
+]
+
 const AIRPORT_FIELDS: FieldDef[] = [
   {
     key: 'area_m2',
@@ -212,6 +250,15 @@ const AIRPORT_FIELDS: FieldDef[] = [
     hint: 'Глубина расчёта для аэропорта частичная — проверьте допущения',
   },
   {
+    key: 'unit_price',
+    label: 'Цена решения (если не из каталога)',
+    unit: '₽',
+    type: 'number',
+    group: 'ops',
+    hint: 'Не нужна, если в подборе уже выбрано решение с ценой.',
+    example: '4500000',
+  },
+  {
     key: 'staff_count',
     label: 'Численность персонала',
     unit: 'чел.',
@@ -222,6 +269,13 @@ const AIRPORT_FIELDS: FieldDef[] = [
     key: 'current_labor_cost_year',
     label: 'Стоимость персонала',
     unit: '₽/год',
+    type: 'number',
+    group: 'staff',
+  },
+  {
+    key: 'staff_salary_month',
+    label: 'Средняя зарплата, ₽/мес.',
+    unit: '₽/мес',
     type: 'number',
     group: 'staff',
   },
@@ -253,6 +307,15 @@ const MEDICAL_FIELDS: FieldDef[] = [
     hint: 'Для медицины расчёты ориентировочные — уточняйте процессы на объекте',
   },
   {
+    key: 'unit_price',
+    label: 'Цена решения (если не из каталога)',
+    unit: '₽',
+    type: 'number',
+    group: 'ops',
+    hint: 'Не нужна, если в подборе уже выбрано решение с ценой.',
+    example: '4500000',
+  },
+  {
     key: 'staff_count',
     label: 'Численность персонала',
     unit: 'чел.',
@@ -265,6 +328,20 @@ const MEDICAL_FIELDS: FieldDef[] = [
     unit: '₽/год',
     type: 'number',
     group: 'staff',
+  },
+  {
+    key: 'staff_salary_month',
+    label: 'Средняя зарплата, ₽/мес.',
+    unit: '₽/мес',
+    type: 'number',
+    group: 'staff',
+  },
+  {
+    key: 'required_payload_kg',
+    label: 'Грузоподъёмность',
+    unit: 'кг',
+    type: 'number',
+    group: 'infra',
   },
   {
     key: 'humidity_max_pct',
@@ -345,6 +422,12 @@ interface ObjectParamsFormProps {
   robotPrice?: number | null
 }
 
+function requiredBadge(category?: string): string {
+  if (category === 'conditional') return 'Условно обязательное поле.'
+  if (category === 'derived') return 'Нужно для экономики (альтернатива).'
+  return 'Обязательное поле.'
+}
+
 function FieldHint({
   hint,
   example,
@@ -361,11 +444,9 @@ function FieldHint({
   if (!hint && !example && !required && !reason) return null
   return (
     <p className="mt-1 text-xs text-steel-500">
-      {required && (
-        <span className="font-medium text-brand-800">
-          {category === 'conditional' ? 'Условно обязательно. ' : 'Обязательно. '}
-        </span>
-      )}
+      {required ? (
+        <span className="font-medium text-brand-800">{requiredBadge(category)} </span>
+      ) : null}
       {reason ? <span className="text-steel-600">{reason}. </span> : null}
       {hint}
       {example && (
@@ -398,15 +479,23 @@ export function ObjectParamsForm({
       schema?.properties && Object.keys(schema.properties).length > 0
         ? schemaToFields(schema)
         : fallbackFields
-    // Схема каталога может не содержать unit_price / staff_salary — дополняем
-    // полями минимального набора из типового шаблона, не дублируя ключи.
+    // Схема/тип могут не содержать unit_price — дополняем общим набором экономики.
     const have = new Set(base.map((f) => f.key))
-    const extras = fallbackFields.filter(
+    const pool = [...SHARED_ECONOMICS_FIELDS, ...fallbackFields]
+    const extras = pool.filter(
       (f) =>
         !have.has(f.key) &&
         ((COMPACT_FIELD_KEYS as readonly string[]).includes(f.key) || Boolean(f.required)),
     )
-    return extras.length ? [...base, ...extras] : base
+    // dedupe by key (SHARED first wins)
+    const seen = new Set(have)
+    const unique: FieldDef[] = []
+    for (const f of extras) {
+      if (seen.has(f.key)) continue
+      seen.add(f.key)
+      unique.push(f)
+    }
+    return unique.length ? [...base, ...unique] : base
   }, [schema, fallbackFields])
 
   const priceOpts = useMemo(() => ({ robotPrice }), [robotPrice])

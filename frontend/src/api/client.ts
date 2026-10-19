@@ -142,12 +142,26 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const isAuthRoute = error.config?.url?.includes('/auth/')
       if (!isAuthRoute) {
         localStorage.removeItem('access_token')
         localStorage.removeItem('refresh_token')
+      }
+    }
+    // PDF/Excel: responseType=blob — тело ошибки тоже Blob; иначе 409 выглядит как «Конфликт данных»
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.data instanceof Blob &&
+      error.response.status >= 400
+    ) {
+      try {
+        const text = await error.response.data.text()
+        const parsed: unknown = JSON.parse(text)
+        error.response.data = parsed as ApiErrorBody
+      } catch {
+        /* оставляем Blob */
       }
     }
     return Promise.reject(error)

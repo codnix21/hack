@@ -152,10 +152,10 @@ export function LandingPage() {
               </Button>
               <Button
                 size="lg"
-                variant="outline"
+                variant="outlineOnDark"
                 loading={guestLoading}
                 onClick={() => void startGuest('/app/projects/new')}
-                className="min-w-[12rem] border-white/30 bg-transparent text-white hover:bg-white/10"
+                className="min-w-[12rem]"
               >
                 Создать проект
               </Button>

@@ -117,7 +117,7 @@ export function economicsChecklist(
       label: 'Цена решения',
       filled: hasPriceSource(params, opts),
       category: 'conditional',
-      reason: 'CAPEX: каталог / unit_price / assumed_unit_price',
+      reason: 'Нужна цена из каталога или вручную — для расчёта CAPEX',
     },
   ]
 }
@@ -135,10 +135,10 @@ export function assessEconomicsLocal(
         code: 'required',
         message:
           c.field === 'peak_demand'
-            ? 'Укажите пиковую нагрузку (оп/ч)'
+            ? 'Обязательное поле: укажите пиковую нагрузку (оп/ч)'
             : c.field === 'current_labor_cost_year'
-              ? 'Укажите годовые затраты на персонал или численность со ставкой'
-              : 'Выберите решение с ценой или укажите unit_price / assumed_unit_price',
+              ? 'Обязательное поле: годовые затраты на персонал или численность со ставкой'
+              : 'Условно обязательное поле: выберите решение с ценой в каталоге или укажите цену вручную',
         severity: 'error',
         category: c.category,
         capability: 'economics',
@@ -210,7 +210,7 @@ export function fieldRequirement(
     return {
       required: need && key === 'staff_count',
       category: 'derived',
-      reason: 'Альтернатива прямому current_labor_cost_year',
+      reason: 'Альтернатива прямому полю «годовые затраты на персонал»',
     }
   }
   if (key === 'unit_price' || key === 'assumed_unit_price') {

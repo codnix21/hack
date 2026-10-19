@@ -34,15 +34,29 @@ import {
 
 const NO_SOURCE_DATA = 'Нет данных в исходных материалах'
 
+function formatScalar(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'да' : 'нет'
+  if (value == null) return NO_SOURCE_DATA
+  if (typeof value === 'string') {
+    const mapped: Record<string, string> = {
+      warehouse: 'склад',
+      airport: 'аэропорт',
+      medical: 'медучреждение',
+    }
+    return mapped[value] || value
+  }
+  return String(value)
+}
+
 function asText(value: unknown): string {
   if (value == null || value === '') return NO_SOURCE_DATA
   if (typeof value === 'string') return value || NO_SOURCE_DATA
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return formatScalar(value)
   if (Array.isArray(value)) {
     if (value.length === 0) return NO_SOURCE_DATA
     return value
       .map((item) => {
-        if (typeof item === 'string') return item
+        if (typeof item === 'string') return formatScalar(item)
         if (item && typeof item === 'object') {
           const o = item as Record<string, unknown>
           return String(o.title || o.name || o.result || JSON.stringify(item))
@@ -55,7 +69,12 @@ function asText(value: unknown): string {
     const entries = Object.entries(value as Record<string, unknown>)
     if (entries.length === 0) return NO_SOURCE_DATA
     return entries
-      .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+      .map(([k, v]) => {
+        const label = objectParamLabel(k)
+        if (Array.isArray(v)) return `${label}: ${asText(v)}`
+        if (v && typeof v === 'object') return `${label}: ${asText(v)}`
+        return `${label}: ${formatScalar(v)}`
+      })
       .join('; ')
   }
   return String(value)

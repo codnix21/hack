@@ -80,13 +80,23 @@ ASSUMPTION_LABELS_RU = {
     "labor_reduction_share": "Ожидаемая доля сокращения трудозатрат",
     "additional_revenue": "Дополнительная выручка",
     "raas_monthly_per_robot": "Аренда (RaaS) в месяц на робота",
-    "unit_price": "Стоимость единицы оборудования",
+    "unit_price": "Цена решения",
     "peak_demand": "Пиковая нагрузка",
     "productivity": "Производительность",
     "robots_count": "Количество роботов",
     "software_cost": "Стоимость ПО",
     "maintenance_year": "Обслуживание",
     "implementation_cost": "Внедрение",
+    "discount_rate": "Ставка дисконтирования",
+    "battery_cycle_years": "Цикл замены АКБ",
+    "battery_cost_share": "Доля стоимости АКБ от цены",
+    "charging_station_cost": "Стоимость зарядной станции",
+    "charging_stations_count": "Число зарядных станций",
+    "depreciation_enabled": "Учёт амортизации",
+    "depreciation_method": "Метод амортизации",
+    "depreciation_years": "Срок амортизации",
+    "salvage_value": "Ликвидационная стоимость",
+    "assumed_unit_price": "Принятая цена решения",
 }
 
 # label, unit (optional)
@@ -151,6 +161,38 @@ OBJECT_PARAM_META: dict[str, tuple[str, str]] = {
     "availability": ("Доступность", ""),
     "reserve": ("Резерв", ""),
     "years": ("Горизонт анализа", "лет"),
+    "staff_salary_month": ("Средняя зарплата", "₽/мес"),
+    "payroll_tax_coef": ("Коэффициент начислений на ФОТ", ""),
+    "shifts_per_day": ("Число смен в сутки", "шт"),
+    "hours_per_shift": ("Часов в смене", "ч"),
+    # Датасеты_хакатон (транслит-ключи)
+    "rovnost_pola_otklonenie": ("Ровность пола (отклонение)", "мм"),
+    "rabochih_dney_v_godu": ("Рабочих дней в году", "дн"),
+    "obem_priemki_poddony_sutki": ("Объём приёмки", "поддоны/сут"),
+    "obem_otgruzki_poddony_sutki": ("Объём отгрузки", "поддоны/сут"),
+    "obem_otbora_strok_sutki_vsego": ("Объём отбора", "строк/сут"),
+    "obem_otbora_shtuk_sutki_vsego": ("Объём отбора", "шт/сут"),
+    "dolya_melkoshtuchnogo_otbora_piece_pick": ("Доля мелкоштучного отбора", ""),
+    "kolichestvo_sku_aktivnyh": ("Количество активных SKU", "шт"),
+    "dolya_sku_s_bystrym_oborotom_a_klass": ("Доля SKU A-класса", ""),
+    "obschaya_chislennost_personala_sklada": ("Общая численность персонала склада", "чел"),
+    "iz_nih_otborschiki_komplektovschiki": ("Из них: отборщики", "чел"),
+    "iz_nih_operatory_pogruzchikov": ("Из них: операторы погрузчиков", "чел"),
+    "iz_nih_operatory_upakovochnyh_liniy": ("Из них: операторы упаковки", "чел"),
+    "srednyaya_z_p_otborschika_gross": ("Средняя з/п отборщика", "₽"),
+    "srednyaya_z_p_operatora_pogruzchika_gross": ("Средняя з/п оператора погрузчика", "₽"),
+    "koeffitsient_nachisleniy_na_fot_strahovye_vznosy": ("Коэффициент начислений на ФОТ", ""),
+    "srednyaya_vyrabotka_otborschika_strok_ch": ("Средняя выработка отборщика", "строк/ч"),
+    "koeffitsient_poter_rabochego_vremeni_otpusk_bolezn_tekuchest": (
+        "Коэффициент потерь рабочего времени",
+        "",
+    ),
+    "srednyaya_dlina_marshruta_otborschika_na_1_stroku": ("Средняя длина маршрута отборщика", "м"),
+    "protyazhennost_konveyernoy_transportnoy_sistemy": ("Протяжённость конвейерной системы", "м"),
+    "tip_stellazhnoy_sistemy": ("Тип стеллажной системы", ""),
+    "kolichestvo_palletomest": ("Количество паллетомест", "шт"),
+    "srednyaya_massa_gruzovoy_edinitsy_pallet": ("Средняя масса паллеты", "кг"),
+    "srednyaya_massa_shtuchnoy_edinitsy_sku": ("Средняя масса штучной единицы", "кг"),
 }
 
 ASSUMPTION_PARAM_KEYS = set(ASSUMPTION_LABELS_RU.keys()) | {
@@ -324,6 +366,18 @@ def _dash(value: Any) -> Any:
     return _na(value, "—")
 
 
+_VALUE_LABELS_RU = {
+    "straight_line": "Линейный метод",
+    "declining_balance": "Уменьшаемого остатка",
+    "warehouse": "Склад",
+    "airport": "Аэропорт",
+    "medical": "Медицинское учреждение",
+    "purchase": "Покупка",
+    "raas": "Аренда (RaaS)",
+    "both": "Покупка и аренда",
+}
+
+
 def _fmt_cell(value: Any) -> Any:
     if value is None:
         return "Нет данных"
@@ -347,6 +401,10 @@ def _fmt_cell(value: Any) -> Any:
                     parts.append(str(item))
             return "; ".join(parts)
         return "Нет данных в исходных материалах"
+    if isinstance(value, str) and value in _VALUE_LABELS_RU:
+        return _VALUE_LABELS_RU[value]
+    if isinstance(value, str) and value in METRIC_LABELS_RU:
+        return METRIC_LABELS_RU[value]
     return value
 
 
@@ -445,17 +503,44 @@ def _project_status_ru(status: Optional[str], is_demo: bool = False) -> str:
     return PROJECT_STATUS_RU.get(str(status), str(status))
 
 
+def _strip_dataset_prefix(key: str) -> str:
+    for prefix in (
+        "ds_warehouse_",
+        "ds_airport_",
+        "ds_medical_",
+        "ds_med_",
+        "ds_",
+    ):
+        if key.startswith(prefix):
+            return key[len(prefix) :]
+    return key
+
+
 def _param_label(key: str) -> str:
-    if key in OBJECT_PARAM_META:
-        return OBJECT_PARAM_META[key][0]
-    if key in ASSUMPTION_LABELS_RU:
-        return ASSUMPTION_LABELS_RU[key]
+    for candidate in (key, _strip_dataset_prefix(key)):
+        if candidate in OBJECT_PARAM_META:
+            return OBJECT_PARAM_META[candidate][0]
+        if candidate in ASSUMPTION_LABELS_RU:
+            return ASSUMPTION_LABELS_RU[candidate]
+        if candidate in FORMULA_LABELS_RU:
+            return FORMULA_LABELS_RU[candidate]
+        if candidate in BREAKDOWN_LABELS_RU:
+            return BREAKDOWN_LABELS_RU[candidate]
+        if candidate in METRIC_LABELS_RU:
+            return METRIC_LABELS_RU[candidate]
+    # Не отдаём snake_case комиссии — нейтральная подпись
+    base = _strip_dataset_prefix(key)
+    if base != key:
+        return f"Параметр датасета ({base.replace('_', ' ')})"
+    if "_" in key and key.isascii():
+        return f"Параметр ({key.replace('_', ' ')})"
     return key
 
 
 def _param_unit(key: str) -> str:
-    if key in OBJECT_PARAM_META:
-        return OBJECT_PARAM_META[key][1]
+    for candidate in (key, _strip_dataset_prefix(key)):
+        if candidate in OBJECT_PARAM_META:
+            return OBJECT_PARAM_META[candidate][1]
     unit_map = {
         "training_per_robot": "₽",
         "energy_per_robot_year": "₽/год",
@@ -512,7 +597,7 @@ def _param_source(key: str) -> str:
 
 
 def _assumption_label(code: str) -> str:
-    return ASSUMPTION_LABELS_RU.get(code, code)
+    return _param_label(code)
 
 
 def _is_model_assumption(key: str) -> bool:
@@ -1641,8 +1726,11 @@ def export_project_pdf(
     # Параметры объекта
     params = project.object_params if isinstance(getattr(project, "object_params", None), dict) else {}
     param_data = [["Параметр", "Значение", "Единица", "Источник"]]
+    wrote_params = 0
     if params:
-        for key, value in list(params.items())[:40]:
+        for key, value in params.items():
+            if _skip_object_param(str(key), value):
+                continue
             param_data.append(
                 [
                     _param_label(str(key)),
@@ -1651,7 +1739,10 @@ def export_project_pdf(
                     _param_source(str(key)),
                 ]
             )
-    else:
+            wrote_params += 1
+            if wrote_params >= 40:
+                break
+    if wrote_params == 0:
         param_data.append(["Нет данных", "Нет данных", "—", "—"])
     story.append(
         section(
@@ -1884,13 +1975,20 @@ def export_project_pdf(
         wi_items.append(p("Нет сохранённого анализа «что если»", normal_style))
     story.append(section("Анализ «что если»", wi_items))
 
-    # Допущения
+    # Допущения — только модельные (без ds_* и сырых ключей датасета)
     assum = assumptions or {}
     ass_data = [["Показатель", "Значение"]]
+    wrote_ass = 0
     if isinstance(assum, dict) and assum:
-        for k, v in list(assum.items())[:40]:
-            ass_data.append([_assumption_label(str(k)), _fmt_cell(v)])
-    else:
+        for k, v in assum.items():
+            key = str(k)
+            if not _is_model_assumption(key):
+                continue
+            ass_data.append([_assumption_label(key), _fmt_cell(v)])
+            wrote_ass += 1
+            if wrote_ass >= 40:
+                break
+    if wrote_ass == 0:
         ass_data.append(["Нет данных", "Нет данных"])
     story.append(
         section(

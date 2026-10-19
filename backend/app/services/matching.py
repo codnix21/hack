@@ -49,6 +49,27 @@ def _mark_needs_review(status: str) -> str:
     return "needs_review"
 
 
+def _floor_types_compatible(object_floor: str, robot_floors: list[Any]) -> bool:
+    """Совместимость покрытий: «промышленный бетон» ≈ «бетон» (не строгое равенство строк)."""
+    obj = str(object_floor).strip().lower().replace("ё", "е")
+    if not obj:
+        return True
+    for raw in robot_floors:
+        rf = str(raw).strip().lower().replace("ё", "е")
+        if not rf:
+            continue
+        if obj == rf:
+            return True
+        # подтип / уточнение: промышленный бетон ⊇ бетон, ж/б пол ⊇ бетон
+        if rf in obj or obj in rf:
+            return True
+        obj_tokens = {t for t in obj.replace("-", " ").replace("/", " ").split() if len(t) >= 4}
+        rf_tokens = {t for t in rf.replace("-", " ").replace("/", " ").split() if len(t) >= 4}
+        if obj_tokens & rf_tokens:
+            return True
+    return False
+
+
 def _norm_text(value: Any) -> str:
     return str(value or "").strip().lower().replace("ё", "е")
 
@@ -220,8 +241,7 @@ def match_robot_to_project(
             score -= 8
         else:
             floors_list = robot_floors if isinstance(robot_floors, list) else [robot_floors]
-            floors_norm = [str(f).lower() for f in floors_list]
-            if str(floor_type).lower() not in floors_norm:
+            if not _floor_types_compatible(str(floor_type), floors_list):
                 status = _mark_needs_review(status)
                 msg = (
                     f"⚠ Несоответствие типа покрытия: объект «{floor_type}», "

@@ -36,6 +36,9 @@ def _raise_if_economics_stale(db: Session, project: Project) -> None:
                 "message": "Сначала выполните расчёт экономики — в отчёте нет актуальных KPI.",
             },
         )
+    # Демо: гость не может пересчитать; отдаём последний сохранённый расчёт.
+    if project.is_demo:
+        return
     current = _resolve_inputs(db, project, EconomicsRequest(scenario="purchase"))
     mismatches = _economics_input_mismatches(calc.inputs, current)
     if mismatches:

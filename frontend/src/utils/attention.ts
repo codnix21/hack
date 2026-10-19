@@ -79,10 +79,16 @@ function completenessToAttention(item: CompletenessItem): AttentionItem | null {
   if (item.kind === 'filled') return null
   const goField = resolveAttentionGoField(item.key, item.detail)
   if (item.kind === 'missing') {
+    const critical =
+      item.key === 'peak_demand' ||
+      item.key === 'current_labor_cost_year' ||
+      item.key === 'unit_price'
     return {
       id: `c:${item.key}`,
       category: 'fix',
-      title: `${item.label}: нет значения`,
+      title: critical
+        ? `Обязательное поле не заполнено: ${item.label}`
+        : `${item.label}: нет значения`,
       impact: localizeUserFacingWarning(item.detail),
       goStep: 'object',
       goField,

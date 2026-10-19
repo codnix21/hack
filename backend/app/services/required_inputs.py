@@ -86,7 +86,7 @@ FIELD_CATALOG: list[dict[str, Any]] = [
         "aliases": ["economics_robot_id", "selected_robot.price_rub", "assumed_unit_price"],
         "category": "conditional",
         "capabilities": ["economics", "report"],
-        "reason": "Нужна цена решения (каталог / явная / явное допущение) для CAPEX",
+        "reason": "Нужна цена из каталога или вручную — для расчёта CAPEX",
         "group": "ops",
         "formula_refs": ["calc_capex", "opex"],
     },
@@ -119,7 +119,7 @@ FIELD_CATALOG: list[dict[str, Any]] = [
         "field": "staff_count",
         "category": "derived",
         "capabilities": ["economics"],
-        "reason": "Может порождать current_labor_cost_year вместе со ставкой",
+        "reason": "Вместе со ставкой даёт годовые затраты на персонал",
         "group": "staff",
         "formula_refs": ["derived_labor_from_headcount"],
     },
@@ -289,13 +289,13 @@ def validate_for_economics(
     price_ok, price_origin = has_price_source(params, robot_price=robot_price)
     if not price_ok:
         msg = (
-            "Выберите решение с ценой в каталоге («В расчёт»), укажите unit_price "
-            "или явное assumed_unit_price. Скрытое демо-допущение 3.5 млн ₽ не используется."
+            "Условно обязательное поле: выберите решение с ценой в каталоге («В расчёт») "
+            "или укажите цену вручную. Скрытое демо-допущение 3.5 млн ₽ не используется."
         )
         if has_selected_robot and (robot_price is None or robot_price <= 0):
             msg = (
-                "У выбранного решения нет цены в каталоге. Укажите unit_price или "
-                "assumed_unit_price (явное допущение), либо выберите другое решение."
+                "У выбранного решения нет цены в каталоге. Укажите цену вручную "
+                "или выберите другое решение."
             )
         errors.append(
             _issue(
@@ -311,7 +311,7 @@ def validate_for_economics(
             _issue(
                 "assumed_unit_price",
                 "assumption",
-                "Используется явное допущение цены (assumed_unit_price) — не коммерческое предложение",
+                "Используется принятая цена (явное допущение) — не коммерческое предложение",
                 severity="warning",
                 category="conditional",
                 capability="economics",
@@ -377,7 +377,7 @@ def _economics_checklist(
             "label": "Цена решения",
             "filled": price_ok,
             "category": "conditional",
-            "reason": "CAPEX (каталог / unit_price / assumed_unit_price)",
+            "reason": "Нужна цена из каталога или вручную — для CAPEX",
         },
     ]
 

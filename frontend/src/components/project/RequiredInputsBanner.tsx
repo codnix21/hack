@@ -1,4 +1,5 @@
 import type { CapabilityReadiness, ChecklistItem } from '../../utils/requiredInputs'
+import { localizeUserFacingWarning } from '../../utils/labels'
 import { Button } from '../ui/Button'
 
 interface Props {
@@ -60,10 +61,15 @@ export function RequiredInputsBanner({
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                   : 'border-amber-200 bg-amber-50 text-amber-950'
               }`}
-              title={c.reason}
+              title={localizeUserFacingWarning(c.reason)}
               onClick={() => onGoField?.(c.field)}
             >
               {c.filled ? '✓' : '!'} {c.label}
+              {!c.filled && c.category === 'required'
+                ? ' · обязательно'
+                : !c.filled && c.category === 'conditional'
+                  ? ' · условно'
+                  : ''}
             </button>
           </li>
         ))}
@@ -80,7 +86,10 @@ export function RequiredInputsBanner({
               >
                 {c.label}
               </button>
-              <span className="text-steel-600"> — {c.reason}</span>
+              <span className="text-steel-600">
+                {' '}
+                — {localizeUserFacingWarning(c.reason)}
+              </span>
             </li>
           ))}
         </ul>

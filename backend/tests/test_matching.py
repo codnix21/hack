@@ -30,6 +30,32 @@ def _robot(**kwargs):
     return SimpleNamespace(**defaults)
 
 
+def test_floor_industrial_concrete_compatible_with_concrete():
+    """«Промышленный бетон» не должен конфликтовать с допуском «бетон»."""
+    from app.services.matching import _floor_types_compatible
+
+    assert _floor_types_compatible("Промышленный бетон", ["бетон", "асфальт", "плитка"])
+    assert _floor_types_compatible("бетон", ["промышленный бетон"])
+    assert not _floor_types_compatible("плитка", ["асфальт", "бетон"])
+
+    r = match_robot_to_project(
+        _robot(),
+        {
+            "required_payload_kg": 100,
+            "aisle_width_mm": 2000,
+            "floor_type": "Промышленный бетон",
+            "required_processes": ["transport"],
+            "temperature_min_c": 5,
+            "temperature_max_c": 30,
+            "indoor": True,
+            "charging_stations": 2,
+        },
+        "warehouse",
+    )
+    assert not any("Несоответствие типа покрытия" in x for x in r["match_reasons"])
+    assert any("покрытия" in x.lower() and "совместим" in x.lower() for x in r["match_reasons"])
+
+
 def test_hard_exclude_payload():
     r = match_robot_to_project(_robot(payload_kg=100), {"required_payload_kg": 300}, "warehouse")
     assert r["status"] == "excluded"

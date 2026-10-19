@@ -222,7 +222,7 @@ def _resolve_inputs(db: Session, project: Project, req: EconomicsRequest) -> dic
             "unit_price_assumed_value": unit_price,
             "unit_price_origin": price_origin,
             "unit_price_assumed_note": (
-                "Используется явное допущение цены (assumed_unit_price) — "
+                "Используется принятая цена (явное допущение) — "
                 "не коммерческое предложение поставщика."
             ),
         }
@@ -230,7 +230,7 @@ def _resolve_inputs(db: Session, project: Project, req: EconomicsRequest) -> dic
         assumptions = {
             **assumptions,
             "unit_price_origin": price_origin,
-            "unit_price_note": "Цена задана явно в параметрах объекта (unit_price).",
+            "unit_price_note": "Цена задана явно в параметрах объекта.",
         }
     elif price_origin == "robot.price_rub":
         assumptions = {
@@ -418,7 +418,7 @@ def calculate(
         result.setdefault("assumptions", {})["unit_price_assumed"] = True
         warn = list(result.get("input_warnings") or [])
         warn.append(
-            "CAPEX и OPEX используют явное допущение цены (assumed_unit_price) — "
+            "CAPEX и OPEX используют принятую цену (явное допущение) — "
             "не коммерческое предложение поставщика."
         )
         result["input_warnings"] = warn
