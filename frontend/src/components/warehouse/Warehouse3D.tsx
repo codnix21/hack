@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Text, useGLTF } from '@react-three/drei'
+import { OrbitControls, Text } from '@react-three/drei'
 import * as THREE from 'three'
 import type { VisualizationLayout } from '../../types'
 import type { LayerFlags, SimRobot, SimCollision } from '../../simulation/types'
@@ -11,11 +11,16 @@ import {
   vizExtentsM,
   vizPxToScene,
   vizRectToSceneBox,
+  vizRouteToScenePoints,
 } from '../../utils/sceneCoords'
 import { useThemeStore } from '../../store/themeStore'
 
-/** Опциональная модель AMR из Blender (public/models/amr.glb). */
-const AMR_GLB = '/models/amr.glb'
+/**
+ * GLB (`/models/amr.glb`) намеренно не подгружается через useGLTF:
+ * при отсутствии файла SPA/прокси часто отдаёт index.html → краш всего приложения.
+ * Когда появится валидный GLB, подключать только после isGlbMagic + ErrorBoundary.
+ * Сейчас — процедурная геометрия AMR.
+ */
 
 interface Props {
   layout: VisualizationLayout
@@ -178,12 +183,9 @@ function Routes({
   return (
     <group>
       {(layout.routes || []).map((route) => {
-        if (route.blocked) return null
-        const pts = (route.points || []).map((p) => {
-          const s = vizPxToScene(layout, p.x, p.y)
-          return new THREE.Vector3(s.x, 0.08, s.z)
-        })
-        if (pts.length < 2) return null
+        const scenePts = vizRouteToScenePoints(layout, route)
+        if (scenePts.length < 2) return null
+        const pts = scenePts.map((p) => new THREE.Vector3(p.x, 0.08, p.z))
         const selected = robots.find((r) => r.id === selectedRobotId)?.routeId === route.id
         const dim = Boolean(selectedRobotId && !selected)
         const curve = new THREE.CatmullRomCurve3(pts)
@@ -201,26 +203,6 @@ function Routes({
       })}
     </group>
   )
-}
-
-function AmrGlbBody({ color }: { color: string }) {
-  const gltf = useGLTF(AMR_GLB)
-  const cloned = useMemo(() => {
-    const root = gltf.scene.clone(true)
-    root.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        const mesh = obj as THREE.Mesh
-        mesh.castShadow = true
-        if (mesh.material && 'color' in mesh.material) {
-          const mat = (mesh.material as THREE.MeshStandardMaterial).clone()
-          mat.color = new THREE.Color(color)
-          mesh.material = mat
-        }
-      }
-    })
-    return root
-  }, [gltf.scene, color])
-  return <primitive object={cloned} scale={1} />
 }
 
 function AmrProcedural({ color, selected, cargoKg }: { color: string; selected: boolean; cargoKg: number }) {
@@ -257,13 +239,11 @@ function AmrRobot({
   layout,
   selected,
   onSelect,
-  useGlb,
 }: {
   robot: SimRobot
   layout: VisualizationLayout
   selected: boolean
   onSelect: () => void
-  useGlb: boolean
 }) {
   const s = vizPxToScene(layout, robot.x, robot.y)
   const color = STATUS_COLOR[robot.status]
@@ -276,13 +256,7 @@ function AmrRobot({
         onSelect()
       }}
     >
-      {useGlb ? (
-        <Suspense fallback={<AmrProcedural color={color} selected={selected} cargoKg={robot.cargoKg} />}>
-          <AmrGlbBody color={color} />
-        </Suspense>
-      ) : (
-        <AmrProcedural color={color} selected={selected} cargoKg={robot.cargoKg} />
-      )}
+      <AmrProcedural color={color} selected={selected} cargoKg={robot.cargoKg} />
       {selected && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.65, 0.78, 32]} />
@@ -383,7 +357,7 @@ function CameraRig({
   return null
 }
 
-function SceneContent(props: Props & { bg: string; floor: string; grid: string; useGlb: boolean }) {
+function SceneContent(props: Props & { bg: string; floor: string; grid: string }) {
   const selected = props.robots.find((r) => r.id === props.selectedRobotId) || null
   const extents = vizExtentsM(props.layout)
   return (
@@ -409,7 +383,6 @@ function SceneContent(props: Props & { bg: string; floor: string; grid: string; 
             layout={props.layout}
             selected={r.id === props.selectedRobotId}
             onSelect={() => props.onSelectRobot(r.id)}
-            useGlb={props.useGlb}
           />
         ))}
       <CollisionMarkers
@@ -431,27 +404,12 @@ function SceneContent(props: Props & { bg: string; floor: string; grid: string; 
 
 export function Warehouse3D(props: Props) {
   const theme = useThemeStore((s) => s.theme)
-  const [useGlb, setUseGlb] = useState(false)
   const webglOk = useMemo(() => {
     try {
       const c = document.createElement('canvas')
       return !!(c.getContext('webgl') || c.getContext('experimental-webgl'))
     } catch {
       return false
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    fetch(AMR_GLB, { method: 'HEAD' })
-      .then((r) => {
-        if (!cancelled) setUseGlb(r.ok)
-      })
-      .catch(() => {
-        if (!cancelled) setUseGlb(false)
-      })
-    return () => {
-      cancelled = true
     }
   }, [])
 
@@ -496,7 +454,7 @@ export function Warehouse3D(props: Props) {
         }}
       >
         <Suspense fallback={null}>
-          <SceneContent {...props} bg={colors.bg} floor={colors.floor} grid={colors.grid} useGlb={useGlb} />
+          <SceneContent {...props} bg={colors.bg} floor={colors.floor} grid={colors.grid} />
         </Suspense>
       </Canvas>
     </div>

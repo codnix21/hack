@@ -174,6 +174,21 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   const editLocked = readOnly || narrowViewport
   const theme = useThemeStore((s) => s.theme)
 
+  /** Сброс выбора, если объект/маршрут удалены (в т.ч. после переключения 2D↔3D). */
+  useEffect(() => {
+    if (!layout) {
+      setSelectedId(null)
+      setSelectedRouteId(null)
+      return
+    }
+    if (selectedId && !layout.objects.some((o) => o.id === selectedId)) {
+      setSelectedId(null)
+    }
+    if (selectedRouteId && !(layout.routes || []).some((r) => r.id === selectedRouteId)) {
+      setSelectedRouteId(null)
+    }
+  }, [layout, selectedId, selectedRouteId])
+
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
     const mq = window.matchMedia('(max-width: 1023px)')

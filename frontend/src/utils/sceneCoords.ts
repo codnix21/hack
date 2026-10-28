@@ -117,3 +117,32 @@ export function topCameraPosition(extents: WarehouseExtentsM): { position: [numb
     target: [0, 0, 0],
   }
 }
+
+/** Полилиния маршрута VisualizationLayout (px) → точки сцены; blocked → []. */
+export function vizRouteToScenePoints(
+  layout: VisualizationLayout,
+  route: { points?: { x: number; y: number }[]; blocked?: boolean },
+): SceneXZ[] {
+  if (route.blocked) return []
+  const pts = route.points || []
+  if (pts.length < 2) return []
+  return pts.map((p) => vizPxToScene(layout, p.x, p.y))
+}
+
+/** Длина полилинии в метрах сцены (эквивалент метрам плана). */
+export function scenePolylineLengthM(points: SceneXZ[]): number {
+  let total = 0
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x
+    const dz = points[i].z - points[i - 1].z
+    total += Math.hypot(dx, dz)
+  }
+  return total
+}
+
+/** Проверка бинарного GLB по magic «glTF». */
+export function isGlbMagic(buf: ArrayBuffer): boolean {
+  if (buf.byteLength < 4) return false
+  const u8 = new Uint8Array(buf, 0, 4)
+  return u8[0] === 0x67 && u8[1] === 0x6c && u8[2] === 0x54 && u8[3] === 0x46
+}
