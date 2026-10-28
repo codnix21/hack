@@ -100,22 +100,104 @@ export function warehouseMetersToScene(
   return metersToScene(xM, yM, { widthM: layout.width_m, lengthM: layout.length_m })
 }
 
-/** Камера «весь склад в кадре» (изометрия). */
-export function fitCameraPosition(extents: WarehouseExtentsM): { position: [number, number, number]; target: [number, number, number] } {
-  const span = Math.max(extents.widthM, extents.lengthM, 8)
-  const dist = span * 0.95
+export interface CameraFitOptions {
+  /** Вертикальный FOV камеры, градусы (как у PerspectiveCamera). */
+  fovDeg?: number
+  /** aspect = width/height контейнера Canvas. */
+  aspect?: number
+  /** Запас кадра (>1). */
+  padding?: number
+  mode?: 'iso' | 'top'
+}
+
+export interface CameraFitResult {
+  position: [number, number, number]
+  target: [number, number, number]
+  near: number
+  far: number
+}
+
+/** Габариты помещения из DTO (не по «двум случайным объектам»). */
+export function warehouseRoomExtents(layout: Pick<WarehouseLayout, 'width_m' | 'length_m'>): WarehouseExtentsM {
   return {
-    position: [dist * 0.85, dist * 0.75, dist * 0.85],
-    target: [0, 0, 0],
+    widthM: Math.max(1, Number(layout.width_m) || 1),
+    lengthM: Math.max(1, Number(layout.length_m) || 1),
   }
 }
 
-export function topCameraPosition(extents: WarehouseExtentsM): { position: [number, number, number]; target: [number, number, number] } {
-  const span = Math.max(extents.widthM, extents.lengthM, 8)
+/** AABB пола в координатах сцены (центр склада в нуле). */
+export function sceneRoomBounds(extents: WarehouseExtentsM) {
+  const hw = extents.widthM / 2
+  const hl = extents.lengthM / 2
   return {
-    position: [0, span * 1.35, 0.01],
-    target: [0, 0, 0],
+    minX: -hw,
+    maxX: hw,
+    minZ: -hl,
+    maxZ: hl,
+    halfDiag: Math.hypot(hw, hl),
   }
+}
+
+/**
+ * Дистанция камеры, чтобы прямоугольник пола целиком попал в перспективу.
+ * Учитывает FOV и aspect: для вытянутого склада берётся более жёсткая ось.
+ */
+export function fitDistanceForRoom(
+  extents: WarehouseExtentsM,
+  opts: Pick<CameraFitOptions, 'fovDeg' | 'aspect' | 'padding'> = {},
+): number {
+  const fovDeg = opts.fovDeg ?? 42
+  const aspect = Math.max(0.35, opts.aspect ?? 16 / 9)
+  const padding = opts.padding ?? 1.28
+  const halfW = Math.max(extents.widthM, 1) / 2
+  const halfL = Math.max(extents.lengthM, 1) / 2
+  const vFov = (fovDeg * Math.PI) / 180
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect)
+  // Покрыть половину длины по вертикали кадра и половину ширины по горизонтали
+  const distV = halfL / Math.tan(vFov / 2)
+  const distH = halfW / Math.tan(hFov / 2)
+  // Сфера, описывающая пол — страховка при косом ракурсе
+  const distSphere = Math.hypot(halfW, halfL) / Math.sin(vFov / 2)
+  return Math.max(distV, distH, distSphere * 0.72, 6) * padding
+}
+
+/** Камера «весь склад в кадре» (изометрия / top). Геометрию не сдвигает — только eye/target. */
+export function fitCameraPosition(
+  extents: WarehouseExtentsM,
+  opts: CameraFitOptions = {},
+): CameraFitResult {
+  const mode = opts.mode ?? 'iso'
+  const dist = fitDistanceForRoom(extents, opts)
+  const span = Math.max(extents.widthM, extents.lengthM, 8)
+  const near = Math.max(0.05, span / 800)
+  const far = Math.max(800, span * 40)
+
+  if (mode === 'top') {
+    return {
+      position: [0, dist, 0.001],
+      target: [0, 0, 0],
+      near,
+      far,
+    }
+  }
+
+  // Изометрия: направление (1, elev, 1), длина = dist
+  const elev = 0.62
+  const horiz = Math.sqrt(Math.max(1e-6, 1 - elev * elev))
+  const s = 1 / Math.SQRT2
+  return {
+    position: [dist * horiz * s, dist * elev, dist * horiz * s],
+    target: [0, 0, 0],
+    near,
+    far,
+  }
+}
+
+export function topCameraPosition(
+  extents: WarehouseExtentsM,
+  opts: Omit<CameraFitOptions, 'mode'> = {},
+): CameraFitResult {
+  return fitCameraPosition(extents, { ...opts, mode: 'top', fovDeg: opts.fovDeg ?? 42 })
 }
 
 /** Полилиния маршрута VisualizationLayout (px) → точки сцены; blocked → []. */

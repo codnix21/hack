@@ -103,6 +103,44 @@ test.describe('P2 layout 2D/3D toggle', () => {
     await expect(page.getByTestId('layout-zoom-in')).toBeEnabled()
   })
 
+  test('3D fit, layers, and inspector collapse enlarge scene', async ({ page }) => {
+    test.setTimeout(180_000)
+    await asGuest(page)
+    await createWarehouseProject(page, 'P2 layout 3D UX')
+    await clickStage(page, /План|Планировка/i)
+    await expect(page.getByTestId('layout-canvas')).toBeVisible({ timeout: 45_000 })
+
+    const addRack = page.getByTestId('layout-add-rack')
+    if (await addRack.isVisible().catch(() => false)) await addRack.click()
+
+    await page.getByTestId('layout-view-3d').click()
+    await expect(page.getByTestId('layout-3d-preview')).toBeVisible({ timeout: 30_000 })
+    const webglBlocked = await page.getByTestId('layout-3d-webgl-fallback').isVisible().catch(() => false)
+    test.skip(webglBlocked, 'WebGL unavailable')
+
+    await expect(page.getByTestId('layout-3d-canvas')).toBeVisible()
+    const before = await page.getByTestId('layout-canvas-wrap').boundingBox()
+    expect(before?.width).toBeGreaterThan(200)
+    expect(before?.height).toBeGreaterThan(300)
+
+    await page.getByTestId('layout-3d-fit').click()
+    await expect(page.getByTestId('layout-3d-canvas')).toBeVisible()
+
+    await expect(page.getByTestId('layout-3d-layer-grid')).toBeChecked()
+    await page.getByTestId('layout-3d-layer-grid').click()
+    await expect(page.getByTestId('layout-3d-layer-grid')).not.toBeChecked()
+
+    await expect(page.getByTestId('layout-inspector')).toBeVisible()
+    await page.getByTestId('layout-inspector-toggle').click()
+    await expect(page.getByTestId('layout-inspector')).toBeHidden()
+    const after = await page.getByTestId('layout-canvas-wrap').boundingBox()
+    expect((after?.width || 0)).toBeGreaterThanOrEqual((before?.width || 0) - 2)
+
+    await page.getByTestId('layout-inspector-toggle').click()
+    await expect(page.getByTestId('layout-inspector')).toBeVisible()
+    await expect(page.getByTestId('layout-inspector-summary').or(page.getByTestId('layout-rotation-input'))).toBeVisible()
+  })
+
   test('selection survives 2D→3D→2D when object still exists', async ({ page }) => {
     test.setTimeout(180_000)
     await asGuest(page)

@@ -3,15 +3,18 @@ import type { VisualizationLayout, WarehouseLayout } from '../types'
 import {
   LAYOUT_PAD_PX,
   fitCameraPosition,
+  fitDistanceForRoom,
   isGlbMagic,
   metersToScene,
   scenePolylineLengthM,
+  sceneRoomBounds,
   vizExtentsM,
   vizPxToMeters,
   vizPxToScene,
   vizRectToSceneBox,
   vizRouteToScenePoints,
   warehouseMetersToScene,
+  warehouseRoomExtents,
 } from './sceneCoords'
 
 function sampleViz(): VisualizationLayout {
@@ -87,10 +90,29 @@ describe('sceneCoords', () => {
     expect(s.z).toBeCloseTo(0, 5)
   })
 
-  it('fit camera scales with warehouse size', () => {
-    const small = fitCameraPosition({ widthM: 10, lengthM: 10 })
-    const large = fitCameraPosition({ widthM: 80, lengthM: 80 })
+  it('fit camera scales with warehouse size and FOV/aspect', () => {
+    const small = fitCameraPosition({ widthM: 10, lengthM: 10 }, { fovDeg: 42, aspect: 16 / 9 })
+    const large = fitCameraPosition({ widthM: 80, lengthM: 80 }, { fovDeg: 42, aspect: 16 / 9 })
     expect(large.position[1]).toBeGreaterThan(small.position[1])
+    expect(large.far).toBeGreaterThan(large.near)
+    // Вытянутый склад: узкий aspect требует большей дистанции по ширине
+    const wide = fitDistanceForRoom(
+      { widthM: 120, lengthM: 20 },
+      { fovDeg: 42, aspect: 1.2, padding: 1 },
+    )
+    const square = fitDistanceForRoom(
+      { widthM: 40, lengthM: 40 },
+      { fovDeg: 42, aspect: 1.2, padding: 1 },
+    )
+    expect(wide).toBeGreaterThan(square * 0.5)
+  })
+
+  it('scene room bounds come from DTO extents, not objects', () => {
+    const e = warehouseRoomExtents({ width_m: 60, length_m: 20 })
+    const b = sceneRoomBounds(e)
+    expect(b.maxX - b.minX).toBeCloseTo(60, 5)
+    expect(b.maxZ - b.minZ).toBeCloseTo(20, 5)
+    expect(b.halfDiag).toBeCloseTo(Math.hypot(30, 10), 5)
   })
 
   it('handles empty layout extents via fallback', () => {

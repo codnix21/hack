@@ -5,6 +5,8 @@ import {
   Crosshair,
   Hand,
   Maximize2,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Route,
   Save,
@@ -36,6 +38,10 @@ import {
   type Viewport,
 } from './layoutViewport'
 import { Layout3DPreview } from './Layout3DPreview'
+import {
+  DEFAULT_LAYOUT_3D_LAYERS,
+  type Layout3DLayers,
+} from './Layout3DCanvas'
 
 type EditorTool = 'select' | 'pan' | 'route'
 type PlanViewMode = '2d' | '3d'
@@ -170,6 +176,9 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   const [draftPoints, setDraftPoints] = useState<{ x: number; y: number }[]>([])
   const [inspectorOpen, setInspectorOpen] = useState(true)
   const [narrowViewport, setNarrowViewport] = useState(false)
+  const [layout3dLayers, setLayout3dLayers] = useState<Layout3DLayers>(DEFAULT_LAYOUT_3D_LAYERS)
+  const [layout3dCam, setLayout3dCam] = useState<'iso' | 'top'>('iso')
+  const [layout3dFitNonce, setLayout3dFitNonce] = useState(0)
   /** Пример-проект или узкий экран — без правки геометрии (просмотр + панорама). */
   const editLocked = readOnly || narrowViewport
   const theme = useThemeStore((s) => s.theme)
@@ -638,56 +647,8 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
         </span>
       </div>
 
-      {/* Toolbar groups */}
+      {/* Toolbar: компактные группы; в «Пространстве» скрыты 2D-only инструменты */}
       <div className="flex flex-wrap items-center gap-2 rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-2">
-        <div className="flex items-center gap-1" role="group" aria-label="Инструмент">
-          <Button
-            size="sm"
-            variant={tool === 'select' ? 'primary' : 'outline'}
-            data-testid="layout-tool-select"
-            onClick={() => {
-              setTool('select')
-              setDraftPoints([])
-            }}
-            aria-pressed={tool === 'select'}
-            title="Выбор и перемещение"
-          >
-            <Crosshair className="h-3.5 w-3.5" />
-            Выбор
-          </Button>
-          <Button
-            size="sm"
-            variant={tool === 'pan' ? 'primary' : 'outline'}
-            data-testid="layout-tool-pan"
-            onClick={() => {
-              setTool('pan')
-              setDraftPoints([])
-            }}
-            aria-pressed={tool === 'pan'}
-            title="Панорама"
-          >
-            <Hand className="h-3.5 w-3.5" />
-            Панорама
-          </Button>
-          {!editLocked && (
-            <Button
-              size="sm"
-              variant={tool === 'route' ? 'primary' : 'outline'}
-              data-testid="layout-tool-route"
-              onClick={() => {
-                setTool('route')
-                setSelectedId(null)
-                setSelectedRouteId(null)
-              }}
-              aria-pressed={tool === 'route'}
-              title="Клик — точки маршрута, Enter / «Готово» — завершить"
-            >
-              <Route className="h-3.5 w-3.5" />
-              Маршрут
-            </Button>
-          )}
-        </div>
-        <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
         <div className="flex items-center gap-1" role="group" aria-label="Режим плана">
           <Button
             size="sm"
@@ -696,62 +657,131 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             aria-pressed={planView === '2d'}
             onClick={() => setPlanView('2d')}
           >
-            2D — План
+            План
           </Button>
           <Button
             size="sm"
             variant={planView === '3d' ? 'primary' : 'outline'}
             data-testid="layout-view-3d"
             aria-pressed={planView === '3d'}
-            onClick={() => setPlanView('3d')}
+            onClick={() => {
+              setPlanView('3d')
+              setTool('select')
+              setDraftPoints([])
+              setLayout3dFitNonce((n) => n + 1)
+            }}
             title="Пространственный вид той же планировки"
           >
-            3D — Пространство
+            Пространство
           </Button>
         </div>
-        <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
-        <div className="flex items-center gap-1" role="group" aria-label="Вид">
-          <Button
-            size="sm"
-            variant="outline"
-            data-testid="layout-zoom-out"
-            disabled={planView !== '2d'}
-            aria-label="Уменьшить масштаб"
-            onClick={() => setVp((v) => ({ ...v, zoom: Math.max(0.4, v.zoom / 1.25) }))}
-          >
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            data-testid="layout-zoom-in"
-            aria-label="Увеличить масштаб"
-            disabled={planView !== '2d'}
-            onClick={() => setVp((v) => ({ ...v, zoom: Math.min(120, v.zoom * 1.25) }))}
-          >
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            data-testid="layout-fit"
-            disabled={planView !== '2d'}
-            onClick={fitToWarehouse}
-            title="По размеру склада"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-            По размеру
-          </Button>
-          <label className="ml-1 flex cursor-pointer items-center gap-1.5 text-xs text-[var(--nc-muted)]">
-            <input
-              type="checkbox"
-              checked={snap}
-              onChange={(e) => setSnap(e.target.checked)}
-              data-testid="layout-snap"
-            />
-            Сетка
-          </label>
-        </div>
+
+        {planView === '2d' ? (
+          <>
+            <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
+            <div className="flex items-center gap-1" role="group" aria-label="Инструмент">
+              <Button
+                size="sm"
+                variant={tool === 'select' ? 'primary' : 'outline'}
+                data-testid="layout-tool-select"
+                onClick={() => {
+                  setTool('select')
+                  setDraftPoints([])
+                }}
+                aria-pressed={tool === 'select'}
+                title="Выбор и перемещение"
+              >
+                <Crosshair className="h-3.5 w-3.5" />
+                Выбор
+              </Button>
+              <Button
+                size="sm"
+                variant={tool === 'pan' ? 'primary' : 'outline'}
+                data-testid="layout-tool-pan"
+                onClick={() => {
+                  setTool('pan')
+                  setDraftPoints([])
+                }}
+                aria-pressed={tool === 'pan'}
+                title="Панорама"
+              >
+                <Hand className="h-3.5 w-3.5" />
+                Панорама
+              </Button>
+              {!editLocked && (
+                <Button
+                  size="sm"
+                  variant={tool === 'route' ? 'primary' : 'outline'}
+                  data-testid="layout-tool-route"
+                  onClick={() => {
+                    setTool('route')
+                    setSelectedId(null)
+                    setSelectedRouteId(null)
+                  }}
+                  aria-pressed={tool === 'route'}
+                  title="Клик — точки маршрута, Enter / «Готово» — завершить"
+                >
+                  <Route className="h-3.5 w-3.5" />
+                  Маршрут
+                </Button>
+              )}
+            </div>
+            <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
+            <div className="flex items-center gap-1" role="group" aria-label="Вид">
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="layout-zoom-out"
+                aria-label="Уменьшить масштаб"
+                onClick={() => setVp((v) => ({ ...v, zoom: Math.max(0.4, v.zoom / 1.25) }))}
+              >
+                <ZoomOut className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="layout-zoom-in"
+                aria-label="Увеличить масштаб"
+                onClick={() => setVp((v) => ({ ...v, zoom: Math.min(120, v.zoom * 1.25) }))}
+              >
+                <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="layout-fit"
+                onClick={fitToWarehouse}
+                title="По размеру склада"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+                По размеру
+              </Button>
+              <label className="ml-1 flex cursor-pointer items-center gap-1.5 text-xs text-[var(--nc-muted)]">
+                <input
+                  type="checkbox"
+                  checked={snap}
+                  onChange={(e) => setSnap(e.target.checked)}
+                  data-testid="layout-snap"
+                />
+                Сетка
+              </label>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Сохраняем testid для E2E: в 3D zoom недоступен */}
+            <Button size="sm" variant="outline" data-testid="layout-zoom-in" disabled aria-label="Увеличить масштаб" className="sr-only">
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="outline" data-testid="layout-tool-pan" disabled className="sr-only" aria-hidden>
+              <Hand className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="sm" variant="outline" data-testid="layout-tool-select" disabled={false} className="sr-only" aria-hidden>
+              <Crosshair className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
+
         {!editLocked && (
           <>
             <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
@@ -765,50 +795,72 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 <Plus className="h-3.5 w-3.5" />
                 Стеллаж
               </Button>
-              <Button size="sm" variant="outline" onClick={() => addObject('obstacle')}>
-                <Plus className="h-3.5 w-3.5" />
-                Препятствие
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => addObject('load')}>
-                <Plus className="h-3.5 w-3.5" />
-                Приёмка
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => addObject('unload')}>
-                <Plus className="h-3.5 w-3.5" />
-                Отгрузка
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => addObject('charge')}>
-                <Plus className="h-3.5 w-3.5" />
-                Зарядка
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => addObject('start')}>
-                <Plus className="h-3.5 w-3.5" />
-                Старт
-              </Button>
+              {planView === '2d' ? (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => addObject('obstacle')}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Препятствие
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addObject('load')}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Приёмка
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addObject('unload')}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Отгрузка
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addObject('charge')}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Зарядка
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addObject('start')}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Старт
+                  </Button>
+                </>
+              ) : (
+                <span className="text-[11px] text-[var(--nc-muted)]">Добавление зон — в режиме «План»</span>
+              )}
             </div>
-            <label className="inline-flex">
-              <input
-                data-testid="layout-dxf-input"
-                type="file"
-                accept=".dxf"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) dxfPreviewMut.mutate(f)
-                  e.target.value = ''
-                }}
-              />
-              <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-3 text-sm font-medium text-[var(--nc-ink)] hover:border-brand-500/50">
-                <Upload className="h-3.5 w-3.5" />
-                DXF
-              </span>
-            </label>
+            {planView === '2d' ? (
+              <label className="inline-flex">
+                <input
+                  data-testid="layout-dxf-input"
+                  type="file"
+                  accept=".dxf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) dxfPreviewMut.mutate(f)
+                    e.target.value = ''
+                  }}
+                />
+                <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-3 text-sm font-medium text-[var(--nc-ink)] hover:border-brand-500/50">
+                  <Upload className="h-3.5 w-3.5" />
+                  DXF
+                </span>
+              </label>
+            ) : null}
             <Button size="sm" data-testid="layout-save" loading={saveMut.isPending} onClick={() => saveMut.mutate()}>
               <Save className="h-3.5 w-3.5" />
               Сохранить план
             </Button>
           </>
         )}
+
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="layout-inspector-toggle"
+            aria-expanded={inspectorOpen}
+            onClick={() => setInspectorOpen((v) => !v)}
+            title={inspectorOpen ? 'Свернуть инспектор' : 'Показать инспектор'}
+          >
+            {inspectorOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+            {inspectorOpen ? 'Инспектор' : 'Инспектор'}
+          </Button>
+        </div>
       </div>
 
       {narrowViewport && !readOnly ? (
@@ -819,11 +871,11 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
       ) : null}
 
       <div
-        className={`grid gap-3 ${inspectorOpen ? 'lg:grid-cols-[minmax(0,1fr)_220px]' : ''}`}
+        className={`grid gap-3 ${inspectorOpen ? 'lg:grid-cols-[minmax(0,1fr)_minmax(200px,240px)]' : ''}`}
       >
         {planView === '3d' && layout ? (
           <div
-            className="relative min-h-[32rem] overflow-hidden rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] bg-[var(--nc-surface)] p-2 shadow-panel"
+            className="relative h-[min(72vh,720px)] min-h-[28rem] overflow-hidden rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] bg-[var(--nc-surface)] p-2 shadow-panel"
             data-testid="layout-canvas-wrap"
           >
             <Layout3DPreview
@@ -833,6 +885,12 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 setSelectedId(id)
                 setSelectedRouteId(null)
               }}
+              layers={layout3dLayers}
+              onLayersChange={setLayout3dLayers}
+              cameraMode={layout3dCam}
+              onCameraModeChange={setLayout3dCam}
+              fitNonce={layout3dFitNonce}
+              onFitRequest={() => setLayout3dFitNonce((n) => n + 1)}
             />
             {/* Keep 2D canvas mounted off-screen so viewport/state survive mode switch */}
             <canvas ref={canvasRef} className="pointer-events-none absolute h-0 w-0 opacity-0" data-testid="layout-canvas" aria-hidden />
@@ -974,27 +1032,35 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
         </div>
         )}
 
+        {inspectorOpen ? (
         <div className="nc-panel space-y-3 p-3" data-testid="layout-inspector">
-          <div className="flex items-center justify-between gap-2">
-            <p className="nc-section-label">Инспектор</p>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              data-testid="layout-inspector-toggle"
-              aria-expanded={inspectorOpen}
-              onClick={() => setInspectorOpen((v) => !v)}
-            >
-              {inspectorOpen ? 'Свернуть' : 'Показать'}
-            </Button>
-          </div>
-          {!inspectorOpen ? (
-            <p className="text-xs text-[var(--nc-muted)]">Свойства объекта скрыты — больше места для плана.</p>
+          <p className="nc-section-label">Инспектор</p>
+          <p className="text-sm font-semibold text-[var(--nc-ink)]">
+            {selected || selectedRoute ? 'Параметры' : 'Склад'}
+          </p>
+          {!selected && !selectedRoute ? (
+            <div className="space-y-1 text-xs text-[var(--nc-muted)]" data-testid="layout-inspector-summary">
+              <p className="text-sm text-[var(--nc-ink)]">
+                {layout.width_m} × {layout.length_m} м
+              </p>
+              <p>
+                Объектов:{' '}
+                {layout.objects.filter((o) => o.id !== 'wall_contour').length}
+                {(layout.routes || []).length
+                  ? ` · маршрутов: ${(layout.routes || []).length}`
+                  : ''}
+              </p>
+              {planView === '3d' ? (
+                <p className="pt-1">
+                  ЛКМ — выбор · колёсико — масштаб · ПКМ/средняя — поворот и панорама. Перемещение и
+                  точные размеры — в режиме «План».
+                </p>
+              ) : (
+                <p className="pt-1">Клик по объекту — свойства. Колёсико — масштаб плана.</p>
+              )}
+            </div>
           ) : null}
-          {inspectorOpen ? (
-            <>
-          <p className="text-sm font-semibold text-[var(--nc-ink)]">Размеры объекта</p>
+          <p className="text-sm font-semibold text-[var(--nc-ink)]">Размеры помещения</p>
           <Input
             label="Ширина, м"
             type="number"
@@ -1126,37 +1192,26 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 </Button>
               )}
             </>
-          ) : (
-            <div className="space-y-2 text-xs text-[var(--nc-muted)]">
-              <p className="font-medium text-[var(--nc-ink)]">Ничего не выбрано</p>
-              <p>Клик по объекту — свойства. Колёсико — масштаб, пустая область — панорама.</p>
-              <p className="text-[var(--nc-muted)]">
-                Инструмент «Маршрут» — выставить точки вручную (оранжевая линия). Без ручных
-                маршрутов DES строит пути через A*.
-              </p>
-              {layoutRoutes.length > 0 ? (
-                <ul className="space-y-1 border-t border-[var(--nc-border-subtle)] pt-2">
-                  {layoutRoutes.map((r) => (
-                    <li key={r.id}>
-                      <button
-                        type="button"
-                        className="w-full rounded px-1 py-0.5 text-left hover:bg-[var(--nc-surface-hover)]"
-                        onClick={() => {
-                          setSelectedRouteId(r.id)
-                          setSelectedId(null)
-                        }}
-                      >
-                        {r.name || r.id} · {routeLengthM(r.points).toFixed(1)} м
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          )}
-            </>
+          ) : layoutRoutes.length > 0 ? (
+            <ul className="space-y-1 border-t border-[var(--nc-border-subtle)] pt-2 text-xs">
+              {layoutRoutes.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    className="w-full rounded px-1 py-0.5 text-left hover:bg-[var(--nc-surface-hover)]"
+                    onClick={() => {
+                      setSelectedRouteId(r.id)
+                      setSelectedId(null)
+                    }}
+                  >
+                    {r.name || r.id} · {routeLengthM(r.points).toFixed(1)} м
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
+        ) : null}
       </div>
 
       {dxfPreview && (
