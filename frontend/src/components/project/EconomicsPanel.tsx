@@ -590,6 +590,15 @@ export function EconomicsPanel({
         </div>
       </div>
 
+      {freshness === 'stale' && (
+        <Callout variant="warning" data-testid="economics-stale-banner">
+          <p className="text-sm font-medium">Экономика устарела</p>
+          <p className="mt-1 text-sm">
+            Параметры или состав решений изменились. Нажмите «Рассчитать», чтобы обновить показатели.
+          </p>
+        </Callout>
+      )}
+
       {blockingIssues.length > 0 && (
         <Callout variant="warning" data-testid="economics-missing-inputs">
           <p className="text-sm font-medium">Перед расчётом укажите:</p>
@@ -611,6 +620,7 @@ export function EconomicsPanel({
 
       {isEconomics && (
         <>
+          <div className="space-y-2" data-testid="economics-kpi-row">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi
               title={metricLabel('capex')}
@@ -764,6 +774,7 @@ export function EconomicsPanel({
               />
             </div>
           </details>
+          </div>
 
           <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">

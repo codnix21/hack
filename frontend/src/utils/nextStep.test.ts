@@ -17,10 +17,11 @@ describe('suggestNextStep', () => {
     expect(s.ctaLabel).toMatch(/параметр/i)
   })
 
-  it('suggests matching before layout when params ready', () => {
+  it('suggests layout before matching when params ready', () => {
+    // Продуктовый порядок: планировка → подбор (маршруты/DES опираются на план).
     const s = suggestNextStep({ object: 'done', layout: 'idle', selection: 'ready' })
-    expect(s.step).toBe('selection')
-    expect(s.ctaLabel).toMatch(/подбор/i)
+    expect(s.step).toBe('layout')
+    expect(s.ctaLabel).toMatch(/планировк/i)
   })
 
   it('suggests matching when params done and layout done', () => {

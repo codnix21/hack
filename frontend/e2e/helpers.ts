@@ -94,17 +94,25 @@ export async function clickStage(page: Page, label: RegExp) {
 /** Открыть редактируемую копию демо-склада (не read-only оригинал). */
 export async function openDemoWarehouse(page: Page) {
   await page.goto('/app/demo')
-  await expect(page.getByText(/Демонстрационн|Автоматизация склада|пример/i).first()).toBeVisible({
+  await expect(page.getByRole('heading', { name: /Примеры проектов/i })).toBeVisible({
     timeout: 30_000,
   })
-  // DemoPage: список <li>, не article; CTA «Создать копию» / «Открыть (просмотр)»
+  // DemoPage: карточки <article>; гость — «Копия для редактирования», админ — «Клонировать»
   const row = page
-    .locator('li')
-    .filter({ hasText: /склад|Демо/i })
-    .filter({ has: page.getByRole('button', { name: /Создать копию|Копир/i }) })
+    .locator('article')
+    .filter({ hasText: /склад|Автоматизация|пример|Демо/i })
+    .filter({
+      has: page.getByRole('button', {
+        name: /Копия для редактирования|Клонировать|Создать копию|Копир/i,
+      }),
+    })
     .first()
   await expect(row).toBeVisible({ timeout: 30_000 })
-  await row.getByRole('button', { name: /Создать копию|Копир|Сделать копию/i }).click()
+  await row
+    .getByRole('button', {
+      name: /Копия для редактирования|Клонировать|Создать копию|Копир|Сделать копию/i,
+    })
+    .click()
   await expect(page).toHaveURL(/\/app\/projects\/\d+/, { timeout: 45_000 })
 }
 

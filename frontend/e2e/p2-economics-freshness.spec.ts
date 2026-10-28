@@ -46,10 +46,13 @@ test.describe('P2 B economics freshness', () => {
     await expect(page.getByTestId('economics-freshness-badge')).toContainText(/Актуально/i, {
       timeout: 30_000,
     })
-    await expect(page.getByTestId('economics-kpi-row').getByText(/CAPEX|Капитал/i).first()).toBeVisible()
-    await expect(page.getByTestId('economics-kpi-row').getByText(/OPEX|эксплуат/i).first()).toBeVisible()
-    await expect(page.getByTestId('economics-kpi-row').getByText(/TCO|Совокупн/i).first()).toBeVisible()
-    await expect(page.getByTestId('economics-kpi-row').getByText(/окуп|Payback/i).first()).toBeVisible()
+    const kpi = page.getByTestId('economics-kpi-row')
+    await expect(kpi.getByText(/CAPEX|Капитал/i).first()).toBeVisible()
+    await expect(kpi.getByText(/окуп|Payback/i).first()).toBeVisible()
+    // OPEX/TCO в свёрнутом блоке «Ещё показатели» после declutter
+    await kpi.getByText(/Ещё показатели/i).click()
+    await expect(kpi.getByText(/OPEX|эксплуат/i).first()).toBeVisible()
+    await expect(kpi.getByText(/TCO|Совокупн/i).first()).toBeVisible()
 
     await clickStage(page, /Данные/i)
     const labor = page.locator('[data-param-field="current_labor_cost_year"] input').first()

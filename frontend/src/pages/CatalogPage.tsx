@@ -11,6 +11,7 @@ import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
+import { ErrorState } from '../components/ui/ErrorState'
 import { SkeletonRows } from '../components/ui/Skeleton'
 import { Pagination } from '../components/ui/Pagination'
 import { formatCurrency, formatKg } from '../utils/format'
@@ -259,6 +260,7 @@ export function CatalogPage() {
             value={search}
             onChange={(e) => patchParams({ search: e.target.value }, true)}
             aria-label="Поиск по названию, компании, сценарию"
+            data-testid="catalog-search"
           />
         </div>
         <div className="hidden w-44 md:block">
@@ -475,11 +477,18 @@ export function CatalogPage() {
 
       {listQuery.isLoading && <SkeletonRows rows={8} />}
       {listQuery.isError && (
-        <div className="page-surface p-4 text-sm text-red-600">{getFriendlyError(listQuery.error)}</div>
+        <div className="page-surface">
+          <ErrorState
+            description={getFriendlyError(listQuery.error)}
+            onRetry={() => void listQuery.refetch()}
+          />
+        </div>
       )}
       {!listQuery.isLoading && !listQuery.isError && items.length === 0 && (
         <div className="page-surface">
           <EmptyState
+            testId="catalog-empty"
+            actionTestId="catalog-reset-filters"
             title="Решения не найдены"
             description="Измените поиск или фильтры."
             actionLabel="Сбросить фильтры"

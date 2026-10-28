@@ -1,17 +1,22 @@
 import { test, expect } from '@playwright/test'
-import { asGuest } from './helpers'
+import { asGuest, createWarehouseProject } from './helpers'
 
 /**
- * P2 Scenario A — каталог → фильтры / empty / контекст в проект.
- * Требует живой backend с каталогом (не page.route моки на API).
+ * P2 Scenario A — каталог → фильтры / empty / карточка → «В расчёт» в проект.
+ * Требует живой backend с каталогом (не page.route моки на API, кроме теста ошибки).
  */
 test.describe('P2 A catalog → selection context', () => {
   test('search, filter reset, empty state, compare vs project context', async ({ page }) => {
     test.setTimeout(180_000)
     await asGuest(page)
+    await createWarehouseProject(page, `P2 catalog ctx ${Date.now()}`)
+    const projectId = page.url().match(/\/projects\/(\d+)/)?.[1]
+    expect(projectId).toBeTruthy()
 
     await page.goto('/app/catalog')
-    await expect(page.getByRole('heading', { name: /Оборудование|Каталог роботов|^Каталог$/i })).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: /Каталог решений|Оборудование|Каталог роботов|^Каталог$/i }),
+    ).toBeVisible({
       timeout: 30_000,
     })
     await expect(page.getByTestId('catalog-search')).toBeVisible()
@@ -27,24 +32,31 @@ test.describe('P2 A catalog → selection context', () => {
     await expect(page.getByTestId('catalog-empty')).toBeHidden({ timeout: 30_000 })
 
     // Реальный поиск: берём первую строку после загрузки
-    await expect(page.locator('table.nc-table tbody tr, .page-surface button').first()).toBeVisible({
+    await expect(page.locator('table.nc-table tbody tr').first()).toBeVisible({
       timeout: 45_000,
     })
+    await page.getByRole('button', { name: /Карточка|Открыть карточку/i }).first().click()
+    await expect(page).toHaveURL(/\/app\/catalog\/\d+/, { timeout: 20_000 })
 
-    // Callout: Сравнить ≠ В расчёт
-    await expect(page.getByText(/Сравнить/i).first()).toBeVisible()
-    await expect(page.getByText(/В расчёт/i).first()).toBeVisible()
-
-    // Контекст «В проект»
-    const projectBtn = page.getByRole('button', { name: /^В проект:/i }).first()
-    await expect(projectBtn).toBeVisible({ timeout: 20_000 })
-    await projectBtn.click()
-    await expect(page).toHaveURL(/\/app\/projects/, { timeout: 20_000 })
-    await expect(page.getByText(/Контекст из каталога|Из каталога|В расчёт/i).first()).toBeVisible({
+    // Callout: Сравнить / к сравнению ≠ В расчёт
+    await expect(page.getByText(/Сравнение\s*≠\s*расчёт|сравнен.*расчёт/i).first()).toBeVisible({
       timeout: 15_000,
     })
-    const focus = await page.evaluate(() => sessionStorage.getItem('nc_catalog_focus_robot_id'))
-    expect(focus).toBeTruthy()
+    await expect(page.getByRole('button', { name: /К сравнению/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /В расчёт \(проект\)/i })).toBeVisible()
+
+    await page.getByRole('button', { name: /В расчёт \(проект\)/i }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: /Назначить в расчёт/i })).toBeVisible({
+      timeout: 15_000,
+    })
+    const projectSelect = dialog.getByRole('combobox', { name: /Проект/i })
+    await expect(projectSelect).toBeVisible({ timeout: 20_000 })
+    await projectSelect.selectOption(String(projectId))
+    await expect(dialog.getByRole('button', { name: /^В расчёт$/i })).toBeEnabled({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: /^В расчёт$/i }).click()
+    await expect(page).toHaveURL(new RegExp(`/app/projects/${projectId}`), { timeout: 30_000 })
+    await expect(page).toHaveURL(/[?&]step=economics\b/)
   })
 
   test('catalog list error shows ErrorState with safe retry', async ({ page }) => {

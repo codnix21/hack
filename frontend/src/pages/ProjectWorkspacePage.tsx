@@ -40,6 +40,7 @@ import { Disclosure } from '../components/ui/Disclosure'
 import { UnsavedChangesGuard } from '../components/project/UnsavedChangesGuard'
 import { buildAttentionItems } from '../utils/attention'
 import { suggestNextStep } from '../utils/nextStep'
+import { ProjectGuidanceBar } from '../components/project/ProjectGuidanceBar'
 import { Callout } from '../components/ui/Callout'
 import { ImportFlow } from '../components/project/ImportFlow'
 import { EconomicsPanel } from '../components/project/EconomicsPanel'
@@ -690,6 +691,13 @@ export function ProjectWorkspacePage() {
               {ECONOMICS_FRESHNESS_LABEL[econFreshness]}
             </span>
           </p>
+
+          <ProjectGuidanceBar
+            suggestion={nextStep}
+            currentStep={step}
+            freshness={econFreshness}
+            onGo={(s) => setStep(s)}
+          />
 
       {productStage === 'object' && (
         <>

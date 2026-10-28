@@ -9,9 +9,9 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, options, placeholder, className = '', id, ...props }, ref) => {
-    const selectId = id || props.name
+    const selectId = id || props.name || (label ? `select-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined)
     return (
-      <label className="block space-y-1.5">
+      <label className="block space-y-1.5" htmlFor={selectId}>
         {label && <span className="text-sm font-medium text-[var(--nc-ink)]">{label}</span>}
         <select
           ref={ref}

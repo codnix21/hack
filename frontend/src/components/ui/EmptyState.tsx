@@ -8,6 +8,10 @@ interface EmptyStateProps {
   actionLabel?: string
   onAction?: () => void
   icon?: ReactNode
+  /** Корневой data-testid (например catalog-empty). */
+  testId?: string
+  /** data-testid кнопки действия (например catalog-reset-filters). */
+  actionTestId?: string
 }
 
 export function EmptyState({
@@ -16,16 +20,21 @@ export function EmptyState({
   actionLabel,
   onAction,
   icon,
+  testId,
+  actionTestId,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+    <div
+      className="flex flex-col items-center justify-center px-6 py-14 text-center"
+      data-testid={testId}
+    >
       <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--nc-radius)] border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] text-[var(--nc-muted)]">
         {icon ?? <Inbox className="h-6 w-6" />}
       </div>
       <h3 className="nc-title-sm text-[var(--nc-ink)]">{title}</h3>
       {description ? <p className="nc-body mt-2 max-w-md">{description}</p> : null}
       {actionLabel && onAction && (
-        <Button className="mt-5" onClick={onAction}>
+        <Button className="mt-5" onClick={onAction} data-testid={actionTestId}>
           {actionLabel}
         </Button>
       )}

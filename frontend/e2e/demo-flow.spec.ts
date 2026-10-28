@@ -14,7 +14,7 @@ test.describe('demo flow', () => {
     await expect(page.getByText('NETCORE').first()).toBeVisible({ timeout: 30_000 })
     await expect(
       page.getByRole('heading', {
-        name: /Предынвестиционная оценка роботизации для инженеров и руководителей/i,
+        name: /Оценка роботизации склада до закупки оборудования/i,
       }),
     ).toBeVisible({ timeout: 30_000 })
 
