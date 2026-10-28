@@ -37,6 +37,7 @@ import {
   zoomAtPoint,
   type Viewport,
 } from './layoutViewport'
+import { Link } from 'react-router-dom'
 import { Layout3DPreview } from './Layout3DPreview'
 import {
   DEFAULT_LAYOUT_3D_LAYERS,
@@ -670,10 +671,18 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
               setDraftPoints([])
               setLayout3dFitNonce((n) => n + 1)
             }}
-            title="Пространственный вид той же планировки"
+            title="Встроенный пространственный предпросмотр"
           >
             Пространство
           </Button>
+          <Link
+            to={`/app/projects/${projectId}/spatial`}
+            className="nc-focusable inline-flex h-8 items-center gap-1.5 rounded border border-brand-500/50 bg-brand-500/10 px-2.5 text-sm font-medium text-brand-600 hover:bg-brand-500/20"
+            data-testid="spatial-studio-open"
+            title="Полноэкранный Spatial Studio"
+          >
+            Spatial Studio
+          </Link>
         </div>
 
         {planView === '2d' ? (

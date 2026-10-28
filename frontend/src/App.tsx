@@ -18,6 +18,7 @@ import { LoginPage } from './pages/LoginPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { ProjectCreatePage } from './pages/ProjectCreatePage'
 import { ProjectWorkspacePage } from './pages/ProjectWorkspacePage'
+import { SpatialStudioPage } from './pages/SpatialStudioPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { RobotDetailPage } from './pages/RobotDetailPage'
 import { ComparePage } from './pages/ComparePage'
@@ -69,6 +70,8 @@ const router = createBrowserRouter(
       <Route path="/p/:token" element={<PublicSharePage />} />
 
       <Route element={<ProtectedRoute />}>
+        {/* Spatial Studio — полноэкранный редактор без AppShell (сайдбар/этапы) */}
+        <Route path="/app/projects/:id/spatial" element={<SpatialStudioPage />} />
         <Route path="/app" element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="projects" element={<ProjectsPage />} />

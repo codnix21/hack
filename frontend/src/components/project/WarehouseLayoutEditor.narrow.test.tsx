@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { WarehouseLayoutEditor } from './WarehouseLayoutEditor'
 import { projectsApi } from '../../api/projects'
 
@@ -43,9 +44,11 @@ describe('WarehouseLayoutEditor narrow viewport', () => {
   it('shows read-only hint and hides route tool on narrow screens', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
-      <QueryClientProvider client={qc}>
-        <WarehouseLayoutEditor projectId="1" />
-      </QueryClientProvider>,
+      <MemoryRouter>
+        <QueryClientProvider client={qc}>
+          <WarehouseLayoutEditor projectId="1" />
+        </QueryClientProvider>
+      </MemoryRouter>,
     )
     await waitFor(() => {
       expect(screen.getByTestId('layout-mobile-hint')).toBeInTheDocument()

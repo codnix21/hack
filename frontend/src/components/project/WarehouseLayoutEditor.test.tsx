@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { WarehouseLayoutEditor, clientToLayoutMeters } from './WarehouseLayoutEditor'
 
 const layoutA = {
@@ -31,9 +32,11 @@ vi.mock('../../store/toastStore', () => ({
 function renderEditor(projectId: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={qc}>
-      <WarehouseLayoutEditor projectId={projectId} />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <WarehouseLayoutEditor projectId={projectId} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -107,9 +110,11 @@ describe('WarehouseLayoutEditor undo scope', () => {
     const user = userEvent.setup()
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { rerender } = render(
-      <QueryClientProvider client={qc}>
-        <WarehouseLayoutEditor projectId="11" />
-      </QueryClientProvider>,
+      <MemoryRouter>
+        <QueryClientProvider client={qc}>
+          <WarehouseLayoutEditor projectId="11" />
+        </QueryClientProvider>
+      </MemoryRouter>,
     )
     await screen.findByTestId('layout-add-rack')
     await user.click(screen.getByTestId('layout-add-rack'))
@@ -122,9 +127,11 @@ describe('WarehouseLayoutEditor undo scope', () => {
       source: 'manual',
     })
     rerender(
-      <QueryClientProvider client={qc}>
-        <WarehouseLayoutEditor projectId="22" />
-      </QueryClientProvider>,
+      <MemoryRouter>
+        <QueryClientProvider client={qc}>
+          <WarehouseLayoutEditor projectId="22" />
+        </QueryClientProvider>
+      </MemoryRouter>,
     )
     await waitFor(() => expect(getLayout).toHaveBeenCalledWith('22'))
     await waitFor(() => expect(screen.getByTestId('layout-undo')).toBeDisabled())

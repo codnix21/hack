@@ -100,6 +100,36 @@ export function warehouseMetersToScene(
   return metersToScene(xM, yM, { widthM: layout.width_m, lengthM: layout.length_m })
 }
 
+/** Сцена Three.js (XZ) → метры плана (Y вниз). Обратная к warehouseMetersToScene. */
+export function sceneToWarehouseMeters(
+  layout: Pick<WarehouseLayout, 'width_m' | 'length_m'>,
+  x: number,
+  z: number,
+): PlanMeters {
+  return {
+    xM: x + layout.width_m / 2,
+    yM: z + layout.length_m / 2,
+  }
+}
+
+/**
+ * Центр объекта на плане → патч x/y (левый верх объекта в метрах плана).
+ * rotationDeg — угол плана (как в DTO); в сцене mesh крутится на −rotation вокруг Y.
+ */
+export function objectCenterFromScene(
+  layout: Pick<WarehouseLayout, 'width_m' | 'length_m'>,
+  centerX: number,
+  centerZ: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  const { xM, yM } = sceneToWarehouseMeters(layout, centerX, centerZ)
+  return {
+    x: xM - width / 2,
+    y: yM - height / 2,
+  }
+}
+
 export interface CameraFitOptions {
   /** Вертикальный FOV камеры, градусы (как у PerspectiveCamera). */
   fovDeg?: number

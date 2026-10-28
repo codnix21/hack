@@ -7,7 +7,9 @@ import {
   isGlbMagic,
   metersToScene,
   scenePolylineLengthM,
+  objectCenterFromScene,
   sceneRoomBounds,
+  sceneToWarehouseMeters,
   vizExtentsM,
   vizPxToMeters,
   vizPxToScene,
@@ -113,6 +115,17 @@ describe('sceneCoords', () => {
     expect(b.maxX - b.minX).toBeCloseTo(60, 5)
     expect(b.maxZ - b.minZ).toBeCloseTo(20, 5)
     expect(b.halfDiag).toBeCloseTo(Math.hypot(30, 10), 5)
+  })
+
+  it('round-trips scene XZ ↔ warehouse meters for object centers', () => {
+    const layout = { width_m: 40, length_m: 30 }
+    const s = warehouseMetersToScene(layout as never, 10, 8)
+    const back = sceneToWarehouseMeters(layout, s.x, s.z)
+    expect(back.xM).toBeCloseTo(10, 5)
+    expect(back.yM).toBeCloseTo(8, 5)
+    const corner = objectCenterFromScene(layout, s.x, s.z, 4, 2)
+    expect(corner.x).toBeCloseTo(8, 5)
+    expect(corner.y).toBeCloseTo(7, 5)
   })
 
   it('handles empty layout extents via fallback', () => {
