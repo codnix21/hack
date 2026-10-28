@@ -102,7 +102,8 @@ def _solutions_live_match(db: Session, project: Project) -> list[dict]:
                 "match_score": r["match_score"],
                 "match_reasons": r.get("match_reasons"),
                 "exclusion_reasons": r.get("exclusion_reasons"),
-                "selected": r["status"] == "suitable",
+                # Без сохранённого выбора не помечаем все «suitable» как базу экономики
+                "selected": False,
                 "data_origin": getattr(robot, "data_origin", None) if robot else None,
                 "source_file": getattr(robot, "source_file", None) if robot else None,
                 "source_row": getattr(robot, "source_row", None) if robot else None,

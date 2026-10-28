@@ -689,10 +689,14 @@ def _solution_sort_key(s: dict) -> tuple:
 
 
 def _top_solutions(solutions: list[dict], limit: int = 12) -> list[dict]:
+    """В отчёт: сначала решение «В расчёт»; иначе топ подходящих (не все подряд)."""
     selected = [s for s in solutions if s.get("selected")]
+    if selected:
+        return sorted(selected, key=_solution_sort_key)[:limit]
     preferred = [s for s in solutions if s.get("status") in ("suitable", "needs_review")]
-    pool = selected or preferred or list(solutions)
-    return sorted(pool, key=_solution_sort_key)[:limit]
+    pool = preferred or list(solutions)
+    return sorted(pool, key=_solution_sort_key)[: min(limit, 5)]
+
 
 
 def _econ_value(economics: Optional[dict], path: str) -> Any:

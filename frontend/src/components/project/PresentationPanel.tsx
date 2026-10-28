@@ -77,8 +77,9 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
   })
 
   const econ = econQuery.data?.results
+  /** Только решение с «В расчёт» (selected), не все «предварительно подходит». */
   const selected = useMemo(
-    () => (matchQuery.data?.results || []).filter((r) => r.selected || r.status === 'suitable').slice(0, 5),
+    () => (matchQuery.data?.results || []).filter((r) => r.selected),
     [matchQuery.data],
   )
 
@@ -347,9 +348,11 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
         )}
       </Card>
 
-      <Card title="Выбранные решения">
+      <Card title="Выбранные решения" subtitle="База для экономики — кнопка «В расчёт» на этапе подбора">
         {selected.length === 0 ? (
-          <p className="text-sm text-[var(--nc-muted)]">Запустите подбор и отметьте модели.</p>
+          <p className="text-sm text-[var(--nc-muted)]">
+            На этапе «Подбор» нажмите «В расчёт» у одной модели.
+          </p>
         ) : (
           <ul className="grid gap-2 sm:grid-cols-2">
             {selected.map((r) => (
