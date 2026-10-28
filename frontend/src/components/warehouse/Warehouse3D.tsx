@@ -1,10 +1,21 @@
-import { Suspense, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Text } from '@react-three/drei'
+import { OrbitControls, Text, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import type { VisualizationLayout } from '../../types'
 import type { LayerFlags, SimRobot, SimCollision } from '../../simulation/types'
 import { STATUS_COLOR } from '../../simulation/types'
+import {
+  fitCameraPosition,
+  topCameraPosition,
+  vizExtentsM,
+  vizPxToScene,
+  vizRectToSceneBox,
+} from '../../utils/sceneCoords'
+import { useThemeStore } from '../../store/themeStore'
+
+/** Опциональная модель AMR из Blender (public/models/amr.glb). */
+const AMR_GLB = '/models/amr.glb'
 
 interface Props {
   layout: VisualizationLayout
@@ -18,42 +29,39 @@ interface Props {
   onCameraApplied: () => void
 }
 
-function toScene(layout: VisualizationLayout, x: number, y: number) {
-  const w = layout.width || 800
-  const h = layout.height || 500
-  return {
-    x: (x / w) * 40 - 20,
-    z: (y / h) * 28 - 14,
-  }
-}
-
-function Floor() {
-  const w = 40
-  const d = 28
+function Floor({
+  widthM,
+  lengthM,
+  floor,
+  grid,
+}: {
+  widthM: number
+  lengthM: number
+  floor: string
+  grid: string
+}) {
+  const span = Math.max(widthM, lengthM)
+  const divisions = Math.max(8, Math.round(span))
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, 0]}>
-        <planeGeometry args={[w, d]} />
-        <meshStandardMaterial color="#d9dde3" roughness={0.92} metalness={0.05} />
+        <planeGeometry args={[widthM, lengthM]} />
+        <meshStandardMaterial color={floor} roughness={0.92} metalness={0.05} />
       </mesh>
-      <gridHelper args={[Math.max(w, d), 20, '#a8b2c1', '#e6e9ee']} position={[0, 0.015, 0]} />
-      {/* perimeter curb */}
-      <mesh position={[0, 0.08, -d / 2]}>
-        <boxGeometry args={[w + 0.2, 0.16, 0.2]} />
-        <meshStandardMaterial color="#94a3b8" />
-      </mesh>
-      <mesh position={[0, 0.08, d / 2]}>
-        <boxGeometry args={[w + 0.2, 0.16, 0.2]} />
-        <meshStandardMaterial color="#94a3b8" />
-      </mesh>
-      <mesh position={[-w / 2, 0.08, 0]}>
-        <boxGeometry args={[0.2, 0.16, d]} />
-        <meshStandardMaterial color="#94a3b8" />
-      </mesh>
-      <mesh position={[w / 2, 0.08, 0]}>
-        <boxGeometry args={[0.2, 0.16, d]} />
-        <meshStandardMaterial color="#94a3b8" />
-      </mesh>
+      <gridHelper args={[span, divisions, grid, grid]} position={[0, 0.02, 0]} />
+      {(
+        [
+          [0, 0.1, -lengthM / 2, widthM + 0.2, 0.2, 0.2],
+          [0, 0.1, lengthM / 2, widthM + 0.2, 0.2, 0.2],
+          [-widthM / 2, 0.1, 0, 0.2, 0.2, lengthM],
+          [widthM / 2, 0.1, 0, 0.2, 0.2, lengthM],
+        ] as const
+      ).map(([x, y, z, sx, sy, sz], i) => (
+        <mesh key={i} position={[x, y, z]}>
+          <boxGeometry args={[sx, sy, sz]} />
+          <meshStandardMaterial color="#94a3b8" />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -63,23 +71,18 @@ function Shelves({ layout, visible }: { layout: VisualizationLayout; visible: bo
   return (
     <group>
       {(layout.zones || [])
-        .filter((z) => (z.type || '') === 'storage')
+        .filter((z) => (z.type || '') === 'storage' || (z.type || '') === 'rack')
         .map((z) => {
-          const a = toScene(layout, z.x, z.y)
-          const b = toScene(layout, z.x + z.w, z.y + z.h)
-          const cx = (a.x + b.x) / 2
-          const cz = (a.z + b.z) / 2
-          const sx = Math.max(0.55, Math.abs(b.x - a.x))
-          const sz = Math.max(0.55, Math.abs(b.z - a.z))
+          const box = vizRectToSceneBox(layout, z.x, z.y, z.w, z.h)
+          const rot = ((z.rotation || 0) * Math.PI) / 180
           return (
-            <group key={z.id} position={[cx, 0, cz]}>
-              {/* uprights */}
+            <group key={z.id} position={[box.cx, 0, box.cz]} rotation={[0, -rot, 0]}>
               {(
                 [
-                  [-sx / 2 + 0.06, -sz / 2 + 0.06],
-                  [sx / 2 - 0.06, -sz / 2 + 0.06],
-                  [-sx / 2 + 0.06, sz / 2 - 0.06],
-                  [sx / 2 - 0.06, sz / 2 - 0.06],
+                  [-box.sx / 2 + 0.06, -box.sz / 2 + 0.06],
+                  [box.sx / 2 - 0.06, -box.sz / 2 + 0.06],
+                  [-box.sx / 2 + 0.06, box.sz / 2 - 0.06],
+                  [box.sx / 2 - 0.06, box.sz / 2 - 0.06],
                 ] as const
               ).map(([px, pz], i) => (
                 <mesh key={i} position={[px, 1.1, pz]} castShadow>
@@ -87,18 +90,12 @@ function Shelves({ layout, visible }: { layout: VisualizationLayout; visible: bo
                   <meshStandardMaterial color="#64748b" />
                 </mesh>
               ))}
-              {/* shelves */}
               {[0.35, 1.05, 1.75].map((y) => (
                 <mesh key={y} position={[0, y, 0]} castShadow receiveShadow>
-                  <boxGeometry args={[sx, 0.08, sz]} />
+                  <boxGeometry args={[box.sx, 0.08, box.sz]} />
                   <meshStandardMaterial color="#8fa3b8" roughness={0.7} />
                 </mesh>
               ))}
-              {/* back panel */}
-              <mesh position={[0, 1.1, -sz / 2 + 0.04]}>
-                <boxGeometry args={[sx, 2.2, 0.04]} />
-                <meshStandardMaterial color="#7b8fa5" transparent opacity={0.55} />
-              </mesh>
             </group>
           )
         })}
@@ -111,36 +108,52 @@ function Zones({ layout, visible }: { layout: VisualizationLayout; visible: bool
   return (
     <group>
       {(layout.zones || [])
-        .filter((z) => (z.type || '') !== 'storage')
+        .filter((z) => {
+          const t = (z.type || '').toLowerCase()
+          return t !== 'storage' && t !== 'rack'
+        })
         .map((z) => {
-          const a = toScene(layout, z.x, z.y)
-          const b = toScene(layout, z.x + z.w, z.y + z.h)
-          const cx = (a.x + b.x) / 2
-          const cz = (a.z + b.z) / 2
-          const sx = Math.max(0.4, Math.abs(b.x - a.x))
-          const sz = Math.max(0.4, Math.abs(b.z - a.z))
+          const box = vizRectToSceneBox(layout, z.x, z.y, z.w, z.h)
+          const t = (z.type || '').toLowerCase()
           const color =
-            z.type === 'load' ? '#fdba74' : z.type === 'unload' ? '#93c5fd' : '#e8ecf1'
+            t === 'load'
+              ? '#fdba74'
+              : t === 'unload'
+                ? '#93c5fd'
+                : t === 'obstacle' || t === 'wall'
+                  ? '#fecaca'
+                  : t === 'charge' || t === 'charging'
+                    ? '#bbf7d0'
+                    : '#e8ecf1'
+          const h = t === 'obstacle' || t === 'wall' ? 2.4 : 0.04
           return (
-            <mesh key={z.id} position={[cx, 0.04, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[sx, sz]} />
-              <meshStandardMaterial color={color} transparent opacity={0.9} />
+            <mesh
+              key={z.id}
+              position={[box.cx, h / 2, box.cz]}
+              rotation={t === 'obstacle' || t === 'wall' ? [0, 0, 0] : [-Math.PI / 2, 0, 0]}
+            >
+              {t === 'obstacle' || t === 'wall' ? (
+                <boxGeometry args={[box.sx, h, box.sz]} />
+              ) : (
+                <planeGeometry args={[box.sx, box.sz]} />
+              )}
+              <meshStandardMaterial
+                color={color}
+                transparent
+                opacity={t === 'obstacle' || t === 'wall' ? 0.85 : 0.9}
+              />
             </mesh>
           )
         })}
       {(layout.charging_stations || []).map((p) => {
-        const s = toScene(layout, p.x, p.y)
+        const s = vizPxToScene(layout, p.x, p.y)
         return (
           <group key={p.id} position={[s.x, 0, s.z]}>
             <mesh position={[0, 0.35, 0]} castShadow>
               <boxGeometry args={[0.7, 0.7, 0.7]} />
               <meshStandardMaterial color="#15803d" />
             </mesh>
-            <mesh position={[0, 0.78, 0]}>
-              <boxGeometry args={[0.55, 0.08, 0.55]} />
-              <meshStandardMaterial color="#4ade80" emissive="#166534" emissiveIntensity={0.35} />
-            </mesh>
-            <Text position={[0, 1.05, 0]} fontSize={0.22} color="#14532d" anchorX="center">
+            <Text position={[0, 1.05, 0]} fontSize={0.28} color="#14532d" anchorX="center">
               ЗС
             </Text>
           </group>
@@ -165,21 +178,22 @@ function Routes({
   return (
     <group>
       {(layout.routes || []).map((route) => {
-        const selected = robots.find((r) => r.id === selectedRobotId)?.routeId === route.id
-        const dim = selectedRobotId && !selected
+        if (route.blocked) return null
         const pts = (route.points || []).map((p) => {
-          const s = toScene(layout, p.x, p.y)
-          return new THREE.Vector3(s.x, 0.06, s.z)
+          const s = vizPxToScene(layout, p.x, p.y)
+          return new THREE.Vector3(s.x, 0.08, s.z)
         })
         if (pts.length < 2) return null
+        const selected = robots.find((r) => r.id === selectedRobotId)?.routeId === route.id
+        const dim = Boolean(selectedRobotId && !selected)
         const curve = new THREE.CatmullRomCurve3(pts)
-        const geo = new THREE.TubeGeometry(curve, 48, selected ? 0.07 : 0.045, 8, false)
+        const geo = new THREE.TubeGeometry(curve, Math.min(64, pts.length * 8), selected ? 0.08 : 0.05, 6, false)
         return (
           <mesh key={route.id} geometry={geo}>
             <meshStandardMaterial
               color="#f07316"
               transparent
-              opacity={dim ? 0.18 : selected ? 0.95 : 0.7}
+              opacity={dim ? 0.2 : selected ? 0.95 : 0.7}
               roughness={0.45}
             />
           </mesh>
@@ -189,18 +203,69 @@ function Routes({
   )
 }
 
+function AmrGlbBody({ color }: { color: string }) {
+  const gltf = useGLTF(AMR_GLB)
+  const cloned = useMemo(() => {
+    const root = gltf.scene.clone(true)
+    root.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh
+        mesh.castShadow = true
+        if (mesh.material && 'color' in mesh.material) {
+          const mat = (mesh.material as THREE.MeshStandardMaterial).clone()
+          mat.color = new THREE.Color(color)
+          mesh.material = mat
+        }
+      }
+    })
+    return root
+  }, [gltf.scene, color])
+  return <primitive object={cloned} scale={1} />
+}
+
+function AmrProcedural({ color, selected, cargoKg }: { color: string; selected: boolean; cargoKg: number }) {
+  return (
+    <>
+      <mesh castShadow>
+        <boxGeometry args={[0.95, 0.32, 0.72]} />
+        <meshStandardMaterial color={color} roughness={0.55} metalness={0.15} />
+      </mesh>
+      <mesh position={[0, 0.22, 0]}>
+        <boxGeometry args={[0.78, 0.08, 0.58]} />
+        <meshStandardMaterial color="#1e293b" />
+      </mesh>
+      <mesh position={[0, 0.12, 0.37]}>
+        <boxGeometry args={[0.5, 0.04, 0.04]} />
+        <meshStandardMaterial
+          color="#f07316"
+          emissive="#f07316"
+          emissiveIntensity={selected ? 0.8 : 0.35}
+        />
+      </mesh>
+      {cargoKg > 0 && (
+        <mesh position={[0, 0.42, 0]} castShadow>
+          <boxGeometry args={[0.48, 0.28, 0.38]} />
+          <meshStandardMaterial color="#eab308" />
+        </mesh>
+      )}
+    </>
+  )
+}
+
 function AmrRobot({
   robot,
   layout,
   selected,
   onSelect,
+  useGlb,
 }: {
   robot: SimRobot
   layout: VisualizationLayout
   selected: boolean
   onSelect: () => void
+  useGlb: boolean
 }) {
-  const s = toScene(layout, robot.x, robot.y)
+  const s = vizPxToScene(layout, robot.x, robot.y)
   const color = STATUS_COLOR[robot.status]
   return (
     <group
@@ -211,38 +276,12 @@ function AmrRobot({
         onSelect()
       }}
     >
-      {/* chassis */}
-      <mesh castShadow>
-        <boxGeometry args={[0.95, 0.32, 0.72]} />
-        <meshStandardMaterial color={color} roughness={0.55} metalness={0.15} />
-      </mesh>
-      {/* deck */}
-      <mesh position={[0, 0.22, 0]}>
-        <boxGeometry args={[0.78, 0.08, 0.58]} />
-        <meshStandardMaterial color="#1e293b" />
-      </mesh>
-      {/* status LED strip */}
-      <mesh position={[0, 0.12, 0.37]}>
-        <boxGeometry args={[0.5, 0.04, 0.04]} />
-        <meshStandardMaterial
-          color="#f07316"
-          emissive="#f07316"
-          emissiveIntensity={selected ? 0.8 : 0.35}
-        />
-      </mesh>
-      {robot.cargoKg > 0 && (
-        <mesh position={[0, 0.42, 0]} castShadow>
-          <boxGeometry args={[0.48, 0.28, 0.38]} />
-          <meshStandardMaterial color="#eab308" />
-        </mesh>
-      )}
-      {([-0.28, 0.28] as const).map((z) =>
-        ([-0.32, 0.32] as const).map((x) => (
-          <mesh key={`${x}-${z}`} position={[x, -0.1, z]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.09, 0.09, 0.07, 12]} />
-            <meshStandardMaterial color="#0f172a" />
-          </mesh>
-        )),
+      {useGlb ? (
+        <Suspense fallback={<AmrProcedural color={color} selected={selected} cargoKg={robot.cargoKg} />}>
+          <AmrGlbBody color={color} />
+        </Suspense>
+      ) : (
+        <AmrProcedural color={color} selected={selected} cargoKg={robot.cargoKg} />
       )}
       {selected && (
         <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -250,7 +289,14 @@ function AmrRobot({
           <meshBasicMaterial color="#f07316" transparent opacity={0.85} side={THREE.DoubleSide} />
         </mesh>
       )}
-      <Text position={[0, 0.78, 0]} fontSize={0.26} color="#1c1f26" anchorX="center" outlineWidth={0.02} outlineColor="#ffffff">
+      <Text
+        position={[0, 0.85, 0]}
+        fontSize={0.28}
+        color="#1c1f26"
+        anchorX="center"
+        outlineWidth={0.02}
+        outlineColor="#ffffff"
+      >
         {robot.label}
       </Text>
     </group>
@@ -270,7 +316,7 @@ function CollisionMarkers({
   return (
     <group>
       {collisions.map((c, i) => {
-        const s = toScene(layout, c.x, c.y)
+        const s = vizPxToScene(layout, c.x, c.y)
         return (
           <mesh key={i} position={[s.x, 0.04, s.z]} rotation={[-Math.PI / 2, 0, 0]}>
             <ringGeometry args={[0.45, 0.65, 28]} />
@@ -301,24 +347,32 @@ function CameraRig({
     update: () => void
   } | null
   const applied = useRef<string | null>(null)
+  const extents = vizExtentsM(layout)
 
   useFrame(() => {
     if (preset !== 'reset' && applied.current !== preset) {
       if (preset === 'top') {
-        camera.position.set(0, 32, 0.01)
-        camera.lookAt(0, 0, 0)
+        const c = topCameraPosition(extents)
+        camera.position.set(...c.position)
+        camera.lookAt(...c.target)
       } else if (preset === 'side') {
-        camera.position.set(28, 8, 0)
+        const span = Math.max(extents.widthM, extents.lengthM, 8)
+        camera.position.set(span * 1.1, span * 0.35, 0)
         camera.lookAt(0, 0, 0)
       } else if (preset === 'iso') {
-        camera.position.set(18, 16, 18)
-        camera.lookAt(0, 0, 0)
+        const c = fitCameraPosition(extents)
+        camera.position.set(...c.position)
+        camera.lookAt(...c.target)
+      }
+      if (controls?.target) {
+        controls.target.set(0, 0, 0)
+        controls.update()
       }
       applied.current = preset
       onApplied()
     }
     if (followRobot && selected) {
-      const s = toScene(layout, selected.x, selected.y)
+      const s = vizPxToScene(layout, selected.x, selected.y)
       camera.position.lerp(new THREE.Vector3(s.x + 6, 8, s.z + 6), 0.08)
       if (controls?.target) {
         controls.target.lerp(new THREE.Vector3(s.x, 0.3, s.z), 0.08)
@@ -329,15 +383,16 @@ function CameraRig({
   return null
 }
 
-function SceneContent(props: Props) {
+function SceneContent(props: Props & { bg: string; floor: string; grid: string; useGlb: boolean }) {
   const selected = props.robots.find((r) => r.id === props.selectedRobotId) || null
+  const extents = vizExtentsM(props.layout)
   return (
     <>
-      <color attach="background" args={['#e8ebf0']} />
+      <color attach="background" args={[props.bg]} />
       <ambientLight intensity={0.55} />
-      <directionalLight position={[14, 22, 10]} intensity={1.15} castShadow shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[14, 22, 10]} intensity={1.05} castShadow={false} />
       <hemisphereLight args={['#f8fafc', '#94a3b8', 0.35]} />
-      <Floor />
+      <Floor widthM={extents.widthM} lengthM={extents.lengthM} floor={props.floor} grid={props.grid} />
       <Shelves layout={props.layout} visible={props.layers.shelves} />
       <Zones layout={props.layout} visible={props.layers.zones} />
       <Routes
@@ -354,6 +409,7 @@ function SceneContent(props: Props) {
             layout={props.layout}
             selected={r.id === props.selectedRobotId}
             onSelect={() => props.onSelectRobot(r.id)}
+            useGlb={props.useGlb}
           />
         ))}
       <CollisionMarkers
@@ -374,6 +430,8 @@ function SceneContent(props: Props) {
 }
 
 export function Warehouse3D(props: Props) {
+  const theme = useThemeStore((s) => s.theme)
+  const [useGlb, setUseGlb] = useState(false)
   const webglOk = useMemo(() => {
     try {
       const c = document.createElement('canvas')
@@ -383,9 +441,37 @@ export function Warehouse3D(props: Props) {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    fetch(AMR_GLB, { method: 'HEAD' })
+      .then((r) => {
+        if (!cancelled) setUseGlb(r.ok)
+      })
+      .catch(() => {
+        if (!cancelled) setUseGlb(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const colors = useMemo(
+    () =>
+      theme === 'light'
+        ? { bg: '#e8ebf0', floor: '#d9dde3', grid: '#a8b2c1' }
+        : { bg: '#121826', floor: '#1c2433', grid: '#3d4a60' },
+    [theme],
+  )
+
+  const extents = vizExtentsM(props.layout)
+  const cam = fitCameraPosition(extents)
+
   if (!webglOk) {
     return (
-      <div className="flex h-[420px] flex-col items-center justify-center gap-2 rounded border border-dashed border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-6 text-center">
+      <div
+        className="flex h-[420px] flex-col items-center justify-center gap-2 rounded border border-dashed border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-6 text-center"
+        data-testid="warehouse-3d-webgl-fallback"
+      >
         <p className="text-sm font-medium text-[var(--nc-ink)]">WebGL недоступен</p>
         <p className="max-w-sm text-sm text-[var(--nc-text)]">
           Используйте режимы 2D или изометрия. Обновите браузер или включите аппаратное ускорение.
@@ -395,10 +481,22 @@ export function Warehouse3D(props: Props) {
   }
 
   return (
-    <div className="h-[min(62vh,560px)] min-h-[360px] w-full overflow-hidden rounded-sm bg-[#e8ebf0] ring-1 ring-steel-200/80">
-      <Canvas shadows camera={{ position: [18, 16, 18], fov: 42 }} dpr={[1, 1.75]}>
+    <div
+      className="h-[min(62vh,560px)] min-h-[360px] w-full overflow-hidden rounded-sm ring-1 ring-[var(--nc-border)]"
+      style={{ background: colors.bg }}
+      data-testid="warehouse-3d-canvas"
+    >
+      <Canvas
+        key={`${extents.widthM}x${extents.lengthM}-${theme}`}
+        shadows={false}
+        camera={{ position: cam.position, fov: 42 }}
+        dpr={[1, 1.5]}
+        onCreated={({ gl }) => {
+          gl.setClearColor(colors.bg)
+        }}
+      >
         <Suspense fallback={null}>
-          <SceneContent {...props} />
+          <SceneContent {...props} bg={colors.bg} floor={colors.floor} grid={colors.grid} useGlb={useGlb} />
         </Suspense>
       </Canvas>
     </div>

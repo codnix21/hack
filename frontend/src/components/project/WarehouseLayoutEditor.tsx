@@ -35,8 +35,10 @@ import {
   zoomAtPoint,
   type Viewport,
 } from './layoutViewport'
+import { Layout3DPreview } from './Layout3DPreview'
 
 type EditorTool = 'select' | 'pan' | 'route'
+type PlanViewMode = '2d' | '3d'
 
 function routeLengthM(points: { x: number; y: number }[]) {
   let total = 0
@@ -142,6 +144,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<WarehouseLayout | null>(null)
+  const [planView, setPlanView] = useState<PlanViewMode>('2d')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dxfPreview, setDxfPreview] = useState<{
     entities: { id: string; suggested_kind: string; kind?: string; dxftype: string; layer: string }[]
@@ -670,11 +673,34 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
           )}
         </div>
         <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
+        <div className="flex items-center gap-1" role="group" aria-label="Режим плана">
+          <Button
+            size="sm"
+            variant={planView === '2d' ? 'primary' : 'outline'}
+            data-testid="layout-view-2d"
+            aria-pressed={planView === '2d'}
+            onClick={() => setPlanView('2d')}
+          >
+            2D — План
+          </Button>
+          <Button
+            size="sm"
+            variant={planView === '3d' ? 'primary' : 'outline'}
+            data-testid="layout-view-3d"
+            aria-pressed={planView === '3d'}
+            onClick={() => setPlanView('3d')}
+            title="Пространственный вид той же планировки"
+          >
+            3D — Пространство
+          </Button>
+        </div>
+        <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
         <div className="flex items-center gap-1" role="group" aria-label="Вид">
           <Button
             size="sm"
             variant="outline"
             data-testid="layout-zoom-out"
+            disabled={planView !== '2d'}
             aria-label="Уменьшить масштаб"
             onClick={() => setVp((v) => ({ ...v, zoom: Math.max(0.4, v.zoom / 1.25) }))}
           >
@@ -685,11 +711,19 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             variant="outline"
             data-testid="layout-zoom-in"
             aria-label="Увеличить масштаб"
+            disabled={planView !== '2d'}
             onClick={() => setVp((v) => ({ ...v, zoom: Math.min(120, v.zoom * 1.25) }))}
           >
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="outline" data-testid="layout-fit" onClick={fitToWarehouse} title="По размеру склада">
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="layout-fit"
+            disabled={planView !== '2d'}
+            onClick={fitToWarehouse}
+            title="По размеру склада"
+          >
             <Maximize2 className="h-3.5 w-3.5" />
             По размеру
           </Button>
@@ -772,6 +806,23 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
       <div
         className={`grid gap-3 ${inspectorOpen ? 'lg:grid-cols-[minmax(0,1fr)_220px]' : ''}`}
       >
+        {planView === '3d' && layout ? (
+          <div
+            className="relative min-h-[32rem] overflow-hidden rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] bg-[var(--nc-surface)] p-2 shadow-panel"
+            data-testid="layout-canvas-wrap"
+          >
+            <Layout3DPreview
+              layout={layout}
+              selectedId={selectedId}
+              onSelectId={(id) => {
+                setSelectedId(id)
+                setSelectedRouteId(null)
+              }}
+            />
+            {/* Keep 2D canvas mounted off-screen so viewport/state survive mode switch */}
+            <canvas ref={canvasRef} className="pointer-events-none absolute h-0 w-0 opacity-0" data-testid="layout-canvas" aria-hidden />
+          </div>
+        ) : (
         <div
           ref={wrapRef}
           className="relative h-[min(78vh,780px)] min-h-[32rem] overflow-hidden rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] nc-canvas-surface shadow-panel"
@@ -906,6 +957,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             </div>
           ) : null}
         </div>
+        )}
 
         <div className="nc-panel space-y-3 p-3" data-testid="layout-inspector">
           <div className="flex items-center justify-between gap-2">
