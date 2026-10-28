@@ -42,7 +42,6 @@ import {
   formulaLabel,
   metricLabel,
   robotsCountSourceLabel,
-  valueSourceLabel,
 } from '../../utils/labels'
 import { toastError, toastSuccess } from '../../store/toastStore'
 import {
@@ -182,7 +181,7 @@ export function EconomicsPanel({
   const [sensitivityByParam, setSensitivityByParam] = useState<
     Record<string, SensitivityPoint[]>
   >({})
-  const [altDelta, setAltDelta] = useState<Record<string, number> | null>(null)
+  const [, setAltDelta] = useState<Record<string, number> | null>(null)
   const [explainOpen, setExplainOpen] = useState(false)
   const [explainData, setExplainData] = useState<EconomicsExplainResponse | null>(null)
   const [showAllScenarioCols, setShowAllScenarioCols] = useState(false)
@@ -620,7 +619,6 @@ export function EconomicsPanel({
                   ? formatCurrency(lastResult.capex.capex)
                   : 'Нет данных'
               }
-              hint="Оборудование, инфраструктура, интеграция, обучение, резерв и зарядные станции (часть статей — допущения модели)"
             />
             <Kpi
               title={metricLabel('annual_effect')}
@@ -628,7 +626,6 @@ export function EconomicsPanel({
                 lastResult?.annual_effect?.net_annual_effect ??
                   lastResult?.annual_effect?.annual_effect,
               )}
-              hint="Чистый денежный эффект за год в границах модели"
             />
             <Kpi
               title={metricLabel('payback')}
@@ -636,7 +633,7 @@ export function EconomicsPanel({
               hint={
                 lastResult?.payback?.payback_years == null && lastResult?.payback?.message
                   ? String(lastResult.payback.message)
-                  : 'По накопленным денежным потокам в пределах горизонта анализа'
+                  : undefined
               }
             />
             <Kpi
@@ -647,11 +644,6 @@ export function EconomicsPanel({
                   : typeof lastResult?.npv?.message === 'string'
                     ? 'Не применяется'
                     : 'Нет данных'
-              }
-              hint={
-                typeof lastResult?.npv?.message === 'string'
-                  ? String(lastResult.npv.message)
-                  : 'Дисконтирование денежных потоков (ставка — допущение модели)'
               }
             />
           </div>
@@ -735,7 +727,7 @@ export function EconomicsPanel({
           )}
           <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
             <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
-              Дополнительные показатели (эксплуатация, рентабельность, совокупная стоимость)
+              Ещё показатели · роботы, эксплуатация, рентабельность
             </summary>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <Kpi
@@ -763,253 +755,176 @@ export function EconomicsPanel({
                       ? 'Не применяется'
                       : 'Нет данных'
                 }
-                hint={
-                  typeof lastResult?.roi?.message === 'string'
-                    ? String(lastResult.roi.message)
-                    : 'Относительно капитальных затрат сценария покупки'
-                }
               />
               <Kpi
                 title={metricLabel('tco')}
                 value={
                   lastResult?.tco?.tco != null ? formatCurrency(lastResult.tco.tco) : 'Нет данных'
                 }
-                hint={
-                  typeof lastResult?.tco?.tco_note === 'string'
-                    ? String(lastResult.tco.tco_note)
-                    : 'Капитальные + эксплуатационные × горизонт; без оставшегося ручного труда'
-                }
               />
             </div>
           </details>
-          {lastResult?.cost_comparison && (
-            <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-3 py-2 text-sm text-[var(--nc-text)]">
-              <p className="font-medium text-[var(--nc-ink)]">Структура затрат (прозрачность)</p>
-              <ul className="mt-1 grid gap-1 sm:grid-cols-2">
-                <li>
-                  Инвестиции:{' '}
-                  {formatCurrency(
-                    (lastResult.cost_comparison as { initial_investment?: number })
-                      .initial_investment,
-                  )}
-                </li>
-                <li>
-                  Эксплуатационные расходы / год:{' '}
-                  {formatCurrency(
-                    (lastResult.cost_comparison as { annual_opex?: number }).annual_opex,
-                  )}
-                </li>
-                <li>
-                  Оставшийся ручной труд / год:{' '}
-                  {formatCurrency(
-                    (lastResult.cost_comparison as { remaining_manual_labor_annual?: number })
-                      .remaining_manual_labor_annual,
-                  )}
-                </li>
-                <li>
-                  Выход с учётом ручного труда (горизонт):{' '}
-                  {formatCurrency(
-                    (lastResult.cost_comparison as { total_outlay_with_remaining_labor?: number })
-                      .total_outlay_with_remaining_labor,
-                  )}
-                </li>
-              </ul>
-              {lastResult.annual_effect?.note && (
-                <p className="mt-2 text-xs text-amber-800">{String(lastResult.annual_effect.note)}</p>
-              )}
-            </div>
-          )}
 
-          {lastResult?.depreciation?.applicable &&
-            lastResult.depreciation.annual_depreciation != null && (
-              <div
-                className="rounded border border-[rgba(245,193,74,0.4)] bg-[var(--nc-warning-soft)] px-3 py-2 text-sm text-[var(--nc-ink)]"
-                data-testid="depreciation-block"
-              >
-                <p className="font-medium text-[var(--nc-ink)]">Амортизация капитальных затрат (бухгалтерская)</p>
-                <p className="mt-1 text-xs text-[var(--nc-text)]">
-                  Не денежный отток. Не вычитается из чистой приведённой стоимости, внутренней нормы доходности и денежных потоков.
-                </p>
-                <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+          <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
+              Состав затрат и амортизация
+            </summary>
+            <div className="mt-3 space-y-3">
+              {lastResult?.cost_comparison && (
+                <ul className="grid gap-1 text-sm text-[var(--nc-text)] sm:grid-cols-2">
                   <li>
-                    Метод:{' '}
-                    {lastResult.depreciation.method_label_ru ||
-                      lastResult.depreciation.method ||
-                      'линейный'}
+                    Оставшийся ручной труд / год:{' '}
+                    <span className="font-medium text-[var(--nc-ink)]">
+                      {formatCurrency(
+                        (lastResult.cost_comparison as { remaining_manual_labor_annual?: number })
+                          .remaining_manual_labor_annual,
+                      )}
+                    </span>
                   </li>
                   <li>
-                    Срок:{' '}
-                    {lastResult.depreciation.useful_life_years != null
-                      ? `${lastResult.depreciation.useful_life_years} лет`
-                      : '—'}{' '}
-                    <span className="text-amber-800">(допущение)</span>
-                  </li>
-                  <li>
-                    База: {formatCurrency(lastResult.depreciation.depreciable_base)}
-                    {lastResult.depreciation.asset_label
-                      ? ` · ${lastResult.depreciation.asset_label}`
-                      : ''}
-                  </li>
-                  <li>
-                    Амортизация / год:{' '}
-                    {formatCurrency(lastResult.depreciation.annual_depreciation)}
-                  </li>
-                  <li>
-                    Годовой эффект с амортизацией:{' '}
-                    {lastResult.annual_effect?.with_depreciation != null
-                      ? formatCurrency(lastResult.annual_effect.with_depreciation)
-                      : 'Нет данных'}
-                  </li>
-                  <li>
-                    Денежный годовой эффект:{' '}
-                    {formatCurrency(lastResult.annual_effect?.annual_effect)}
+                    Выход с учётом ручного труда:{' '}
+                    <span className="font-medium text-[var(--nc-ink)]">
+                      {formatCurrency(
+                        (
+                          lastResult.cost_comparison as {
+                            total_outlay_with_remaining_labor?: number
+                          }
+                        ).total_outlay_with_remaining_labor,
+                      )}
+                    </span>
                   </li>
                 </ul>
-                {lastResult.annual_effect?.accounting_note && (
-                  <p className="mt-2 text-xs text-[var(--nc-text)]">
-                    {String(lastResult.annual_effect.accounting_note)}
-                  </p>
+              )}
+              {lastResult?.depreciation?.applicable &&
+                lastResult.depreciation.annual_depreciation != null && (
+                  <div
+                    className="rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-2 text-sm"
+                    data-testid="depreciation-block"
+                  >
+                    <p className="font-medium text-[var(--nc-ink)]">
+                      Амортизация / год:{' '}
+                      {formatCurrency(lastResult.depreciation.annual_depreciation)}
+                      <span className="ml-2 text-xs font-normal text-[var(--nc-muted)]">
+                        не входит в денежный поток
+                      </span>
+                    </p>
+                  </div>
                 )}
-              </div>
-            )}
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Card title="Состав капитальных затрат">
-              {Object.keys(lastResult?.capex?.breakdown || {}).length === 0 ? (
-                <p className="text-sm text-[var(--nc-muted)]">Запустите расчёт.</p>
-              ) : (
-                <>
-                  <p className="mb-2 text-xs text-[var(--nc-muted)]">
-                    Статьи с пометкой «допущение» — доли модели, не КП поставщика. Сумма статей
-                    должна равняться итоговым капитальным затратам.
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--nc-muted)]">
+                    Капитальные затраты
                   </p>
-                  <dl className="space-y-2 text-sm">
-                    {Object.entries(lastResult!.capex!.breakdown!).map(([k, v]) => {
-                      const src = lastResult?.capex?.component_sources?.[k]
-                      const assumed = src?.origin === 'model_assumption'
-                      return (
+                  {Object.keys(lastResult?.capex?.breakdown || {}).length === 0 ? (
+                    <p className="text-sm text-[var(--nc-muted)]">Запустите расчёт.</p>
+                  ) : (
+                    <dl className="space-y-1 text-sm">
+                      {Object.entries(lastResult!.capex!.breakdown!).map(([k, v]) => {
+                        const assumed =
+                          lastResult?.capex?.component_sources?.[k]?.origin === 'model_assumption'
+                        return (
+                          <div
+                            key={k}
+                            className="flex justify-between gap-3 border-b border-[var(--nc-border-subtle)] py-1"
+                          >
+                            <dt className="text-[var(--nc-muted)]">
+                              {breakdownLabel(k)}
+                              {assumed ? (
+                                <span className="ml-1 text-[10px] text-amber-700">*</span>
+                              ) : null}
+                            </dt>
+                            <dd className="tabular-nums font-medium text-[var(--nc-ink)]">
+                              {formatBreakdownValue(k, v)}
+                            </dd>
+                          </div>
+                        )
+                      })}
+                    </dl>
+                  )}
+                </div>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--nc-muted)]">
+                    Эксплуатация / год
+                  </p>
+                  {Object.keys(lastResult?.opex?.breakdown || {}).length === 0 ? (
+                    <p className="text-sm text-[var(--nc-muted)]">Запустите расчёт.</p>
+                  ) : (
+                    <dl className="space-y-1 text-sm">
+                      {Object.entries(lastResult!.opex!.breakdown!).map(([k, v]) => (
                         <div
                           key={k}
-                          className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5"
+                          className="flex justify-between gap-3 border-b border-[var(--nc-border-subtle)] py-1"
                         >
-                          <dt className="text-[var(--nc-muted)]">
-                            {breakdownLabel(k)}
-                            {assumed ? (
-                              <span className="ml-1 text-xs text-amber-700">(допущение)</span>
-                            ) : null}
-                          </dt>
-                          <dd className="font-medium text-[var(--nc-ink)]">
+                          <dt className="text-[var(--nc-muted)]">{breakdownLabel(k)}</dt>
+                          <dd className="tabular-nums font-medium text-[var(--nc-ink)]">
                             {formatBreakdownValue(k, v)}
                           </dd>
                         </div>
-                      )
-                    })}
-                  </dl>
-                </>
-              )}
-            </Card>
-            <Card title="Состав эксплуатационных расходов / год">
-              {Object.keys(lastResult?.opex?.breakdown || {}).length === 0 ? (
-                <p className="text-sm text-[var(--nc-muted)]">Запустите расчёт.</p>
-              ) : (
-                <dl className="space-y-2 text-sm">
-                  {Object.entries(lastResult!.opex!.breakdown!).map(([k, v]) => (
-                    <div
-                      key={k}
-                      className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5"
-                    >
-                      <dt className="text-[var(--nc-muted)]">{breakdownLabel(k)}</dt>
-                      <dd className="font-medium text-[var(--nc-ink)]">{formatBreakdownValue(k, v)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </Card>
-          </div>
+                      ))}
+                    </dl>
+                  )}
+                </div>
+              </div>
+              <p className="text-[11px] text-[var(--nc-muted)]">
+                * доля модели, не КП поставщика. Детали формул — в «Как рассчитано».
+              </p>
+            </div>
+          </details>
 
-          <Card title="Допущения модели">
-            <p className="mb-3 text-xs text-[var(--nc-muted)]">
-              {valueSourceLabel('assumption')} — значения по умолчанию. Изменить ключевые параметры
-              можно во вкладке «Анализ сценариев».
+          <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
+              Допущения модели
+            </summary>
+            <p className="mt-2 text-xs text-[var(--nc-muted)]">
+              Значения по умолчанию. Менять — во вкладке «Сценарии и что если».
             </p>
-            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
               {Object.entries(assumptions)
                 .slice(0, 16)
                 .map(([k, v]) => (
                   <div
                     key={k}
-                    className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5"
+                    className="flex justify-between gap-3 border-b border-[var(--nc-border-subtle)] py-1"
                   >
                     <dt className="text-[var(--nc-muted)]">{assumptionLabel(k)}</dt>
-                    <dd className="font-medium text-[var(--nc-ink)]">{String(v)}</dd>
+                    <dd className="tabular-nums font-medium text-[var(--nc-ink)]">{String(v)}</dd>
                   </div>
                 ))}
               {Object.keys(assumptions).length === 0 && (
                 <p className="text-[var(--nc-muted)] sm:col-span-2">Запустите расчёт.</p>
               )}
             </dl>
-          </Card>
+          </details>
         </>
       )}
 
       {isScenarios && (
         <>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          title="Лучший по эффекту"
-          value={best?.name || 'Нет данных'}
-          hint="Сценарий с наибольшим годовым экономическим эффектом"
-        />
-        <Kpi
-          title={metricLabel('capex')}
-          value={best?.capex != null ? formatCurrency(best.capex) : 'Нет данных'}
-          hint="Первоначальные капитальные затраты выбранного сценария"
-        />
-        <Kpi
-          title={metricLabel('annual_effect')}
-          value={formatCurrency(best?.annual_effect)}
-          hint="Ожидаемый чистый эффект за год"
-        />
-        <Kpi
-          title={metricLabel('payback')}
-          value={best?.payback_display || 'Недостаточно данных для расчёта'}
-          hint="По денежным потокам; менее 1 года — в месяцах"
-        />
-      </div>
-      <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
-        <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
-          Дополнительные показатели сценария
-        </summary>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <Kpi
-            title={metricLabel('opex_year')}
-            value={best?.opex_yearly != null ? formatCurrency(best.opex_yearly) : 'Нет данных'}
-          />
-          <Kpi
-            title={metricLabel('tco')}
-            value={best?.tco != null ? formatCurrency(best.tco) : 'Нет данных'}
-          />
-          <Kpi
-            title={metricLabel('roi')}
-            value={best?.roi != null ? formatPercent(Number(best.roi)) : 'Нет данных'}
-          />
-          <Kpi
-            title="Изменение капитальных затрат (анализ «что если»)"
-            value={altDelta ? formatCurrency(altDelta.capex) : 'Нет данных'}
-            hint="Разница после изменения допущений"
-          />
-        </div>
-      </details>
+      {best && (
+        <p className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2 text-sm text-[var(--nc-text)]">
+          Лучший по эффекту:{' '}
+          <span className="font-semibold text-[var(--nc-ink)]">{best.name}</span>
+          {best.annual_effect != null ? (
+            <>
+              {' '}
+              · эффект {formatCurrency(best.annual_effect)}
+            </>
+          ) : null}
+          {best.payback_display ? <> · окупаемость {best.payback_display}</> : null}
+          {best.capex != null ? <> · инвестиции {formatCurrency(best.capex)}</> : null}
+        </p>
+      )}
 
       <Card
         title="Сравнение сценариев"
         actions={
           <Button
             type="button"
+            size="sm"
             variant="outline"
             onClick={() => setShowAllScenarioCols((v) => !v)}
           >
-            {showAllScenarioCols ? 'Только основные показатели' : 'Показать все показатели'}
+            {showAllScenarioCols ? 'Кратко' : 'Все столбцы'}
           </Button>
         }
       >
@@ -1091,33 +1006,6 @@ export function EconomicsPanel({
           rows={scenarios}
           rowKey={(s) => s.id}
         />
-        <p className="mt-2 text-xs text-[var(--nc-muted)]">
-          По умолчанию — пять показателей для решения. Рентабельность для аренды не применяется. Чистая приведённая стоимость и окупаемость
-          — из backend; при отсутствии данных показывается «Нет данных», не ноль.
-        </p>
-        {Object.keys(assumptions).length > 0 && (
-          <details className="mt-4 rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-3 py-2 text-sm text-[var(--nc-ink)]">
-            <summary className="cursor-pointer font-medium text-[var(--nc-ink)]">
-              Ключевые допущения модели (общие для сценариев)
-            </summary>
-            <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                ['labor_reduction_share', 'Доля снижения труда'],
-                ['discount_rate', 'Ставка дисконта'],
-                ['years', 'Горизонт, лет'],
-                ['utilization', 'Загрузка'],
-                ['availability', 'Доступность'],
-              ].map(([key, label]) =>
-                assumptions[key] != null ? (
-                  <li key={key}>
-                    {label}: <span className="font-mono">{String(assumptions[key])}</span>
-                    {key === 'labor_reduction_share' ? ' (допущение, не норматив)' : ''}
-                  </li>
-                ) : null,
-              )}
-            </ul>
-          </details>
-        )}
         <div className="mt-3">
           <AttentionPanel
             items={buildAttentionItems({
@@ -1128,117 +1016,82 @@ export function EconomicsPanel({
             })}
           />
         </div>
-        <div className="mt-6 h-80 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] p-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 12, left: 8, bottom: 48 }}>
-              <CartesianGrid strokeDasharray="2 6" stroke={charts.grid} vertical={false} />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: charts.tick }}
-                interval={0}
-                angle={-18}
-                textAnchor="end"
-                height={56}
-                axisLine={{ stroke: charts.grid }}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: charts.tick }}
-                width={72}
-                axisLine={{ stroke: charts.grid }}
-                tickFormatter={(v) =>
-                  Math.abs(Number(v)) >= 1_000_000
-                    ? `${(Number(v) / 1_000_000).toFixed(0)} млн`
-                    : String(v)
-                }
-              />
-              <Tooltip
-                formatter={(v) => formatCurrency(Number(v ?? 0))}
-                contentStyle={{
-                  background: charts.tooltipBg,
-                  border: `1px solid ${charts.tooltipBorder}`,
-                  borderRadius: 2,
-                  color: charts.tick,
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 12, color: charts.tick }} />
-              <Bar
-                dataKey="Годовой эффект"
-                fill={charts.effect}
-                radius={[2, 2, 0, 0]}
-                maxBarSize={36}
-              />
-              <Bar
-                dataKey={chartCapexKey}
-                fill={charts.capex}
-                radius={[2, 2, 0, 0]}
-                maxBarSize={36}
-              />
-              <Bar
-                dataKey={chartOpexKey}
-                fill={charts.opex}
-                radius={[2, 2, 0, 0]}
-                maxBarSize={36}
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <details className="mt-4 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
+            Диаграмма сравнения
+          </summary>
+          <div className="mt-2 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 12, left: 8, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="2 6" stroke={charts.grid} vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: charts.tick }}
+                  interval={0}
+                  angle={-18}
+                  textAnchor="end"
+                  height={48}
+                  axisLine={{ stroke: charts.grid }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: charts.tick }}
+                  width={64}
+                  axisLine={{ stroke: charts.grid }}
+                  tickFormatter={(v) =>
+                    Math.abs(Number(v)) >= 1_000_000
+                      ? `${(Number(v) / 1_000_000).toFixed(0)} млн`
+                      : String(v)
+                  }
+                />
+                <Tooltip
+                  formatter={(v) => formatCurrency(Number(v ?? 0))}
+                  contentStyle={{
+                    background: charts.tooltipBg,
+                    border: `1px solid ${charts.tooltipBorder}`,
+                    borderRadius: 2,
+                    color: charts.tick,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12, color: charts.tick }} />
+                <Bar
+                  dataKey="Годовой эффект"
+                  fill={charts.effect}
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={36}
+                />
+                <Bar
+                  dataKey={chartCapexKey}
+                  fill={charts.capex}
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={36}
+                />
+                <Bar
+                  dataKey={chartOpexKey}
+                  fill={charts.opex}
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={36}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </details>
       </Card>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Допущения">
-          <p className="mb-3 text-xs text-[var(--nc-muted)]">
-            {valueSourceLabel('assumption')} — значения модели по умолчанию. После «что если» часть
-            параметров помечается как «{valueSourceLabel('user')}».
-          </p>
-          <dl className="space-y-2 text-sm">
-            {Object.entries(assumptions)
-              .slice(0, 12)
-              .map(([k, v]) => {
-                const userKeys = new Set([
-                  'utilization',
-                  'reserve',
-                  'years',
-                  'labor_reduction_share',
-                  'unit_price',
-                  'peak_demand',
-                ])
-                const source = whatIfDirty && userKeys.has(k) ? 'user' : 'assumption'
-                return (
-                  <div key={k} className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5">
-                    <dt className="text-[var(--nc-muted)]">
-                      {assumptionLabel(k)}
-                      <span className="ml-2 text-[10px] uppercase tracking-wide text-[var(--nc-muted)]">
-                        {valueSourceLabel(source)}
-                      </span>
-                    </dt>
-                    <dd className="font-medium text-[var(--nc-ink)]">{String(v)}</dd>
-                  </div>
-                )
-              })}
-            {Object.keys(assumptions).length === 0 && (
-              <p className="text-[var(--nc-muted)]">Запустите расчёт, чтобы увидеть допущения.</p>
-            )}
-          </dl>
-        </Card>
-
-        <Card
+      <Card
           title="Анализ «что если»"
-          subtitle="Изменения пересчитываются автоматически"
+          subtitle="Сдвиньте ползунок — таблица сценариев пересчитается"
           actions={
             <Button variant="outline" size="sm" onClick={resetWhatIf} disabled={!whatIfDirty}>
               <RotateCcw className="h-4 w-4" />
-              Сбросить изменения
+              Сбросить
             </Button>
           }
         >
-          <div className="space-y-4">
-            <p className="text-xs text-[var(--nc-muted)]">
-              Ползунки — «{valueSourceLabel('user')}». Исходные значения модели — «
-              {valueSourceLabel('assumption')}».
-            </p>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
             <Slider
               label="Загрузка оборудования"
-              source={whatIf.utilization !== DEFAULT_WHAT_IF.utilization ? 'user' : 'assumption'}
+              source={whatIf.utilization !== DEFAULT_WHAT_IF.utilization ? 'user' : undefined}
               value={whatIf.utilization}
               min={40}
               max={100}
@@ -1247,7 +1100,7 @@ export function EconomicsPanel({
             />
             <Slider
               label="Резерв парка"
-              source={whatIf.reserve !== DEFAULT_WHAT_IF.reserve ? 'user' : 'assumption'}
+              source={whatIf.reserve !== DEFAULT_WHAT_IF.reserve ? 'user' : undefined}
               value={whatIf.reserve}
               min={0}
               max={40}
@@ -1256,7 +1109,7 @@ export function EconomicsPanel({
             />
             <Slider
               label="Горизонт анализа"
-              source={whatIf.years !== DEFAULT_WHAT_IF.years ? 'user' : 'assumption'}
+              source={whatIf.years !== DEFAULT_WHAT_IF.years ? 'user' : undefined}
               value={whatIf.years}
               min={3}
               max={10}
@@ -1268,7 +1121,7 @@ export function EconomicsPanel({
               source={
                 whatIf.labor_reduction_share !== DEFAULT_WHAT_IF.labor_reduction_share
                   ? 'user'
-                  : 'assumption'
+                  : undefined
               }
               value={whatIf.labor_reduction_share}
               min={10}
@@ -1278,7 +1131,7 @@ export function EconomicsPanel({
             />
             <Slider
               label="Изменение цены единицы"
-              source={whatIf.unit_price_factor !== 0 ? 'user' : 'assumption'}
+              source={whatIf.unit_price_factor !== 0 ? 'user' : undefined}
               value={whatIf.unit_price_factor}
               min={-30}
               max={30}
@@ -1287,7 +1140,7 @@ export function EconomicsPanel({
             />
             <Slider
               label="Изменение пикового спроса"
-              source={whatIf.peak_demand_factor !== 0 ? 'user' : 'assumption'}
+              source={whatIf.peak_demand_factor !== 0 ? 'user' : undefined}
               value={whatIf.peak_demand_factor}
               min={-30}
               max={30}
@@ -1296,18 +1149,19 @@ export function EconomicsPanel({
             />
             <Slider
               label="Изменение стоимости труда (ФОТ/год)"
-              source={whatIf.labor_cost_factor !== 0 ? 'user' : 'assumption'}
+              source={whatIf.labor_cost_factor !== 0 ? 'user' : undefined}
               value={whatIf.labor_cost_factor}
               min={-30}
               max={30}
               unit="%"
               onChange={(v) => setWhatIf((p) => ({ ...p, labor_cost_factor: v }))}
             />
+            </div>
             {(whatIfMut.isPending || sensitivityMut.isPending) && (
               <p className="text-xs text-[var(--nc-muted)]">Пересчёт…</p>
             )}
-            {(basePurchase || altPurchase || altDelta) && (
-              <div className="overflow-x-auto rounded-lg border border-[var(--nc-border)]">
+            {(basePurchase || altPurchase) && (
+              <div className="overflow-x-auto rounded border border-[var(--nc-border)]">
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-[var(--nc-surface-muted)] text-xs uppercase text-[var(--nc-muted)]">
                     <tr>
@@ -1323,8 +1177,6 @@ export function EconomicsPanel({
                         ['Капитальные затраты', 'capex', true],
                         ['Эксплуатация / год', 'opex_yearly', true],
                         ['Годовой эффект', 'annual_effect', true],
-                        ['Совокупная стоимость', 'tco', true],
-                        ['Рентабельность', 'roi', false],
                         ['Окупаемость', 'payback_years', false],
                       ] as const
                     ).map(([title, key, money]) => {
@@ -1334,7 +1186,7 @@ export function EconomicsPanel({
                       return (
                         <tr key={key} className="border-t border-[var(--nc-border-subtle)]">
                           <td className="px-3 py-2 text-[var(--nc-text)]">{title}</td>
-                          <td className="px-3 py-2 font-medium">
+                          <td className="px-3 py-2 font-medium tabular-nums">
                             {isPayback
                               ? kpiPaybackDisplay(basePurchase)
                               : b == null
@@ -1343,7 +1195,7 @@ export function EconomicsPanel({
                                   ? formatCurrency(b)
                                   : formatNumber(b, 1)}
                           </td>
-                          <td className="px-3 py-2 font-medium">
+                          <td className="px-3 py-2 font-medium tabular-nums">
                             {isPayback
                               ? kpiPaybackDisplay(altPurchase || basePurchase)
                               : n == null
@@ -1352,7 +1204,7 @@ export function EconomicsPanel({
                                   ? formatCurrency(n)
                                   : formatNumber(n, 1)}
                           </td>
-                          <td className="px-3 py-2">{deltaPct(b, n)}</td>
+                          <td className="px-3 py-2 tabular-nums">{deltaPct(b, n)}</td>
                         </tr>
                       )
                     })}
@@ -1360,34 +1212,17 @@ export function EconomicsPanel({
                 </table>
               </div>
             )}
-            {altDelta && (
-              <dl className="space-y-1 text-sm text-[var(--nc-text)]">
-                <div className="flex justify-between">
-                  <dt>Δ капитальных затрат</dt>
-                  <dd>{formatCurrency(altDelta.capex)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Δ эксплуатации</dt>
-                  <dd>{formatCurrency(altDelta.opex_annual)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Δ годовой эффект</dt>
-                  <dd>{formatCurrency(altDelta.annual_effect)}</dd>
-                </div>
-              </dl>
-            )}
           </div>
         </Card>
-      </div>
 
       {(sensitivityByParam.unit_price?.length ||
         sensitivityByParam.peak_demand?.length ||
         sensitivityByParam.current_labor_cost_year?.length) && (
-        <Card
-          title="Анализ чувствительности"
-          subtitle="ТЗ 3.5.6: оборудование, объём операций, стоимость труда — полный пересчёт"
-        >
-          <div className="grid gap-6 lg:grid-cols-3">
+        <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
+            Анализ чувствительности
+          </summary>
+          <div className="mt-3 grid gap-4 lg:grid-cols-3">
             <SensitivityChart
               title="Стоимость оборудования"
               data={sensitivityByParam.unit_price || []}
@@ -1407,7 +1242,7 @@ export function EconomicsPanel({
               labelX={(l) => `ФОТ ${formatCurrency(Number(l))}`}
             />
           </div>
-        </Card>
+        </details>
       )}
         </>
       )}
@@ -1593,9 +1428,9 @@ function Slider({
       <div className="mb-1 flex justify-between text-sm">
         <span className="text-[var(--nc-text)]">
           {label}
-          {source && (
-            <span className="ml-2 text-[10px] uppercase tracking-wide text-[var(--nc-muted)]">
-              {valueSourceLabel(source)}
+          {source === 'user' && (
+            <span className="ml-2 text-[10px] uppercase tracking-wide text-[var(--nc-accent)]">
+              изменено
             </span>
           )}
         </span>
