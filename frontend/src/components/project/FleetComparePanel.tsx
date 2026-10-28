@@ -18,6 +18,7 @@ import { Card } from '../ui/Card'
 import { Input } from '../ui/Input'
 import { formatCurrency, formatPayback, formatPercent } from '../../utils/format'
 import { toastError, toastSuccess } from '../../store/toastStore'
+import { useChartTheme } from '../../utils/chartTheme'
 
 interface Props {
   projectId: string
@@ -42,7 +43,7 @@ export function FleetComparePanel({ projectId }: Props) {
       toastSuccess(
         res.persisted
           ? 'Сравнение сохранено. Исходный расчёт сценария «Покупка» не изменён.'
-          : 'Сравнение рассчитано (без записи — демо или нет прав)',
+          : 'Сравнение рассчитано (без записи в проект)',
       )
     },
     onError: (e) => toastError(getFriendlyError(e) || String(e)),
@@ -53,6 +54,7 @@ export function FleetComparePanel({ projectId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
 
+  const charts = useChartTheme()
   const chart = (data?.rows || []).map((r) => ({
     name: r.name_ru,
     capex: r.economics?.capex?.capex ?? 0,
@@ -78,50 +80,64 @@ export function FleetComparePanel({ projectId }: Props) {
       </div>
 
       {data?.insight && (
-        <p className="mb-4 rounded border border-steel-200 bg-steel-50 px-3 py-2 text-sm text-steel-700">
+        <p className="mb-4 rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-3 py-2 text-sm text-[var(--nc-text)]">
           {data.insight}
         </p>
       )}
 
       {data && chart.length > 0 && (
-        <div className="mb-5 h-64">
+        <div className="mb-5 h-64 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] p-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chart} margin={{ top: 8, right: 12, left: 8, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} height={40} />
+              <CartesianGrid strokeDasharray="2 6" stroke={charts.grid} vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: charts.tick }}
+                interval={0}
+                height={40}
+                axisLine={{ stroke: charts.grid }}
+              />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: charts.tick }}
                 width={64}
+                axisLine={{ stroke: charts.grid }}
                 tickFormatter={(v) =>
                   Math.abs(Number(v)) >= 1_000_000
                     ? `${(Number(v) / 1_000_000).toFixed(0)}M`
                     : String(v)
                 }
               />
-              <Tooltip />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="capex" name="Капитальные затраты (CAPEX)" fill="#ea580c" />
-              <Bar dataKey="effect" name="Чистый эффект / год" fill="#0f766e" />
-              <Bar dataKey="capacity" name="Производительность парка, оп/ч" fill="#64748b" />
+              <Tooltip
+                contentStyle={{
+                  background: charts.tooltipBg,
+                  border: `1px solid ${charts.tooltipBorder}`,
+                  borderRadius: 2,
+                  color: charts.tick,
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: charts.tick }} />
+              <Bar dataKey="capex" name="Капитальные затраты" fill={charts.capex} radius={[2, 2, 0, 0]} maxBarSize={36} />
+              <Bar dataKey="effect" name="Чистый эффект / год" fill={charts.effect} radius={[2, 2, 0, 0]} maxBarSize={36} />
+              <Bar dataKey="capacity" name="Производительность парка, оп/ч" fill={charts.opex} radius={[2, 2, 0, 0]} maxBarSize={36} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      <div className="overflow-x-auto rounded border border-steel-200">
+      <div className="overflow-x-auto rounded border border-[var(--nc-border)]">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-steel-50 text-xs uppercase text-steel-500">
+          <thead className="bg-[var(--nc-surface-muted)] text-xs uppercase text-[var(--nc-muted)]">
             <tr>
               <th className="px-3 py-2">Сценарий</th>
               <th className="px-3 py-2">Роботы</th>
               <th className="px-3 py-2">Покрытие пика</th>
               <th className="px-3 py-2">Загрузка</th>
-              <th className="px-3 py-2">CAPEX</th>
-              <th className="px-3 py-2">OPEX / год</th>
+              <th className="px-3 py-2">Инвестиции</th>
+              <th className="px-3 py-2">Эксплуатация / год</th>
               <th className="px-3 py-2">Чистый эффект</th>
-              <th className="px-3 py-2">ROI</th>
+              <th className="px-3 py-2">Рентабельность</th>
               <th className="px-3 py-2">Окупаемость</th>
-              <th className="px-3 py-2">NPV</th>
+              <th className="px-3 py-2">ЧПС</th>
             </tr>
           </thead>
           <tbody>
@@ -129,7 +145,7 @@ export function FleetComparePanel({ projectId }: Props) {
               const e = r.economics
               const op = r.operations
               return (
-                <tr key={r.code} className="border-t border-steel-100">
+                <tr key={r.code} className="border-t border-[var(--nc-border-subtle)]">
                   <td className="px-3 py-2 font-medium">{r.name_ru}</td>
                   <td className="px-3 py-2">{r.robots_count}</td>
                   <td className="px-3 py-2">
@@ -137,7 +153,7 @@ export function FleetComparePanel({ projectId }: Props) {
                       ? formatPercent(op.peak_coverage * 100)
                       : 'Нет данных'}
                     {op.meets_peak_demand === false ? (
-                      <span className="ml-1 text-xs text-amber-700">недостаточно</span>
+                      <span className="ml-1 text-xs text-[var(--nc-warning)]">недостаточно</span>
                     ) : null}
                   </td>
                   <td className="px-3 py-2">
@@ -173,7 +189,7 @@ export function FleetComparePanel({ projectId }: Props) {
       </div>
 
       {(data?.rows || []).some((r) => r.operations?.estimated) && (
-        <p className="mt-3 text-xs text-steel-500">
+        <p className="mt-3 text-xs text-[var(--nc-muted)]">
           Метрики покрытия/загрузки — оценочные по формуле парка, не телеметрия симуляции.
           {(data?.rows?.[0]?.operations?.note && ` ${data.rows[0].operations.note}`) || ''}
         </p>

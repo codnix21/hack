@@ -523,9 +523,9 @@ export function ProjectWorkspacePage() {
             {project.is_demo && (
               <Badge
                 variant="warning"
-                title="Демонстрационные данные используются для показа возможностей платформы"
+                title="Данные каталога платформы используются для показа возможностей"
               >
-                Демо
+                Пример
               </Badge>
             )}
           </span>
@@ -615,16 +615,16 @@ export function ProjectWorkspacePage() {
       />
 
       {(isGuest || readOnly) && (
-        <Disclosure title="О сессии и демо-режиме" className="mb-3">
+        <Disclosure title="О сессии и режиме примера" className="mb-3">
           {isGuest ? (
             <p>
               {readOnly
-                ? 'Это общий демо-проект (только просмотр). Создайте копию на странице «Пример проекта», чтобы редактировать.'
+                ? 'Это общий пример-проект (только просмотр). Создайте копию на странице «Пример проекта», чтобы редактировать.'
                 : 'Гостевая сессия: изменения сохраняются во временном проекте. Для постоянного хранения зарегистрируйтесь.'}
             </p>
           ) : (
             <p>
-              Демонстрационный проект только для просмотра. Скопируйте его, чтобы менять параметры и
+              Пример-проект только для просмотра. Скопируйте его, чтобы менять параметры и
               план.
             </p>
           )}
@@ -642,11 +642,11 @@ export function ProjectWorkspacePage() {
               recommended={nextStep.stage}
             />
           </div>
-          <p className="mt-2 hidden px-1 text-[11px] leading-snug text-steel-500 lg:block">
+          <p className="mt-2 hidden px-1 text-[11px] leading-snug text-[var(--nc-muted)] lg:block">
             {project.summary?.capex != null ? (
               <>
-                CAPEX {formatCurrency(project.summary.capex)}
-                {project.summary.npv != null ? ` · NPV ${formatCurrency(project.summary.npv)}` : ''}
+                Инвестиции {formatCurrency(project.summary.capex)}
+                {project.summary.npv != null ? ` · ЧПС ${formatCurrency(project.summary.npv)}` : ''}
                 <br />
               </>
             ) : null}
@@ -656,7 +656,7 @@ export function ProjectWorkspacePage() {
                   ? 'text-emerald-700'
                   : econFreshness === 'stale'
                     ? 'text-amber-800'
-                    : 'text-steel-500'
+                    : 'text-[var(--nc-muted)]'
               }
               data-testid="economics-freshness"
               title={
@@ -671,10 +671,10 @@ export function ProjectWorkspacePage() {
         </aside>
 
         <div className="min-w-0 space-y-3">
-          <p className="text-xs text-steel-500 lg:hidden">
+          <p className="text-xs text-[var(--nc-muted)] lg:hidden">
             {completenessLine}
             {project.summary?.capex != null
-              ? ` · CAPEX ${formatCurrency(project.summary.capex)}`
+              ? ` · инвестиции ${formatCurrency(project.summary.capex)}`
               : ''}
             {' · '}
             <span
@@ -836,13 +836,13 @@ export function ProjectWorkspacePage() {
               title="Импорт параметров объекта"
               subtitle={
                 readOnly
-                  ? 'Импорт недоступен для демо-проекта — создайте копию'
+                  ? 'Импорт недоступен для пример-проекта — создайте копию'
                   : 'Скачайте Excel-шаблон, заполните жёлтую колонку и загрузите файл'
               }
             >
               {readOnly ? (
-                <p className="text-sm text-steel-600">
-                  Скопируйте демо-проект, чтобы загружать параметры из Excel.
+                <p className="text-sm text-[var(--nc-text)]">
+                  Скопируйте пример-проект, чтобы загружать параметры из Excel.
                 </p>
               ) : (
                 <ImportFlow projectId={id} />
@@ -893,7 +893,7 @@ export function ProjectWorkspacePage() {
             <div className="space-y-4">
               {economicsRobot ? (
                 <Callout variant="info" title="Решение для экономики">
-                  Сейчас в расчёте CAPEX/OPEX используется{' '}
+                  Сейчас в расчёте капитальных и эксплуатационных затрат используется{' '}
                   <strong>{economicsRobot.robot_name || `#${economicsRobot.robot_id}`}</strong>
                   {economicsRobot.robot_price_rub != null
                     ? ` · цена ${formatCurrency(economicsRobot.robot_price_rub)}`
@@ -940,14 +940,14 @@ export function ProjectWorkspacePage() {
               })()}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Tabs items={FILTER_TABS} value={statusFilter} onChange={onStatusFilterChange} />
-                <p className="text-sm text-steel-500">
+                <p className="text-sm text-[var(--nc-muted)]">
                   В фильтре: {filteredResults.length} из {results.length}
                 </p>
               </div>
-              <div className="overflow-hidden rounded border border-steel-200">
+              <div className="overflow-hidden rounded border border-[var(--nc-border)]">
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left text-sm">
-                    <thead className="bg-steel-50 text-xs uppercase text-steel-500">
+                    <thead className="bg-[var(--nc-surface-muted)] text-xs uppercase text-[var(--nc-muted)]">
                       <tr>
                         <th className="px-3 py-2" />
                         <th className="px-3 py-2">Сравнить</th>
@@ -968,11 +968,11 @@ export function ProjectWorkspacePage() {
                       const exclusions = reasonsList(r.exclusion_reasons)
                       return (
                         <Fragment key={rowKey}>
-                          <tr className="border-t border-steel-100 hover:bg-steel-50/80">
+                          <tr className="border-t border-[var(--nc-border-subtle)] hover:bg-[var(--nc-surface-hover)]">
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                className="rounded p-1 text-steel-500 hover:bg-steel-100"
+                                className="rounded p-1 text-[var(--nc-muted)] hover:bg-[var(--nc-surface-hover)]"
                                 aria-label="Показать причины"
                                 onClick={() => setExpandedId(open ? null : rowKey)}
                               >
@@ -999,7 +999,7 @@ export function ProjectWorkspacePage() {
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                className="text-left font-medium text-brand-800 hover:underline"
+                                className="text-left font-medium text-[var(--nc-link)] hover:underline"
                                 onClick={() => navigate(`/app/catalog/${r.robot_id}`)}
                               >
                                 {r.robot_name || `#${r.robot_id}`}
@@ -1027,7 +1027,7 @@ export function ProjectWorkspacePage() {
                               {r.match_score != null ? (
                                 <div className="space-y-0.5">
                                   <Badge variant="info">{formatNumber(r.match_score, 1)}</Badge>
-                                  <p className="max-w-[10rem] text-[11px] leading-snug text-steel-500">
+                                  <p className="max-w-[10rem] text-[11px] leading-snug text-[var(--nc-muted)]">
                                     {r.score_label ||
                                       (r.match_score >= 80
                                         ? 'Высокое соответствие'
@@ -1068,7 +1068,7 @@ export function ProjectWorkspacePage() {
                             </td>
                           </tr>
                           {open && (
-                            <tr className="border-t border-steel-100 bg-steel-50/60">
+                            <tr className="border-t border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)]">
                               <td colSpan={9} className="px-4 py-3">
                                 {(() => {
                                   const warnings = [...matches, ...exclusions].filter((m) =>
@@ -1079,12 +1079,12 @@ export function ProjectWorkspacePage() {
                                   return (
                                     <div className="space-y-4">
                                       {r.recommendation_text && (
-                                        <div className="rounded border border-brand-200 bg-brand-50/50 px-3 py-2 text-sm text-steel-800">
-                                          <p className="font-medium text-steel-900">Рекомендация</p>
+                                        <div className="rounded border border-[var(--nc-accent-line)] bg-[var(--nc-accent-soft)] px-3 py-2 text-sm text-[var(--nc-ink)]">
+                                          <p className="font-medium text-[var(--nc-ink)]">Рекомендация</p>
                                           <p className="mt-1">{r.recommendation_text}</p>
                                           {r.estimated_capex != null && (
-                                            <p className="mt-1 text-xs text-steel-600">
-                                              Оценка CAPEX (допущение): {formatCurrency(r.estimated_capex)}
+                                            <p className="mt-1 text-xs text-[var(--nc-text)]">
+                                              Оценка капитальных затрат (допущение): {formatCurrency(r.estimated_capex)}
                                               {r.estimated_payback_years != null
                                                 ? ` · окупаемость ≈ ${formatNumber(r.estimated_payback_years, 1)} лет`
                                                 : ''}
@@ -1094,7 +1094,7 @@ export function ProjectWorkspacePage() {
                                       )}
                                       {warnings.length > 0 && (
                                         <div
-                                          className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2"
+                                          className="rounded-lg border border-[rgba(245,193,74,0.45)] bg-[var(--nc-warning-soft)] px-3 py-2"
                                           role="status"
                                         >
                                           <p className="mb-1 text-xs font-semibold uppercase text-amber-800">
@@ -1122,16 +1122,16 @@ export function ProjectWorkspacePage() {
                                             Причины соответствия
                                           </p>
                                           {matchOnly.length ? (
-                                            <ul className="list-disc space-y-1 pl-5 text-sm text-steel-700">
+                                            <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--nc-text)]">
                                               {matchOnly.map((m) => (
                                                 <li key={m}>
-                                                  <span className="text-emerald-600">✓</span>{' '}
+                                                  <span className="text-[var(--nc-lime)]">✓</span>{' '}
                                                   {m.replace(/^[✓✔]\s*/, '')}
                                                 </li>
                                               ))}
                                             </ul>
                                           ) : (
-                                            <p className="text-sm text-steel-500">Нет данных</p>
+                                            <p className="text-sm text-[var(--nc-muted)]">Нет данных</p>
                                           )}
                                         </div>
                                         <div>
@@ -1139,7 +1139,7 @@ export function ProjectWorkspacePage() {
                                             Причины исключения / замечания
                                           </p>
                                           {exclOnly.length ? (
-                                            <ul className="list-disc space-y-1 pl-5 text-sm text-steel-700">
+                                            <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--nc-text)]">
                                               {exclOnly.map((m) => (
                                                 <li key={m}>
                                                   <span className="text-red-600">✕</span> {m}
@@ -1147,7 +1147,7 @@ export function ProjectWorkspacePage() {
                                               ))}
                                             </ul>
                                           ) : (
-                                            <p className="text-sm text-steel-500">Нет замечаний</p>
+                                            <p className="text-sm text-[var(--nc-muted)]">Нет замечаний</p>
                                           )}
                                         </div>
                                       </div>
@@ -1178,11 +1178,11 @@ export function ProjectWorkspacePage() {
                 )}
               </div>
               {filteredResults.length === 0 && (
-                <p className="text-sm text-steel-500">Нет решений в выбранном фильтре.</p>
+                <p className="text-sm text-[var(--nc-muted)]">Нет решений в выбранном фильтре.</p>
               )}
               {selectedIds.length > 0 && (
-                <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 shadow-panel">
-                  <p className="text-sm text-steel-800">
+                <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--nc-accent-line)] bg-[var(--nc-accent-soft)] px-4 py-3 shadow-panel">
+                  <p className="text-sm text-[var(--nc-ink)]">
                     Выбрано для сравнения: <strong>{selectedIds.length}</strong>
                     {selectedIds.length < 2 && ' (нужно минимум 2)'}
                   </p>
@@ -1233,12 +1233,12 @@ export function ProjectWorkspacePage() {
                 {selectedIds.map((rid) => (
                   <li
                     key={rid}
-                    className="inline-flex items-center gap-2 rounded border border-steel-200 bg-steel-50 px-2.5 py-1 text-sm"
+                    className="inline-flex items-center gap-2 rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-2.5 py-1 text-sm"
                   >
                     {selectedNames.get(rid) || `#${rid}`}
                     <button
                       type="button"
-                      className="text-steel-400 hover:text-steel-800"
+                      className="text-[var(--nc-muted)] hover:text-[var(--nc-ink)]"
                       aria-label="Убрать из сравнения"
                       onClick={() => setSelectedIds((ids) => ids.filter((x) => x !== rid))}
                     >
@@ -1253,15 +1253,15 @@ export function ProjectWorkspacePage() {
                 <p className="text-sm text-red-600">{getFriendlyError(compareInlineQuery.error)}</p>
               )}
               {compareRobots.length >= 2 && (
-                <div className="overflow-x-auto rounded border border-steel-200">
+                <div className="overflow-x-auto rounded border border-[var(--nc-border)]">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="border-b border-steel-200 bg-steel-50">
-                        <th className="px-3 py-2 text-left font-medium text-steel-600">Параметр</th>
+                      <tr className="border-b border-[var(--nc-border)] bg-[var(--nc-surface-muted)]">
+                        <th className="px-3 py-2 text-left font-medium text-[var(--nc-text)]">Параметр</th>
                         {compareRobots.map((r) => (
                           <th key={r.id} className="min-w-[140px] px-3 py-2 text-left font-medium">
                             {r.name}
-                            <div className="mt-0.5 text-xs font-normal text-steel-500">
+                            <div className="mt-0.5 text-xs font-normal text-[var(--nc-muted)]">
                               {dataOriginLabel(r.data_origin)}
                             </div>
                           </th>
@@ -1286,10 +1286,10 @@ export function ProjectWorkspacePage() {
                           ],
                         ] as const
                       ).map(([label, getter]) => (
-                        <tr key={label} className="border-t border-steel-100">
-                          <td className="px-3 py-2 text-steel-500">{label}</td>
+                        <tr key={label} className="border-t border-[var(--nc-border-subtle)]">
+                          <td className="px-3 py-2 text-[var(--nc-muted)]">{label}</td>
                           {compareRobots.map((r) => (
-                            <td key={`${label}-${r.id}`} className="px-3 py-2 text-steel-800">
+                            <td key={`${label}-${r.id}`} className="px-3 py-2 text-[var(--nc-ink)]">
                               {getter(r)}
                             </td>
                           ))}
@@ -1300,31 +1300,31 @@ export function ProjectWorkspacePage() {
                 </div>
               )}
 
-              <div className="rounded border border-steel-200 bg-steel-50 px-4 py-3 text-sm text-steel-700">
-                <p className="font-medium text-steel-900">Что дальше</p>
+              <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-4 py-3 text-sm text-[var(--nc-text)]">
+                <p className="font-medium text-[var(--nc-ink)]">Что дальше</p>
                 <ol className="mt-1 list-decimal space-y-1 pl-5">
                   <li>
-                    <button type="button" className="text-brand-700 hover:underline" onClick={() => setStep('economics')}>
+                    <button type="button" className="text-[var(--nc-accent)] hover:underline" onClick={() => setStep('economics')}>
                       Экономика
                     </button>{' '}
-                    — CAPEX/OPEX для выбранного сценария покупки
+                    — капитальные и эксплуатационные затраты для сценария покупки
                   </li>
                   <li>
-                    <button type="button" className="text-brand-700 hover:underline" onClick={() => setStep('scenarios')}>
+                    <button type="button" className="text-[var(--nc-accent)] hover:underline" onClick={() => setStep('scenarios')}>
                       Анализ сценариев
                     </button>{' '}
-                    — сравнение «без роботов / покупка / RaaS»
+                    — сравнение «без роботов / покупка / аренда»
                   </li>
                   <li>
                     <button
                       type="button"
-                      className="text-brand-700 hover:underline"
+                      className="text-[var(--nc-accent)] hover:underline"
                       onClick={() => setStep('visualization')}
                     >
                       Визуализация
                     </button>{' '}
                     →{' '}
-                    <button type="button" className="text-brand-700 hover:underline" onClick={() => setStep('results')}>
+                    <button type="button" className="text-[var(--nc-accent)] hover:underline" onClick={() => setStep('results')}>
                       Результаты
                     </button>{' '}
                     → экспорт PDF/Excel
@@ -1379,7 +1379,7 @@ export function ProjectWorkspacePage() {
       {step === 'visualization' && (
         <Card
           title="Симуляция"
-          subtitle="Дискретно-событийная демонстрация по плану (не цифровой двойник). KPI экономики здесь не пересчитываются."
+          subtitle="Дискретно-событийная симуляция по плану (не цифровой двойник). KPI экономики здесь не пересчитываются."
         >
           {!capabilitySummary.des_ready && (
             <Callout variant="warning" className="mb-3" data-testid="des-inputs-incomplete">
@@ -1388,7 +1388,7 @@ export function ProjectWorkspacePage() {
               {!economicsReadinessLocal.ready && (
                 <button
                   type="button"
-                  className="ml-1 font-medium text-brand-800 hover:underline"
+                  className="ml-1 font-medium text-[var(--nc-link)] hover:underline"
                   onClick={() => setStep('object')}
                 >
                   Заполнить параметры
@@ -1405,11 +1405,11 @@ export function ProjectWorkspacePage() {
               readinessQuery.data as { layout?: { warnings?: { code?: string; message?: string }[] } }
             ).layout!.warnings!.some((w) => w.code === 'example_geometry') && (
               <Callout variant="info" className="mb-3" data-testid="des-example-layout-warning">
-                На плане демо-пример геометрии, не обмер объекта. Уточните планировку перед опорой на
+                На плане пример геометрии, не обмер объекта. Уточните планировку перед опорой на
                 DES в отчёте. Экономика уже доступна отдельно.
               </Callout>
             )}
-          <div className="mb-3 grid gap-2 rounded border border-steel-100 bg-steel-50/80 px-3 py-2.5 text-sm text-steel-800 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-3 grid gap-2 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-2.5 text-sm text-[var(--nc-ink)] sm:grid-cols-2 lg:grid-cols-4">
             <div className="min-w-0">
               <p className="nc-section-label">Объект</p>
               <p className="truncate font-medium" title={project.name}>{project.name}</p>
@@ -1420,7 +1420,7 @@ export function ProjectWorkspacePage() {
                 {scenarioId === 'baseline'
                   ? 'Без роботизации'
                   : scenarioId === 'raas'
-                    ? 'RaaS'
+                    ? 'Аренда'
                     : 'Покупка'}
               </p>
             </div>
@@ -1432,18 +1432,18 @@ export function ProjectWorkspacePage() {
             </div>
             <div>
               <p className="nc-section-label">Модель</p>
-              <p className="font-medium">Демонстрационная DES</p>
+              <p className="font-medium">Симуляция DES</p>
             </div>
           </div>
           <Callout variant="info" className="mb-3">
             Геометрия берётся из сохранённого плана (метры). Анимация показывает не более 6 роботов
             на схеме даже если в конфигурации больше — это ограничение отображения, не «потеря»
-            роботов в модели. DES-демо, не цифровой двойник.
+            роботов в модели. DES, не цифровой двойник.
           </Callout>
           {econRobotsQuery.data != null &&
             simRobotsCount != null &&
             econRobotsQuery.data !== simRobotsCount && (
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-[rgba(245,193,74,0.45)] bg-[var(--nc-warning-soft)] px-3 py-2 text-sm text-[var(--nc-warning)]">
                 <p>
                   Экономика рассчитана на <strong>{econRobotsQuery.data}</strong> роботов, симуляция
                   показывает <strong>{simRobotsCount}</strong>. Это разные конфигурации: KPI экономики
@@ -1489,7 +1489,7 @@ export function ProjectWorkspacePage() {
           ) : (
             <EmptyState
               title="Данные визуализации недоступны"
-              description="Выполните экономический расчёт, чтобы получить количество роботов для демонстрационной схемы."
+              description="Выполните экономический расчёт, чтобы получить количество роботов для схемы симуляции."
               actionLabel="Перейти к экономике"
               onAction={() => setSearch({ step: 'economics' })}
             />
@@ -1532,13 +1532,13 @@ export function ProjectWorkspacePage() {
           )}
           {econ && (
             <div className="space-y-5">
-              <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <div className="rounded border border-[rgba(245,193,74,0.4)] bg-[var(--nc-warning-soft)] px-4 py-3 text-sm text-[var(--nc-warning)]">
                 Результат — <strong>предварительная оценка</strong> и требует верификации при
-                обследовании объекта. Демонстрационные данные не заменяют исходные материалы.
+                обследовании объекта. Данные каталога платформы не заменяют исходные материалы.
               </div>
 
               <div>
-                <h3 className="mb-2 text-sm font-semibold text-steel-800">
+                <h3 className="mb-2 text-sm font-semibold text-[var(--nc-ink)]">
                   Экономика (сценарий «Покупка»)
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1581,7 +1581,7 @@ export function ProjectWorkspacePage() {
                   />
                   <ResultKpi title={metricLabel('tco')} value={formatCurrency(econ.tco?.tco)} />
                   <ResultKpi
-                    title="IRR"
+                    title="Внутренняя норма доходности"
                     value={
                       econ.irr?.irr != null
                         ? formatPercent(Number(econ.irr.irr))
@@ -1592,38 +1592,38 @@ export function ProjectWorkspacePage() {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded border border-steel-200 bg-white p-4">
-                  <h3 className="mb-2 text-sm font-semibold text-steel-800">Состав CAPEX</h3>
+                <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-[var(--nc-ink)]">Состав капитальных затрат</h3>
                   <dl className="space-y-1.5 text-sm">
                     {Object.entries(econ.capex?.breakdown || {}).map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-3 border-b border-steel-50 py-1">
-                        <dt className="text-steel-500">{breakdownLabel(k)}</dt>
+                      <div key={k} className="flex justify-between gap-3 border-b border-[var(--nc-border-subtle)] py-1">
+                        <dt className="text-[var(--nc-muted)]">{breakdownLabel(k)}</dt>
                         <dd className="font-medium">{formatBreakdownValue(k, v)}</dd>
                       </div>
                     ))}
                     {!Object.keys(econ.capex?.breakdown || {}).length && (
-                      <p className="text-steel-500">Нет разбивки</p>
+                      <p className="text-[var(--nc-muted)]">Нет разбивки</p>
                     )}
                   </dl>
                 </div>
-                <div className="rounded border border-steel-200 bg-white p-4">
-                  <h3 className="mb-2 text-sm font-semibold text-steel-800">Состав OPEX / год</h3>
+                <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-[var(--nc-ink)]">Состав эксплуатационных расходов / год</h3>
                   <dl className="space-y-1.5 text-sm">
                     {Object.entries(econ.opex?.breakdown || {}).map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-3 border-b border-steel-50 py-1">
-                        <dt className="text-steel-500">{breakdownLabel(k)}</dt>
+                      <div key={k} className="flex justify-between gap-3 border-b border-[var(--nc-border-subtle)] py-1">
+                        <dt className="text-[var(--nc-muted)]">{breakdownLabel(k)}</dt>
                         <dd className="font-medium">{formatBreakdownValue(k, v)}</dd>
                       </div>
                     ))}
                     {!Object.keys(econ.opex?.breakdown || {}).length && (
-                      <p className="text-steel-500">Нет разбивки</p>
+                      <p className="text-[var(--nc-muted)]">Нет разбивки</p>
                     )}
                   </dl>
                 </div>
               </div>
 
-              <div className="rounded border border-steel-200 bg-white p-4 text-sm text-steel-700">
-                <h3 className="mb-2 font-semibold text-steel-800">Краткое заключение</h3>
+              <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4 text-sm text-[var(--nc-text)]">
+                <h3 className="mb-2 font-semibold text-[var(--nc-ink)]">Краткое заключение</h3>
                 <p>
                   {econ.payback?.payback_years == null
                     ? 'При текущих допущениях окупаемость не определена (годовой эффект ≤ 0 или недостаточно данных). Скорректируйте параметры на вкладке «Анализ сценариев».'
@@ -1631,7 +1631,7 @@ export function ProjectWorkspacePage() {
                       ? `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет — в зоне привлекательной предынвестиционной гипотезы (до 3 лет).`
                       : econ.payback.payback_years <= 5
                         ? `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет — умеренный горизонт (3–5 лет). Рекомендуется проверить чувствительность к цене и спросу.`
-                        : `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет (более 5 лет). Имеет смысл сравнить RaaS и уточнить допущения по труду и производительности.`}
+                        : `Ориентировочная окупаемость около ${formatNumber(econ.payback.payback_years, 1)} лет (более 5 лет). Имеет смысл сравнить аренду и уточнить допущения по труду и производительности.`}
                 </p>
                 {results.length > 0 && (
                   <p className="mt-2">
@@ -1643,7 +1643,7 @@ export function ProjectWorkspacePage() {
                 )}
               </div>
 
-              <p className="text-sm text-steel-600">
+              <p className="text-sm text-[var(--nc-text)]">
                 В <strong>PDF</strong> и <strong>Excel</strong>: параметры объекта, подобранные
                 решения, экономика с формулами, сценарии, допущения и источники. Кнопки экспорта — в
                 шапке страницы.
@@ -1675,9 +1675,9 @@ export function ProjectWorkspacePage() {
 
 function ResultKpi({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded border border-steel-200 bg-white p-4 shadow-panel">
-      <p className="text-xs text-steel-500">{title}</p>
-      <p className="mt-1 font-display text-xl font-semibold text-steel-900">{value}</p>
+    <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4 shadow-panel">
+      <p className="text-xs text-[var(--nc-muted)]">{title}</p>
+      <p className="mt-1 font-display text-xl font-semibold text-[var(--nc-ink)]">{value}</p>
     </div>
   )
 }

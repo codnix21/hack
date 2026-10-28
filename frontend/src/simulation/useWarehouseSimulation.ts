@@ -381,8 +381,8 @@ export function useWarehouseSimulation({
 
           if (status === 'WAITING') {
             waitReason = conflictWith
-              ? `Ожидание: конфликт с ${conflictWith} (приоритет по id, демо-reservation)`
-              : 'Ожидание: конфликт зоны (приоритет по id, демо-reservation)'
+              ? `Ожидание: конфликт с ${conflictWith} (приоритет по id, reservation)`
+              : 'Ожидание: конфликт зоны (приоритет по id, reservation)'
             if (task && !isTerminalTask(task.status)) {
               task.status = 'WAITING'
               task.conflictWith = conflictWith

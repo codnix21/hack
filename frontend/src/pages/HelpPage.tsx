@@ -1,31 +1,79 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
-import { Card } from '../components/ui/Card'
+import { Callout } from '../components/ui/Callout'
 
 const TERMS = [
   {
-    t: 'Капитальные затраты (CAPEX)',
-    d: 'Первоначальные вложения: оборудование, инфраструктура, ПО, внедрение и резерв. Часть статей — допущения модели, не коммерческое предложение поставщика.',
+    t: 'AMR / AGV',
+    d: 'Автономный мобильный робот и транспорт с направляющими. В каталоге — решения разных классов; подбор опирается на заполненные ТТХ.',
   },
   {
-    t: 'Эксплуатационные расходы (OPEX)',
-    d: 'Ежегодные затраты роботизации: сервис, энергия, связь, персонал сопровождения и др.',
+    t: 'Инвестиции / эксплуатация / совокупная стоимость',
+    d: 'Капитальные затраты, операционные расходы и совокупная стоимость владения за горизонт. Единицы и период указаны рядом с суммами.',
   },
   {
-    t: 'Совокупная стоимость владения (TCO)',
-    d: 'CAPEX + OPEX × горизонт анализа в границах модели. Не включает оставшийся ручной труд — полный денежный выход показывается отдельно.',
+    t: 'Актуальность расчёта',
+    d: '«Актуален» — соответствует текущим параметрам. «Устарел» — параметры менялись после расчёта; экспорт отчёта недоступен до пересчёта.',
   },
   {
-    t: 'Чистая приведённая стоимость (NPV)',
-    d: 'Дисконтированная стоимость денежных потоков при выбранной ставке (по умолчанию 12%).',
+    t: 'DES',
+    d: 'Дискретно-событийная симуляция на плане. Не телеметрия склада и не цифровой двойник.',
   },
   {
-    t: 'Роботы как услуга (RaaS)',
-    d: 'Аренда вместо покупки. ROI относительно стартового CAPEX к покупке не сопоставляется — смотрите платежи, NPV и эффект.',
+    t: 'Аренда',
+    d: 'Модель «роботы как услуга»: в сравнении сценариев учитывается подписка вместо полной покупки.',
+  },
+]
+
+const STAGES = [
+  {
+    id: 'object',
+    title: 'Данные',
+    need: 'Тип объекта, пиковая нагрузка, численность и ФОТ, цена решения (или из каталога).',
+    assume: 'Пик из суточного объёма — расчётная оценка, если нет прямого замера.',
+    limit: 'Без минимума полей подбор и экономика недоступны.',
   },
   {
-    t: 'Что необходимо проверить',
-    d: 'Характеристики робота, которых нет в каталоге. Отсутствие данных не считается преимуществом: балл ограничивается, статус — «требует проверки».',
+    id: 'matching',
+    title: 'Подбор',
+    need: 'Заполненные данные объекта; в каталоге — релевантные ТТХ.',
+    assume: 'Исключения по типу объекта/процессу помечаются явно.',
+    limit: 'Отсутствующие характеристики не подставляются нулями.',
+  },
+  {
+    id: 'compare',
+    title: 'Сравнение',
+    need: 'Выбор кандидатов и сценариев «без роботизации / покупка / аренда».',
+    assume: 'Допущения «что если» влияют на пересчёт внутри проекта.',
+    limit: 'Глобальное сравнение каталога не подменяет сравнение в проекте.',
+  },
+  {
+    id: 'layout',
+    title: 'План',
+    need: 'Зоны и маршруты в метрах; при импорте — DXF (не DWG).',
+    assume: 'Геометрия редактора — инженерный чертёж, не BIM.',
+    limit: 'Планировка не блокирует экономику, но нужна для осмысленного DES.',
+  },
+  {
+    id: 'economics',
+    title: 'Экономика',
+    need: 'Параметры объекта и выбранное решение; актуальный расчёт для экспорта.',
+    assume: 'Доля снижения труда и горизонт — сценарные допущения.',
+    limit: 'Устаревший результат нельзя принять за актуальный; фиктивные суммы не показываются.',
+  },
+  {
+    id: 'des',
+    title: 'DES',
+    need: 'План с зонами; число роботов согласовано с экономикой, где возможно.',
+    assume: 'Симуляция с упрощёнными показателями.',
+    limit: 'Не цифровой двойник; расхождение числа роботов помечается явно.',
+  },
+  {
+    id: 'report',
+    title: 'Отчёт',
+    need: 'Актуальный экономический расчёт.',
+    assume: 'PDF и Excel отражают сохранённый снимок расчёта.',
+    limit: 'При устаревшем расчёте экспорт блокируется до пересчёта.',
   },
 ]
 
@@ -33,62 +81,90 @@ export function HelpPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="Справка"
-        subtitle="Методика, термины и границы предварительной оценки NETCORE"
-        crumbs={[{ label: 'Обзор', to: '/app' }, { label: 'Справка' }]}
+        title="База знаний"
+        subtitle="Требования к данным, допущения и ограничения по этапам проекта"
+        crumbs={[
+          { label: 'Обзор', to: '/app' },
+          { label: 'База знаний' },
+        ]}
       />
 
-      <Card title="Что делает платформа">
-        <p className="text-sm leading-relaxed text-steel-700">
-          NETCORE помогает оценить целесообразность роботизации объекта: подобрать решения из
-          каталога, сравнить сценарии «без роботов / покупка / услуга», рассчитать экономику и
-          посмотреть демонстрационную схему работы на плане. Это{' '}
-          <strong className="font-semibold text-ink">предынвестиционная оценка</strong>, а не
-          замена обследования объекта и коммерческого предложения поставщика.
+      <div className="page-surface space-y-4 p-5">
+        <h2 className="font-display text-base font-semibold text-[var(--nc-ink)]">Что делает платформа</h2>
+        <p className="text-sm leading-relaxed text-[var(--nc-text)]">
+          NETCORE — предынвестиционная оценка роботизации: каталог, подбор, экономика, план в
+          метрах и симуляция DES. Не замена обследования площадки и КП поставщика.
         </p>
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-steel-700">
-          <li>Создайте проект и укажите тип объекта (склад, аэропорт или медучреждение).</li>
-          <li>Заполните параметры вручную или загрузите Excel; при необходимости уточните план.</li>
-          <li>Запустите подбор — смотрите причины и недостающие характеристики.</li>
-          <li>Сравните сценарии и измените допущения в анализе «что если».</li>
-          <li>Скачайте отчёт PDF или Excel для обсуждения с руководством.</li>
-        </ol>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to="/app/projects/new"
-            className="rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-500"
+            className="nc-focusable inline-flex h-8 items-center justify-center rounded bg-brand-600 px-2.5 text-sm font-medium text-white hover:bg-brand-700"
           >
             Создать проект
           </Link>
           <Link
             to="/app/demo"
-            className="rounded border border-steel-300 px-3 py-2 text-sm font-medium text-steel-800 hover:bg-steel-50"
+            className="nc-focusable inline-flex h-8 items-center justify-center rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-2.5 text-sm font-medium text-[var(--nc-ink)] hover:bg-[var(--nc-surface-hover)]"
           >
-            Открыть демо
+            Открыть примеры
           </Link>
         </div>
-      </Card>
+      </div>
 
-      <Card title="Термины">
-        <dl className="space-y-3">
+      <div className="space-y-3">
+        <h2 className="font-display text-base font-semibold text-[var(--nc-ink)]">Этапы проекта</h2>
+        {STAGES.map((s) => (
+          <div key={s.id} className="page-surface space-y-2 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-display text-sm font-semibold text-[var(--nc-ink)]">{s.title}</h3>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--nc-muted)]">
+                step={s.id}
+              </span>
+            </div>
+            <dl className="grid gap-2 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--nc-muted)]">
+                  Нужно
+                </dt>
+                <dd className="mt-0.5 text-[var(--nc-text)]">{s.need}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--nc-muted)]">
+                  Допущения
+                </dt>
+                <dd className="mt-0.5 text-[var(--nc-text)]">{s.assume}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--nc-muted)]">
+                  Ограничения
+                </dt>
+                <dd className="mt-0.5 text-[var(--nc-text)]">{s.limit}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
+
+      <div className="page-surface p-5">
+        <h2 className="font-display text-base font-semibold text-[var(--nc-ink)]">Термины</h2>
+        <dl className="mt-3 space-y-3">
           {TERMS.map((item) => (
-            <div key={item.t} className="border-b border-steel-100 pb-3 last:border-0 last:pb-0">
-              <dt className="font-display text-sm font-semibold tracking-wide text-ink">{item.t}</dt>
-              <dd className="mt-1 text-sm text-steel-600">{item.d}</dd>
+            <div key={item.t} className="border-b border-[var(--nc-border-subtle)] pb-3 last:border-0 last:pb-0">
+              <dt className="font-display text-sm font-semibold text-[var(--nc-ink)]">{item.t}</dt>
+              <dd className="mt-1 text-sm text-[var(--nc-muted)]">{item.d}</dd>
             </div>
           ))}
         </dl>
-      </Card>
+      </div>
 
-      <Card title="Ограничения">
-        <ul className="list-disc space-y-2 pl-5 text-sm text-steel-700">
-          <li>Доля снижения труда 40% — сценарное допущение, не отраслевая статистика.</li>
-          <li>Пиковая нагрузка из суточного объёма отбора — расчётная оценка, не измерение на объекте.</li>
-          <li>Симуляция — дискретно-событийная демонстрация, не цифровой двойник склада.</li>
-          <li>Цены и ТТХ без данных каталога не выдумываются; неполные карточки помечаются.</li>
-          <li>Поддержка DXF (не DWG). Координаты плана — в метрах.</li>
+      <Callout variant="warning" title="Общие ограничения">
+        <ul className="list-disc space-y-1 pl-4 text-sm">
+          <li>Доля снижения труда — сценарное допущение, не отраслевая статистика.</li>
+          <li>DES — симуляция, не цифровой двойник.</li>
+          <li>Цены и ТТХ без данных каталога не выдумываются.</li>
+          <li>DXF поддерживается; DWG — нет. Координаты плана — в метрах.</li>
         </ul>
-      </Card>
+      </Callout>
     </div>
   )
 }

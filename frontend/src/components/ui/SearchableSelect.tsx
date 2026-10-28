@@ -111,7 +111,7 @@ export function SearchableSelect({
 
   return (
     <div ref={rootRef} className={`relative block space-y-1.5 ${className}`}>
-      {label && <span className="text-sm font-medium text-steel-700">{label}</span>}
+      {label && <span className="text-sm font-medium text-[var(--nc-text)]">{label}</span>}
       <div className="relative">
         <button
           type="button"
@@ -121,9 +121,9 @@ export function SearchableSelect({
           aria-controls={listId}
           aria-label={ariaLabel || label || placeholder}
           aria-invalid={!!error}
-          className={`flex h-10 w-full items-center justify-between gap-2 rounded border bg-white px-3 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-steel-50 ${
-            error ? 'border-red-400' : open ? 'border-brand-500' : 'border-steel-300'
-          } ${selected ? 'text-steel-900' : 'text-steel-400'}`}
+          className={`flex h-10 w-full items-center justify-between gap-2 rounded border bg-[var(--nc-surface)] px-3 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:bg-[var(--nc-surface-muted)] ${
+            error ? 'border-red-400' : open ? 'border-brand-500' : 'border-[var(--nc-border-strong)]'
+          } ${selected ? 'text-[var(--nc-ink)]' : 'text-[var(--nc-faint)]'}`}
           onClick={() => !disabled && setOpen((v) => !v)}
           onKeyDown={onKeyDown}
         >
@@ -133,7 +133,7 @@ export function SearchableSelect({
               <span
                 role="button"
                 tabIndex={-1}
-                className="rounded p-0.5 text-steel-400 hover:bg-steel-100 hover:text-steel-700"
+                className="rounded p-0.5 text-[var(--nc-faint)] hover:bg-[var(--nc-surface-hover)] hover:text-[var(--nc-text)]"
                 aria-label="Очистить"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -144,22 +144,22 @@ export function SearchableSelect({
                 <X className="h-3.5 w-3.5" />
               </span>
             ) : null}
-            <ChevronDown className={`h-4 w-4 text-steel-400 transition ${open ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`h-4 w-4 text-[var(--nc-faint)] transition ${open ? 'rotate-180' : ''}`} />
           </span>
         </button>
 
         {open && (
           <div
-            className="absolute z-40 mt-1 w-full overflow-hidden rounded border border-steel-200 bg-white shadow-lift"
+            className="absolute z-40 mt-1 w-full overflow-hidden rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] shadow-lift"
             role="presentation"
           >
-            <div className="border-b border-steel-100 p-2">
+            <div className="border-b border-[var(--nc-border-subtle)] p-2">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-steel-400" />
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--nc-faint)]" />
                 <input
                   ref={searchRef}
                   type="search"
-                  className="h-9 w-full rounded border border-steel-200 bg-steel-50 pl-8 pr-2 text-sm text-steel-900 placeholder:text-steel-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-400/40"
+                  className="h-9 w-full rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] pl-8 pr-2 text-sm text-[var(--nc-ink)] placeholder:text-[var(--nc-faint)] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-400/40"
                   placeholder={searchPlaceholder}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -175,7 +175,7 @@ export function SearchableSelect({
               aria-label={label || placeholder}
             >
               {filtered.length === 0 ? (
-                <li className="px-3 py-4 text-center text-sm text-steel-500">{emptyText}</li>
+                <li className="px-3 py-4 text-center text-sm text-[var(--nc-muted)]">{emptyText}</li>
               ) : (
                 filtered.map((opt, i) => {
                   const selectedOpt = String(opt.value) === valueStr
@@ -186,10 +186,10 @@ export function SearchableSelect({
                         type="button"
                         className={`flex w-full px-3 py-2 text-left text-sm transition ${
                           selectedOpt
-                            ? 'bg-brand-50 font-medium text-brand-900'
+                            ? 'bg-[var(--nc-surface-selected)] font-medium text-[var(--nc-ink)]'
                             : active
-                              ? 'bg-steel-50 text-steel-900'
-                              : 'text-steel-800 hover:bg-steel-50'
+                              ? 'bg-[var(--nc-surface-muted)] text-[var(--nc-ink)]'
+                              : 'text-[var(--nc-ink)] hover:bg-[var(--nc-surface-hover)]'
                         }`}
                         onMouseEnter={() => setActiveIndex(i)}
                         onClick={() => pick(String(opt.value))}
@@ -204,7 +204,7 @@ export function SearchableSelect({
           </div>
         )}
       </div>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-[var(--nc-danger)]">{error}</span>}
     </div>
   )
 }

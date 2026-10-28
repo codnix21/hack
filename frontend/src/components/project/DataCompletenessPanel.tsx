@@ -139,6 +139,59 @@ export function DataCompletenessPanel({
 
   const canProceed = missing < CRITICAL_KEYS.length
 
+  // Компактный режим рядом с RequiredInputsBanner — без второго «баннера готовности»
+  if (hideAttention) {
+    return (
+      <details className="nc-panel group px-3 py-2" data-testid="data-completeness-compact">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="font-medium text-[var(--nc-ink)]">Сводка полей объекта</span>
+          <span className="text-xs text-[var(--nc-muted)]">
+            заполнено {filled} · нет данных {missing} · допущений {assumptions}
+            {review > 0 ? ` · проверка ${review}` : ''}
+          </span>
+        </summary>
+        <div className="mt-2 space-y-2 border-t border-[var(--nc-border-subtle)] pt-2">
+          <p className="text-xs text-[var(--nc-muted)]">
+            Отсутствующие значения не подставляются. Минимальный набор для экономики — в блоке выше.
+          </p>
+          <ul className="divide-y divide-[var(--nc-border-subtle)]">
+            {items.map((item) => (
+              <li
+                key={item.key}
+                className="flex flex-col gap-0.5 py-1.5 sm:flex-row sm:justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--nc-ink)]">{item.label}</p>
+                  <p className="text-xs text-[var(--nc-muted)]">{item.detail}</p>
+                </div>
+                <span className="mt-0.5 shrink-0 text-xs font-medium text-[var(--nc-muted)] sm:mt-0">
+                  {KIND_RU[item.kind]}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {onFocusImport && (
+              <Button type="button" size="sm" variant="outline" onClick={onFocusImport}>
+                Загрузить Excel
+              </Button>
+            )}
+            {onContinueToMatching && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={onContinueToMatching}
+                disabled={!canProceed && filled === 0}
+              >
+                {missing > 0 ? 'К подбору с предупреждениями' : 'К подбору'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </details>
+    )
+  }
+
   return (
     <div className="nc-panel space-y-3 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -149,22 +202,22 @@ export function DataCompletenessPanel({
             выдумываются.
           </p>
         </div>
-        <dl className="flex flex-wrap gap-4 text-xs text-steel-500">
+        <dl className="flex flex-wrap gap-4 text-xs text-[var(--nc-muted)]">
           <div>
-            <dt className="text-emerald-700">Заполнено</dt>
-            <dd className="text-lg font-semibold tabular-nums text-ink">{filled}</dd>
+            <dt className="text-[var(--nc-lime)]">Заполнено</dt>
+            <dd className="text-lg font-semibold tabular-nums text-[var(--nc-ink)]">{filled}</dd>
           </div>
           <div>
             <dt className="text-red-700">Нет данных</dt>
-            <dd className="text-lg font-semibold tabular-nums text-ink">{missing}</dd>
+            <dd className="text-lg font-semibold tabular-nums text-[var(--nc-ink)]">{missing}</dd>
           </div>
           <div>
-            <dt className="text-amber-700">Допущения</dt>
-            <dd className="text-lg font-semibold tabular-nums text-ink">{assumptions}</dd>
+            <dt className="text-[var(--nc-warning)]">Допущения</dt>
+            <dd className="text-lg font-semibold tabular-nums text-[var(--nc-ink)]">{assumptions}</dd>
           </div>
           <div>
             <dt>Проверка</dt>
-            <dd className="text-lg font-semibold tabular-nums text-ink">{review}</dd>
+            <dd className="text-lg font-semibold tabular-nums text-[var(--nc-ink)]">{review}</dd>
           </div>
         </dl>
       </div>
@@ -182,53 +235,29 @@ export function DataCompletenessPanel({
       )}
 
       {!hideAttention && (
-        <details className="rounded border border-steel-100" open={missing > 0 || assumptions > 0}>
-          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-ink">
+        <details className="rounded border border-[var(--nc-border-subtle)]" open={missing > 0 || assumptions > 0}>
+          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-[var(--nc-ink)]">
             Подробности по полям ({items.length})
           </summary>
-          <ul className="divide-y divide-steel-100 border-t border-steel-100">
+          <ul className="divide-y divide-[var(--nc-border-subtle)] border-t border-[var(--nc-border-subtle)]">
             {items.map((item) => (
               <li
                 key={item.key}
                 className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:justify-between"
               >
                 <div>
-                  <p className="text-sm font-medium text-ink">{item.label}</p>
-                  <p className="text-xs text-steel-500">{item.detail}</p>
+                  <p className="text-sm font-medium text-[var(--nc-ink)]">{item.label}</p>
+                  <p className="text-xs text-[var(--nc-muted)]">{item.detail}</p>
                 </div>
                 <span
                   className={`mt-1 shrink-0 text-xs font-medium sm:mt-0 ${
                     item.kind === 'filled'
-                      ? 'text-emerald-700'
+                      ? 'text-[var(--nc-lime)]'
                       : item.kind === 'missing'
                         ? 'text-red-700'
-                        : 'text-amber-800'
+                        : 'text-[var(--nc-warning)]'
                   }`}
                 >
-                  {KIND_RU[item.kind]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {hideAttention && (
-        <details className="rounded border border-steel-100">
-          <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-ink">
-            Сводка по полям ({items.length}) — подробности
-          </summary>
-          <ul className="divide-y divide-steel-100 border-t border-steel-100">
-            {items.map((item) => (
-              <li
-                key={item.key}
-                className="flex flex-col gap-0.5 px-3 py-2 sm:flex-row sm:justify-between"
-              >
-                <div>
-                  <p className="text-sm font-medium text-ink">{item.label}</p>
-                  <p className="text-xs text-steel-500">{item.detail}</p>
-                </div>
-                <span className="mt-1 shrink-0 text-xs font-medium text-steel-600 sm:mt-0">
                   {KIND_RU[item.kind]}
                 </span>
               </li>

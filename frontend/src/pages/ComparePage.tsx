@@ -9,10 +9,12 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { EmptyState } from '../components/ui/EmptyState'
-import { SkeletonRows } from '../components/ui/Skeleton'
-import { Badge } from '../components/ui/Badge'
+import { ErrorState } from '../components/ui/ErrorState'
+import { LoadingState } from '../components/ui/LoadingState'
+import { Callout } from '../components/ui/Callout'
 import { Modal } from '../components/ui/Modal'
 import { Pagination } from '../components/ui/Pagination'
+import { StatusPill } from '../components/ui/StatusPill'
 import { formatCurrency, formatHours, formatKg, formatMps } from '../utils/format'
 import {
   confirmationLevelLabel,
@@ -178,9 +180,9 @@ export function ComparePage() {
     <div>
       <PageHeader
         title="Сравнение решений"
-        subtitle="Выберите решения из каталога и сопоставьте характеристики"
+        subtitle="Глобальное сопоставление ТТХ из каталога (не сценарии экономики проекта)"
         crumbs={[
-          { label: 'Панель управления', to: '/app' },
+          { label: 'Обзор', to: '/app' },
           ...(projectReturn
             ? [{ label: 'Проект', to: `/app/projects/${projectReturn}?step=compare` }]
             : []),
@@ -211,12 +213,21 @@ export function ComparePage() {
         }
       />
 
+      <Callout variant="info" className="mb-3" title="Два разных контекста">
+        {projectReturn
+          ? 'Вы открыли сравнение из проекта: здесь сопоставляются модели каталога. Сценарии «без роботизации / покупка / аренда» и экономика — на этапе «Сравнение» в проекте.'
+          : 'Это глобальное сравнение каталога. Назначение «В расчёт» и сценарии экономики выполняются внутри проекта.'}{' '}
+        <Link to="/app/catalog" className="font-medium text-[var(--nc-link)] hover:underline">
+          К каталогу
+        </Link>
+      </Callout>
+
       <div className="mb-3 nc-panel px-3 py-2.5">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-steel-700">
+            <p className="text-xs font-medium text-[var(--nc-text)]">
               Выбрано: {ids.length} из {MAX_COMPARE}
-              <span className="font-normal text-steel-500"> · минимум 2</span>
+              <span className="font-normal text-[var(--nc-muted)]"> · минимум 2</span>
             </p>
           </div>
           {ids.length > 0 && (
@@ -227,23 +238,23 @@ export function ComparePage() {
         </div>
 
         {ids.length === 0 ? (
-          <p className="text-sm text-steel-500">
+          <p className="text-sm text-[var(--nc-muted)]">
             Добавьте решения кнопкой выше или из карточки в каталоге («К сравнению»).
           </p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {chipItems.map((item) => (
               <li key={item.id}>
-                <span className="inline-flex items-center gap-1.5 rounded border border-steel-200 bg-steel-50 py-1 pl-2.5 pr-1 text-sm text-steel-800">
+                <span className="inline-flex items-center gap-1.5 rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] py-1 pl-2.5 pr-1 text-sm text-[var(--nc-ink)]">
                   <Link
                     to={`/app/catalog/${item.id}`}
-                    className="max-w-[220px] truncate font-medium hover:text-brand-700"
+                    className="max-w-[220px] truncate font-medium text-[var(--nc-link)] hover:underline"
                   >
                     {item.name}
                   </Link>
                   <button
                     type="button"
-                    className="rounded p-1 text-steel-400 hover:bg-white hover:text-steel-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    className="rounded p-1 text-[var(--nc-faint)] hover:bg-[var(--nc-surface)] hover:text-[var(--nc-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                     aria-label={`Убрать ${item.name} из сравнения`}
                     onClick={() => removeId(item.id)}
                   >
@@ -255,7 +266,7 @@ export function ComparePage() {
           </ul>
         )}
         {atLimit && (
-          <p className="mt-2 text-xs text-steel-500">
+          <p className="mt-2 text-xs text-[var(--nc-muted)]">
             Достигнут лимит сравнения ({MAX_COMPARE}). Уберите одно решение, чтобы добавить другое.
           </p>
         )}
@@ -276,10 +287,18 @@ export function ComparePage() {
         </div>
       )}
 
-      {ids.length >= 2 && compareQuery.isLoading && <SkeletonRows rows={8} />}
+      {ids.length >= 2 && compareQuery.isLoading && (
+        <LoadingState rows={8} label="Загрузка сравнения…" />
+      )}
 
       {ids.length >= 2 && compareQuery.isError && (
-        <p className="text-sm text-red-600">{getFriendlyError(compareQuery.error)}</p>
+        <div className="page-surface">
+          <ErrorState
+            title="Не удалось загрузить сравнение"
+            description={getFriendlyError(compareQuery.error)}
+            onRetry={() => void compareQuery.refetch()}
+          />
+        </div>
       )}
 
       {ids.length >= 2 &&
@@ -301,30 +320,30 @@ export function ComparePage() {
           <table className="nc-table min-w-full text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 bg-steel-50 px-3 py-2 text-left">Параметр</th>
+                <th className="sticky left-0 z-10 bg-[var(--nc-surface-muted)] px-3 py-2 text-left">Параметр</th>
                 {orderedRobots.map((r) => (
-                  <th key={r.id} className="min-w-[140px] px-3 py-2 text-left font-medium text-steel-800">
+                  <th key={r.id} className="min-w-[140px] px-3 py-2 text-left font-medium text-[var(--nc-ink)]">
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="min-w-0">
                         <Link
                           to={`/app/catalog/${r.id}`}
-                          className="line-clamp-2 text-brand-700 hover:underline"
+                          className="line-clamp-2 text-[var(--nc-link)] hover:underline"
                           title={r.name}
                         >
                           {r.name}
                         </Link>
                         <div className="mt-0.5">
-                          <Badge
-                            variant={r.data_origin === 'source' ? 'success' : 'warning'}
+                          <StatusPill
+                            tone={r.data_origin === 'source' ? 'success' : 'warning'}
                             title={dataOriginTooltip(r.data_origin)}
                           >
                             {dataOriginLabel(r.data_origin)}
-                          </Badge>
+                          </StatusPill>
                         </div>
                       </div>
                       <button
                         type="button"
-                        className="shrink-0 rounded p-1 text-steel-400 hover:bg-steel-100 hover:text-steel-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                        className="shrink-0 rounded p-1 text-[var(--nc-faint)] hover:bg-[var(--nc-surface-hover)] hover:text-[var(--nc-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                         aria-label={`Убрать ${r.name}`}
                         onClick={() => removeId(r.id)}
                       >
@@ -341,15 +360,15 @@ export function ComparePage() {
                 const differs =
                   values.length > 1 && values.some((v) => String(v) !== String(values[0]))
                 return (
-                  <tr key={row.label} className={differs ? 'bg-amber-50/40' : undefined}>
-                    <td className="sticky left-0 z-10 bg-inherit px-3 py-1.5 text-steel-500">
+                  <tr key={row.label} className={differs ? 'bg-[var(--nc-warning-soft)]' : undefined}>
+                    <td className="sticky left-0 z-10 bg-inherit px-3 py-1.5 text-[var(--nc-muted)]">
                       {row.label}
                     </td>
                     {orderedRobots.map((r, i) => (
                       <td
                         key={`${row.label}-${r.id}`}
-                        className={`px-3 py-1.5 text-steel-800 ${
-                          String(values[i]) === NO_SOURCE_DATA ? 'text-steel-400' : ''
+                        className={`px-3 py-1.5 text-[var(--nc-ink)] ${
+                          String(values[i]) === NO_SOURCE_DATA ? 'text-[var(--nc-faint)]' : ''
                         }`}
                       >
                         {values[i]}
@@ -385,18 +404,18 @@ export function ComparePage() {
             placeholder="Например: AMR, MiR, Geek+"
             aria-label="Поиск решений"
           />
-          {pickerQuery.isLoading && <p className="text-sm text-steel-500">Загрузка каталога…</p>}
+          {pickerQuery.isLoading && <p className="text-sm text-[var(--nc-muted)]">Загрузка каталога…</p>}
           {pickerQuery.isError && (
-            <p className="text-sm text-red-600">{getFriendlyError(pickerQuery.error)}</p>
+            <p className="text-sm text-[var(--nc-danger)]">{getFriendlyError(pickerQuery.error)}</p>
           )}
           {!pickerQuery.isLoading && !pickerQuery.isError && pickerItems.length === 0 && (
-            <p className="py-6 text-center text-sm text-steel-500">
-              <Search className="mx-auto mb-2 h-5 w-5 text-steel-400" />
+            <p className="py-6 text-center text-sm text-[var(--nc-muted)]">
+              <Search className="mx-auto mb-2 h-5 w-5 text-[var(--nc-faint)]" />
               Ничего не найдено. Измените запрос.
             </p>
           )}
           {pickerItems.length > 0 && (
-            <ul className="divide-y divide-steel-100 rounded border border-steel-200">
+            <ul className="divide-y divide-[var(--nc-border-subtle)] rounded border border-[var(--nc-border)]">
               {pickerItems.map((r) => {
                 const selected = ids.includes(String(r.id))
                 const disabled = !selected && atLimit
@@ -406,8 +425,8 @@ export function ComparePage() {
                     className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-steel-900">{r.name}</p>
-                      <p className="text-xs text-steel-500">
+                      <p className="truncate font-medium text-[var(--nc-ink)]">{r.name}</p>
+                      <p className="text-xs text-[var(--nc-muted)]">
                         {(r.manufacturer_id != null && manufacturerMap.get(r.manufacturer_id)) ||
                           'Производитель не указан'}{' '}
                         · {formatKg(r.payload_kg)} · {formatCurrency(r.price_rub)}
@@ -440,7 +459,7 @@ export function ComparePage() {
               onPageChange={setPickerPage}
             />
           )}
-          <p className="text-xs text-steel-500">
+          <p className="text-xs text-[var(--nc-muted)]">
             Также можно добавить решение со страницы каталога или карточки робота.
           </p>
           <Button

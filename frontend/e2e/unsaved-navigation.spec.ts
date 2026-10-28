@@ -31,7 +31,7 @@ test.describe('unsaved params SPA guard', () => {
     await expect(page.getByTestId('unsaved-guard-dialog')).toHaveCount(0)
     await expect(page).toHaveURL(/\/app\/projects\/\d+/)
 
-    await mainNav.getByRole('link', { name: /Каталог решений/i }).click()
+    await mainNav.getByRole('link', { name: /Каталог/i }).click()
     await expect(page.getByTestId('unsaved-guard-dialog')).toBeVisible({ timeout: 10_000 })
     await page.getByTestId('unsaved-discard').click()
     await expect(page).toHaveURL(/\/app\/catalog/, { timeout: 15_000 })

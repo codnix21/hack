@@ -22,6 +22,8 @@ import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
 import { Badge } from '../ui/Badge'
 import { toastError, toastSuccess } from '../../store/toastStore'
+import { useThemeStore } from '../../store/themeStore'
+import { readCanvasColors } from '../../utils/chartTheme'
 import { dxfEntityTypeLabel } from '../../utils/labels'
 import {
   adaptiveGridStepM,
@@ -163,6 +165,23 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   const [historyLen, setHistoryLen] = useState(0)
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [draftPoints, setDraftPoints] = useState<{ x: number; y: number }[]>([])
+  const [inspectorOpen, setInspectorOpen] = useState(true)
+  const [narrowViewport, setNarrowViewport] = useState(false)
+  /** Пример-проект или узкий экран — без правки геометрии (просмотр + панорама). */
+  const editLocked = readOnly || narrowViewport
+  const theme = useThemeStore((s) => s.theme)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const apply = () => {
+      setNarrowViewport(mq.matches)
+      setInspectorOpen(!mq.matches)
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
 
   const query = useQuery({
     queryKey: ['project-layout', projectId],
@@ -290,19 +309,20 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     canvas.width = w
     canvas.height = h
 
-    ctx.fillStyle = '#e8edf3'
+    const colors = readCanvasColors()
+    ctx.fillStyle = colors.floor
     ctx.fillRect(0, 0, w, h)
 
     const origin = worldToScreen(0, 0, vp)
     const corner = worldToScreen(layout.width_m, layout.length_m, vp)
 
     // floor
-    ctx.fillStyle = '#f1f5f9'
+    ctx.fillStyle = colors.floor
     ctx.fillRect(origin.x, origin.y, corner.x - origin.x, corner.y - origin.y)
 
     // adaptive grid
     const stepM = adaptiveGridStepM(vp.zoom)
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)'
+    ctx.strokeStyle = colors.grid
     ctx.lineWidth = 1
     for (let xm = 0; xm <= layout.width_m + 1e-6; xm += stepM) {
       const p = worldToScreen(xm, 0, vp)
@@ -320,8 +340,8 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     }
 
     // warehouse border
-    ctx.strokeStyle = '#0f172a'
-    ctx.lineWidth = 2.5
+    ctx.strokeStyle = 'rgba(240, 115, 22, 0.55)'
+    ctx.lineWidth = 2
     ctx.strokeRect(origin.x, origin.y, corner.x - origin.x, corner.y - origin.y)
 
     const showLabels = vp.zoom >= 3
@@ -340,7 +360,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
       ctx.globalAlpha = o.id === selectedId ? 0.95 : 0.82
       ctx.fillRect(-ww / 2, -hh / 2, ww, hh)
       ctx.globalAlpha = 1
-      ctx.strokeStyle = o.id === selectedId ? '#ea580c' : '#1e293b'
+      ctx.strokeStyle = o.id === selectedId ? '#f07316' : 'rgba(255,255,255,0.35)'
       ctx.lineWidth = o.id === selectedId ? 2.5 : 1.1
       ctx.strokeRect(-ww / 2, -hh / 2, ww, hh)
       // kind mark
@@ -354,8 +374,8 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
         ctx.stroke()
       }
       if (showLabels) {
-        ctx.fillStyle = '#0f172a'
-        ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
+        ctx.fillStyle = 'rgba(242,244,248,0.9)'
+        ctx.font = '600 11px "IBM Plex Sans", system-ui, sans-serif'
         const label = String(o.name || o.kind || '').slice(0, 16)
         if (label && ww > 28) ctx.fillText(label, -ww / 2 + 4, -hh / 2 + 14)
       }
@@ -419,7 +439,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     ctx.fillStyle = '#334155'
     ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
     ctx.fillText(`${barM} м`, bx + barPx + 8, by + 4)
-  }, [layout, vp, selectedId, selectedRouteId, draftPoints, cursorM, canvasSize])
+  }, [layout, vp, selectedId, selectedRouteId, draftPoints, cursorM, canvasSize, theme])
 
   const selected = layout?.objects.find((o) => o.id === selectedId) || null
   const selectedRoute = layout?.routes?.find((r) => r.id === selectedRouteId) || null
@@ -459,7 +479,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   const finishDraftRoute = () => {
-    if (!layout || readOnly || draftPoints.length < 2) {
+    if (!layout || editLocked || draftPoints.length < 2) {
       if (draftPoints.length === 1) toastError('Нужны минимум 2 точки маршрута')
       return
     }
@@ -485,7 +505,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   const removeSelectedRoute = () => {
-    if (!layout || !selectedRouteId || readOnly) return
+    if (!layout || !selectedRouteId || editLocked) return
     commitLayout({
       ...layout,
       routes: (layout.routes || []).filter((r) => r.id !== selectedRouteId),
@@ -494,7 +514,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   const updateSelectedRoute = (patch: Partial<LayoutRoute>) => {
-    if (!layout || !selectedRouteId || readOnly) return
+    if (!layout || !selectedRouteId || editLocked) return
     commitLayout({
       ...layout,
       routes: (layout.routes || []).map((r) =>
@@ -517,7 +537,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- finishDraftRoute зависит от draft/layout
-  }, [tool, draftPoints, layout, readOnly])
+  }, [tool, draftPoints, layout, editLocked])
 
   const clampObject = (o: LayoutObject, x: number, y: number) => {
     if (!layout) return { x, y }
@@ -530,7 +550,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   const updateSelected = (patch: Partial<LayoutObject>) => {
-    if (!layout || !selectedId || readOnly) return
+    if (!layout || !selectedId || editLocked) return
     commitLayout({
       ...layout,
       objects: layout.objects.map((o) => (o.id === selectedId ? { ...o, ...patch } : o)),
@@ -538,7 +558,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   const addObject = (kind: string) => {
-    if (!layout || readOnly) return
+    if (!layout || editLocked) return
     const width = kind === 'rack' ? 8 : 4
     const height = kind === 'rack' ? 12 : 3
     // центр текущего вида в метрах
@@ -568,7 +588,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   const removeSelected = () => {
-    if (!layout || !selectedId || readOnly) return
+    if (!layout || !selectedId || editLocked) return
     if (selectedId === 'wall_contour') {
       toastError('Контур склада нельзя удалить')
       return
@@ -578,7 +598,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
   }
 
   if (query.isLoading || !layout) {
-    return <p className="text-sm text-steel-500">Загрузка плана…</p>
+    return <p className="text-sm text-[var(--nc-muted)]">Загрузка плана…</p>
   }
 
   const outOfBounds =
@@ -595,13 +615,13 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
         {layout.source === 'default_example' || layout.objects.some((o) => o.example) ? (
           <Badge variant="warning">Примерная геометрия</Badge>
         ) : null}
-        <span className="text-xs text-steel-500" data-testid="layout-undo-scope">
+        <span className="text-xs text-[var(--nc-muted)]" data-testid="layout-undo-scope">
           Undo локальный (до сохранения / перезагрузки)
         </span>
       </div>
 
       {/* Toolbar groups */}
-      <div className="flex flex-wrap items-center gap-2 rounded border border-steel-200 bg-white p-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-2">
         <div className="flex items-center gap-1" role="group" aria-label="Инструмент">
           <Button
             size="sm"
@@ -631,7 +651,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             <Hand className="h-3.5 w-3.5" />
             Панорама
           </Button>
-          {!readOnly && (
+          {!editLocked && (
             <Button
               size="sm"
               variant={tool === 'route' ? 'primary' : 'outline'}
@@ -649,19 +669,31 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             </Button>
           )}
         </div>
-        <div className="h-6 w-px bg-steel-200" aria-hidden />
+        <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
         <div className="flex items-center gap-1" role="group" aria-label="Вид">
-          <Button size="sm" variant="outline" data-testid="layout-zoom-out" onClick={() => setVp((v) => ({ ...v, zoom: Math.max(0.4, v.zoom / 1.25) }))}>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="layout-zoom-out"
+            aria-label="Уменьшить масштаб"
+            onClick={() => setVp((v) => ({ ...v, zoom: Math.max(0.4, v.zoom / 1.25) }))}
+          >
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="outline" data-testid="layout-zoom-in" onClick={() => setVp((v) => ({ ...v, zoom: Math.min(120, v.zoom * 1.25) }))}>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="layout-zoom-in"
+            aria-label="Увеличить масштаб"
+            onClick={() => setVp((v) => ({ ...v, zoom: Math.min(120, v.zoom * 1.25) }))}
+          >
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
           <Button size="sm" variant="outline" data-testid="layout-fit" onClick={fitToWarehouse} title="По размеру склада">
             <Maximize2 className="h-3.5 w-3.5" />
             По размеру
           </Button>
-          <label className="ml-1 flex cursor-pointer items-center gap-1.5 text-xs text-steel-600">
+          <label className="ml-1 flex cursor-pointer items-center gap-1.5 text-xs text-[var(--nc-muted)]">
             <input
               type="checkbox"
               checked={snap}
@@ -671,14 +703,14 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             Сетка
           </label>
         </div>
-        {!readOnly && (
+        {!editLocked && (
           <>
-            <div className="h-6 w-px bg-steel-200" aria-hidden />
+            <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
             <Button size="sm" variant="outline" data-testid="layout-undo" disabled={historyLen === 0} onClick={undoLayout}>
               <Undo2 className="h-3.5 w-3.5" />
               Отменить
             </Button>
-            <div className="h-6 w-px bg-steel-200" aria-hidden />
+            <div className="h-6 w-px bg-[var(--nc-border)]" aria-hidden />
             <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Объекты">
               <Button size="sm" variant="outline" data-testid="layout-add-rack" onClick={() => addObject('rack')}>
                 <Plus className="h-3.5 w-3.5" />
@@ -717,7 +749,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                   e.target.value = ''
                 }}
               />
-              <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded border border-steel-300 bg-white px-3 text-sm font-medium hover:bg-steel-50">
+              <span className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-3 text-sm font-medium text-[var(--nc-ink)] hover:border-brand-500/50">
                 <Upload className="h-3.5 w-3.5" />
                 DXF
               </span>
@@ -730,10 +762,19 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
         )}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+      {narrowViewport && !readOnly ? (
+        <p className="text-xs text-[var(--nc-warning)] lg:hidden" data-testid="layout-mobile-hint">
+          Режим просмотра на узком экране: правка объектов и маршрутов отключена. Откройте широкий
+          экран для редактирования — геометрия в метрах не меняется при просмотре.
+        </p>
+      ) : null}
+
+      <div
+        className={`grid gap-3 ${inspectorOpen ? 'lg:grid-cols-[minmax(0,1fr)_220px]' : ''}`}
+      >
         <div
           ref={wrapRef}
-          className="relative h-[min(72vh,680px)] min-h-[30rem] overflow-hidden rounded border border-steel-200 bg-[#eef0f4]"
+          className="relative h-[min(78vh,780px)] min-h-[32rem] overflow-hidden rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] nc-canvas-surface shadow-panel"
           data-testid="layout-canvas-wrap"
         >
           <canvas
@@ -758,7 +799,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 setPanDrag({ x: e.clientX, y: e.clientY, panX: vp.panX, panY: vp.panY })
                 return
               }
-              if (readOnly) return
+              if (editLocked) return
               if (tool === 'route') {
                 e.preventDefault()
                 const step = snap ? adaptiveGridStepM(vp.zoom) : 0
@@ -791,7 +832,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
               setPanDrag({ x: e.clientX, y: e.clientY, panX: vp.panX, panY: vp.panY })
             }}
             onDoubleClick={(e) => {
-              if (tool !== 'route' || readOnly) return
+              if (tool !== 'route' || editLocked) return
               e.preventDefault()
               finishDraftRoute()
             }}
@@ -811,7 +852,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 }))
                 return
               }
-              if (!drag || !layout || readOnly) return
+              if (!drag || !layout || editLocked) return
               const obj = layout.objects.find((o) => o.id === drag.id)
               if (!obj) return
               const next = clampObject(obj, x - drag.ox, y - drag.oy)
@@ -831,19 +872,19 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             }}
           />
           <div className="pointer-events-none absolute bottom-2 left-2 right-2 flex flex-wrap items-end justify-between gap-2">
-            <p className="rounded bg-white/90 px-2 py-1 text-xs text-steel-600 shadow-sm" data-testid="layout-size-label">
+            <p className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)]/95 px-2 py-1 text-xs text-[var(--nc-muted)]" data-testid="layout-size-label">
               Размер: {layout.width_m} × {layout.length_m} м · {formatArea(layout.width_m, layout.length_m)} м²
               {cursorM ? ` · курсор ${cursorM.x.toFixed(1)}, ${cursorM.y.toFixed(1)} м` : ''}
               {snap ? ` · шаг ${adaptiveGridStepM(vp.zoom)} м` : ''}
               {layoutRoutes.length ? ` · маршрутов ${layoutRoutes.length}` : ''}
             </p>
-            <p className="rounded bg-white/90 px-2 py-1 font-mono text-[11px] text-steel-500" data-testid="layout-zoom-label">
+            <p className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)]/95 px-2 py-1 font-mono text-[11px] text-[var(--nc-faint)]" data-testid="layout-zoom-label">
               {vp.zoom.toFixed(1)} px/м
             </p>
           </div>
-          {tool === 'route' && !readOnly ? (
-            <div className="absolute left-2 top-2 flex flex-wrap items-center gap-2 rounded border border-orange-200 bg-white/95 p-2 shadow-sm">
-              <p className="text-xs text-steel-700">
+          {tool === 'route' && !editLocked ? (
+            <div className="absolute left-2 top-2 flex flex-wrap items-center gap-2 rounded border border-[var(--nc-accent-line)] bg-[var(--nc-surface)]/95 p-2 shadow-sm">
+              <p className="text-xs text-[var(--nc-text)]">
                 Маршрут: клик — точка ({draftPoints.length})
                 {draftPoints.length >= 2
                   ? ` · ${routeLengthM(draftPoints).toFixed(1)} м`
@@ -866,14 +907,32 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
           ) : null}
         </div>
 
-        <div className="nc-panel space-y-3 p-3">
-          <p className="nc-section-label">Инспектор</p>
-          <p className="text-sm font-semibold text-ink">Размеры склада</p>
+        <div className="nc-panel space-y-3 p-3" data-testid="layout-inspector">
+          <div className="flex items-center justify-between gap-2">
+            <p className="nc-section-label">Инспектор</p>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2 text-xs"
+              data-testid="layout-inspector-toggle"
+              aria-expanded={inspectorOpen}
+              onClick={() => setInspectorOpen((v) => !v)}
+            >
+              {inspectorOpen ? 'Свернуть' : 'Показать'}
+            </Button>
+          </div>
+          {!inspectorOpen ? (
+            <p className="text-xs text-[var(--nc-muted)]">Свойства объекта скрыты — больше места для плана.</p>
+          ) : null}
+          {inspectorOpen ? (
+            <>
+          <p className="text-sm font-semibold text-[var(--nc-ink)]">Размеры объекта</p>
           <Input
             label="Ширина, м"
             type="number"
             step="0.1"
-            disabled={readOnly}
+            disabled={editLocked}
             value={String(layout.width_m)}
             onChange={(e) => {
               const width_m = Math.max(5, Number(e.target.value) || 5)
@@ -890,7 +949,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             label="Длина, м"
             type="number"
             step="0.1"
-            disabled={readOnly}
+            disabled={editLocked}
             value={String(layout.length_m)}
             onChange={(e) => {
               const length_m = Math.max(5, Number(e.target.value) || 5)
@@ -905,22 +964,22 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
           />
           {selectedRoute ? (
             <>
-              <p className="pt-2 text-sm font-semibold text-steel-800">Маршрут</p>
+              <p className="pt-2 text-sm font-semibold text-[var(--nc-ink)]">Маршрут</p>
               <Input
                 label="Название"
-                disabled={readOnly}
+                disabled={editLocked}
                 value={selectedRoute.name || ''}
                 onChange={(e) => updateSelectedRoute({ name: e.target.value })}
               />
-              <p className="text-xs text-steel-600">
+              <p className="text-xs text-[var(--nc-muted)]">
                 Точек: {selectedRoute.points.length} · длина{' '}
                 {routeLengthM(selectedRoute.points).toFixed(1)} м
               </p>
-              <p className="text-[11px] text-steel-500">
+              <p className="text-[11px] text-[var(--nc-muted)]">
                 В DES этот маршрут используется вместо авто-A*. Сохраните план.
               </p>
-              <p className="font-mono text-[10px] text-steel-400">ID: {selectedRoute.id}</p>
-              {!readOnly && (
+              <p className="font-mono text-[10px] text-[var(--nc-faint)]">ID: {selectedRoute.id}</p>
+              {!editLocked && (
                 <Button size="sm" variant="ghost" className="text-red-700" onClick={removeSelectedRoute}>
                   <Trash2 className="h-3.5 w-3.5" />
                   Удалить маршрут
@@ -929,16 +988,16 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             </>
           ) : selected ? (
             <>
-              <p className="pt-2 text-sm font-semibold text-steel-800">Объект</p>
+              <p className="pt-2 text-sm font-semibold text-[var(--nc-ink)]">Объект</p>
               <Input
                 label="Название"
-                disabled={readOnly}
+                disabled={editLocked}
                 value={selected.name}
                 onChange={(e) => updateSelected({ name: e.target.value })}
               />
               <Select
                 label="Тип"
-                disabled={readOnly || selected.id === 'wall_contour'}
+                disabled={editLocked || selected.id === 'wall_contour'}
                 value={selected.kind}
                 options={KIND_OPTIONS}
                 onChange={(e) => updateSelected({ kind: e.target.value })}
@@ -947,7 +1006,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 label="X, м"
                 type="number"
                 step="0.1"
-                disabled={readOnly}
+                disabled={editLocked}
                 value={String(selected.x)}
                 onChange={(e) => updateSelected({ x: Number(e.target.value) })}
               />
@@ -955,7 +1014,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 label="Y, м"
                 type="number"
                 step="0.1"
-                disabled={readOnly}
+                disabled={editLocked}
                 value={String(selected.y)}
                 onChange={(e) => updateSelected({ y: Number(e.target.value) })}
               />
@@ -963,7 +1022,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 label="Ширина, м"
                 type="number"
                 step="0.1"
-                disabled={readOnly}
+                disabled={editLocked}
                 value={String(selected.width)}
                 onChange={(e) => updateSelected({ width: Math.max(0.2, Number(e.target.value)) })}
               />
@@ -971,7 +1030,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 label="Длина, м"
                 type="number"
                 step="0.1"
-                disabled={readOnly}
+                disabled={editLocked}
                 value={String(selected.height)}
                 onChange={(e) => updateSelected({ height: Math.max(0.2, Number(e.target.value)) })}
               />
@@ -979,21 +1038,21 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                 label="Поворот, °"
                 type="number"
                 step="5"
-                disabled={readOnly || selected.id === 'wall_contour'}
+                disabled={editLocked || selected.id === 'wall_contour'}
                 value={String(selected.rotation || 0)}
                 onChange={(e) => updateSelected({ rotation: Number(e.target.value) || 0 })}
                 data-testid="layout-rotation-input"
               />
-              <p className="text-[11px] text-steel-500" data-testid="layout-rotation-note">
+              <p className="text-[11px] text-[var(--nc-muted)]" data-testid="layout-rotation-note">
                 Поворот учитывается в редакторе, hit-test и A* (OBB). Не CAD-точность.
               </p>
               {outOfBounds ? (
-                <p className="text-xs text-amber-800" data-testid="layout-oob-warning">
+                <p className="text-xs text-[var(--nc-warning)]" data-testid="layout-oob-warning">
                   Объект выходит за границы склада — скорректируйте координаты или размеры.
                 </p>
               ) : null}
-              <p className="font-mono text-[10px] text-steel-400">ID: {selected.id}</p>
-              {!readOnly && (
+              <p className="font-mono text-[10px] text-[var(--nc-faint)]">ID: {selected.id}</p>
+              {!editLocked && (
                 <Button size="sm" variant="ghost" className="text-red-700" onClick={removeSelected}>
                   <Trash2 className="h-3.5 w-3.5" />
                   Удалить
@@ -1001,20 +1060,20 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
               )}
             </>
           ) : (
-            <div className="space-y-2 text-xs text-steel-600">
-              <p className="font-medium text-steel-800">Ничего не выбрано</p>
+            <div className="space-y-2 text-xs text-[var(--nc-muted)]">
+              <p className="font-medium text-[var(--nc-ink)]">Ничего не выбрано</p>
               <p>Клик по объекту — свойства. Колёсико — масштаб, пустая область — панорама.</p>
-              <p className="text-steel-500">
+              <p className="text-[var(--nc-muted)]">
                 Инструмент «Маршрут» — выставить точки вручную (оранжевая линия). Без ручных
                 маршрутов DES строит пути через A*.
               </p>
               {layoutRoutes.length > 0 ? (
-                <ul className="space-y-1 border-t border-steel-100 pt-2">
+                <ul className="space-y-1 border-t border-[var(--nc-border-subtle)] pt-2">
                   {layoutRoutes.map((r) => (
                     <li key={r.id}>
                       <button
                         type="button"
-                        className="w-full rounded px-1 py-0.5 text-left hover:bg-steel-50"
+                        className="w-full rounded px-1 py-0.5 text-left hover:bg-[var(--nc-surface-hover)]"
                         onClick={() => {
                           setSelectedRouteId(r.id)
                           setSelectedId(null)
@@ -1028,19 +1087,21 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
               ) : null}
             </div>
           )}
+            </>
+          ) : null}
         </div>
       </div>
 
       {dxfPreview && (
-        <div className="rounded border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-950">Импорт DXF — предварительный просмотр</p>
-          <p className="mt-1 text-xs text-amber-900">
+        <div className="rounded border border-[rgba(245,193,74,0.4)] bg-[var(--nc-warning-soft)] p-4">
+          <p className="text-sm font-semibold text-[var(--nc-warning)]">Импорт DXF — предварительный просмотр</p>
+          <p className="mt-1 text-xs text-[var(--nc-warning)]">
             Линии не считаются стенами автоматически. Назначьте тип и масштаб, затем подтвердите.
           </p>
           <div className="mt-3 max-h-48 overflow-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="text-steel-600">
+                <tr className="text-[var(--nc-muted)]">
                   <th className="py-1">Элемент чертежа</th>
                   <th>Слой</th>
                   <th>Назначить</th>
@@ -1051,12 +1112,12 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
                   <tr key={e.id} className="border-t border-amber-100">
                     <td className="py-1" title={`CAD: ${e.dxftype}`}>
                       {dxfEntityTypeLabel(e.dxftype)}
-                      <span className="ml-1 text-[10px] text-steel-400">({e.dxftype})</span>
+                      <span className="ml-1 text-[10px] text-[var(--nc-faint)]">({e.dxftype})</span>
                     </td>
                     <td>{e.layer || '—'}</td>
                     <td>
                       <select
-                        className="rounded border border-steel-300 bg-white px-1 py-0.5"
+                        className="rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-1 py-0.5"
                         value={e.kind || e.suggested_kind}
                         onChange={(ev) => {
                           const next = { ...dxfPreview, entities: [...dxfPreview.entities] }
@@ -1095,7 +1156,7 @@ export function WarehouseLayoutEditor({ projectId, readOnly = false }: Props) {
             </Button>
           </div>
           {(dxfPreview.warnings || []).slice(0, 3).map((w) => (
-            <p key={w} className="mt-1 text-xs text-amber-800">
+            <p key={w} className="mt-1 text-xs text-[var(--nc-warning)]">
               {w}
             </p>
           ))}

@@ -87,7 +87,7 @@ function HeroPlanVisual() {
         ZONE A · STORAGE
       </text>
       <text x="1180" y="780" fill="rgba(255,255,255,0.28)" fontSize="13" fontFamily="ui-monospace, monospace">
-        AMR PATH · DEMO
+        МАРШРУТ · NETCORE
       </text>
     </svg>
   )
@@ -112,7 +112,7 @@ export function LandingPage() {
   }
 
   return (
-    <div className="landing-page min-h-screen bg-steel-50 text-steel-800">
+    <div className="landing-page min-h-screen bg-[var(--nc-surface-muted)] text-[var(--nc-ink)]">
       {/* HERO — одно полотно на первый экран */}
       <header className="relative min-h-[100svh] overflow-hidden text-white">
         <HeroPlanVisual />
@@ -125,7 +125,7 @@ export function LandingPage() {
             </span>
             <Link
               to="/login"
-              className="nc-focusable text-sm font-medium text-steel-200 underline-offset-4 hover:text-white hover:underline"
+              className="nc-focusable text-sm font-medium text-[var(--nc-text)] underline-offset-4 hover:text-white hover:underline"
             >
               Войти
             </Link>
@@ -138,8 +138,8 @@ export function LandingPage() {
             <h1 className="landing-rise landing-rise-delay-1 mt-5 max-w-xl font-display text-2xl font-semibold leading-tight text-white sm:text-3xl lg:text-4xl">
               Оценка роботизации склада до закупки оборудования
             </h1>
-            <p className="landing-rise landing-rise-delay-2 mt-3 max-w-md text-base leading-relaxed text-steel-300 sm:text-lg">
-              Подбор AMR/AGV, расчёт CAPEX и эффекта, схема работы на плане объекта.
+            <p className="landing-rise landing-rise-delay-2 mt-3 max-w-md text-base leading-relaxed text-[var(--nc-faint)] sm:text-lg">
+              Подбор AMR/AGV, расчёт инвестиций и эффекта, схема работы на плане объекта.
             </p>
             <div className="landing-rise landing-rise-delay-3 mt-8 flex flex-wrap gap-3">
               <Button
@@ -148,7 +148,7 @@ export function LandingPage() {
                 onClick={() => void startGuest('/app/demo')}
                 className="min-w-[12rem]"
               >
-                Смотреть демо
+                Смотреть примеры
               </Button>
               <Button
                 size="lg"
@@ -165,12 +165,12 @@ export function LandingPage() {
       </header>
 
       {/* Одна задача: что получает клиент */}
-      <section className="border-b border-steel-200 bg-white px-5 py-16 sm:px-8 lg:px-12">
+      <section className="border-b border-[var(--nc-border)] bg-[var(--nc-surface)] px-5 py-16 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-3xl">
-          <h2 className="font-display text-2xl font-semibold text-ink sm:text-3xl">
+          <h2 className="font-display text-2xl font-semibold text-[var(--nc-ink)] sm:text-3xl">
             От цифр объекта — к решению для руководства
           </h2>
-          <p className="mt-3 text-base leading-relaxed text-steel-600">
+          <p className="mt-3 text-base leading-relaxed text-[var(--nc-text)]">
             NETCORE собирает исходные данные, отбирает решения из каталога и считает экономику
             так, чтобы можно было обсуждать внедрение с фактами, а не с презентацией «из воздуха».
           </p>
@@ -178,23 +178,23 @@ export function LandingPage() {
       </section>
 
       {/* Одна задача: путь */}
-      <section className="border-b border-steel-200 bg-steel-50 px-5 py-16 sm:px-8 lg:px-12">
+      <section className="border-b border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-5 py-16 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-5xl">
-          <h2 className="font-display text-2xl font-semibold text-ink sm:text-3xl">Как проходит оценка</h2>
-          <p className="mt-2 max-w-xl text-steel-600">
+          <h2 className="font-display text-2xl font-semibold text-[var(--nc-ink)] sm:text-3xl">Как проходит оценка</h2>
+          <p className="mt-2 max-w-xl text-[var(--nc-text)]">
             Четыре шага — от параметров площадки до отчёта. Без заполнения всего каталога полей.
           </p>
           <ol className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               ['01', 'Объект', 'Пик нагрузки, персонал, цена решения — минимум для расчёта'],
               ['02', 'Подбор', 'Кандидаты AMR/AGV по параметрам и ограничениям площадки'],
-              ['03', 'Экономика', 'CAPEX, эффект, окупаемость, сценарии покупки и RaaS'],
-              ['04', 'План и отчёт', 'Схема на плане, DES-демо, PDF/Excel для руководства'],
+              ['03', 'Экономика', 'Инвестиции, эффект, окупаемость, сценарии покупки и аренды'],
+              ['04', 'План и отчёт', 'Схема на плане, DES, PDF/Excel для руководства'],
             ].map(([n, t, d]) => (
               <li key={n} className="border-t border-brand-600 pt-4">
-                <p className="font-mono text-xs tracking-widest text-brand-700">{n}</p>
-                <p className="mt-2 font-display text-lg font-semibold text-ink">{t}</p>
-                <p className="mt-1 text-sm leading-relaxed text-steel-600">{d}</p>
+                <p className="font-mono text-xs tracking-widest text-[var(--nc-accent)]">{n}</p>
+                <p className="mt-2 font-display text-lg font-semibold text-[var(--nc-ink)]">{t}</p>
+                <p className="mt-1 text-sm leading-relaxed text-[var(--nc-text)]">{d}</p>
               </li>
             ))}
           </ol>
@@ -202,21 +202,21 @@ export function LandingPage() {
       </section>
 
       {/* Одна задача: для кого */}
-      <section className="border-b border-steel-200 bg-white px-5 py-16 sm:px-8 lg:px-12">
+      <section className="border-b border-[var(--nc-border)] bg-[var(--nc-surface)] px-5 py-16 sm:px-8 lg:px-12">
         <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-end">
           <div>
-            <h2 className="font-display text-2xl font-semibold text-ink sm:text-3xl">
+            <h2 className="font-display text-2xl font-semibold text-[var(--nc-ink)] sm:text-3xl">
               Для команд, которые выбирают роботизацию
             </h2>
-            <p className="mt-3 text-steel-600">
+            <p className="mt-3 text-[var(--nc-text)]">
               Операционные директора, инженеры по автоматизации и интеграторы — когда нужно быстро
               понять масштаб инвестиций и сравнить варианты до обследования объекта.
             </p>
           </div>
-          <ul className="space-y-3 text-sm text-steel-700">
+          <ul className="space-y-3 text-sm text-[var(--nc-text)]">
             <li className="border-l-2 border-brand-600 pl-3">Складская логистика и fulfilment</li>
-            <li className="border-l-2 border-steel-200 pl-3">Аэропортовые и сервисные зоны</li>
-            <li className="border-l-2 border-steel-200 pl-3">Медицинская внутриобъектовая логистика</li>
+            <li className="border-l-2 border-[var(--nc-border)] pl-3">Аэропортовые и сервисные зоны</li>
+            <li className="border-l-2 border-[var(--nc-border)] pl-3">Медицинская внутриобъектовая логистика</li>
           </ul>
         </div>
       </section>
@@ -229,20 +229,20 @@ export function LandingPage() {
               NETCORE
             </p>
             <h2 className="mt-3 font-display text-2xl font-semibold sm:text-3xl">
-              Откройте демо или начните свой проект
+              Откройте примеры или начните свой проект
             </h2>
-            <p className="mt-2 text-steel-300">
+            <p className="mt-2 text-[var(--nc-faint)]">
               Гостевая сессия — без регистрации. Результат предварительный и требует проверки на
               объекте.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button size="lg" loading={guestLoading} onClick={() => void startGuest('/app/demo')}>
-              Смотреть демо
+              Смотреть примеры
             </Button>
             <Link
               to="/login"
-              className="nc-focusable inline-flex h-11 items-center rounded border border-white/25 px-5 text-sm font-medium text-white hover:bg-white/10"
+              className="nc-focusable inline-flex h-11 items-center rounded border border-white/25 px-5 text-sm font-medium text-white hover:bg-[var(--nc-surface)]/10"
             >
               Войти
             </Link>
@@ -250,9 +250,9 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-steel-200 bg-steel-50 px-5 py-6 text-xs text-steel-500 sm:px-8 lg:px-12">
+      <footer className="border-t border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-5 py-6 text-xs text-[var(--nc-muted)] sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2">
-          <span className="font-display font-semibold tracking-wide text-steel-700">NETCORE</span>
+          <span className="font-display font-semibold tracking-wide text-[var(--nc-text)]">NETCORE</span>
           <span>Предынвестиционная оценка · не замена обследования объекта</span>
         </div>
       </footer>

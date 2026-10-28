@@ -36,7 +36,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-[var(--nc-bg)]">
       {sidebarOpen && (
         <button
           type="button"
@@ -53,8 +53,10 @@ export function AppShell() {
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setSidebarOpen((v) => !v)} />
-        <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-5">
-          <Outlet />
+        <main className="app-main flex-1 overflow-auto">
+          <div className="app-main-inner">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -488,14 +488,38 @@ def calculate(
     )
     db.add(calc)
 
+    # Upsert Scenario — иначе Excel/PDF «Сценарии» пустые (раньше обновляли только существующие строки)
+    scenario_names = {
+        "baseline": "Без роботизации",
+        "purchase": "Покупка оборудования",
+        "raas": "Роботы как услуга",
+    }
+    sc_code = str(req.scenario or inputs.get("scenario") or "purchase")
     sc = (
         db.query(Scenario)
-        .filter(Scenario.project_id == project_id, Scenario.code == req.scenario)
+        .filter(Scenario.project_id == project_id, Scenario.code == sc_code)
         .first()
     )
+    sc_params = {
+        k: inputs[k]
+        for k in ("peak_demand", "productivity", "utilization", "availability", "reserve", "years")
+        if k in inputs
+    }
     if sc:
         sc.results = result
-        sc.params = {k: inputs[k] for k in ("peak_demand", "productivity", "utilization", "availability", "reserve", "years")}
+        sc.params = sc_params
+        if not sc.name_ru:
+            sc.name_ru = scenario_names.get(sc_code, sc_code)
+    else:
+        db.add(
+            Scenario(
+                project_id=project_id,
+                code=sc_code,
+                name_ru=scenario_names.get(sc_code, sc_code),
+                params=sc_params,
+                results=result,
+            )
+        )
 
     project.last_calc_at = utcnow()
     project.updated_at = utcnow()
@@ -575,6 +599,8 @@ def what_if(
         return {**payload, "read_only": True}
 
     # Persist last what-if on latest calculation so Excel/PDF export can include it
+    from sqlalchemy.orm.attributes import flag_modified
+
     last = (
         db.query(Calculation)
         .filter(Calculation.project_id == project_id)
@@ -585,9 +611,21 @@ def what_if(
         results = dict(last.results or {})
         results["what_if"] = payload
         last.results = results
-        from sqlalchemy.orm.attributes import flag_modified
-
         flag_modified(last, "results")
+        db.commit()
+    else:
+        # Ещё не было сохранённого расчёта — создаём версию, иначе отчёт не увидит «что если»
+        calc = Calculation(
+            project_id=project_id,
+            version=1,
+            model_version=settings.MODEL_VERSION,
+            author_id=user.id,
+            inputs=base_inputs,
+            assumptions=base_inputs.get("assumptions"),
+            results={**base_result, "what_if": payload},
+            changed_params=None,
+        )
+        db.add(calc)
         db.commit()
 
     return payload

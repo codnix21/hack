@@ -29,7 +29,7 @@ export const PROJECT_STATUS_LABELS: Record<string, string> = {
   active: 'Активный',
   archived: 'В архиве',
   completed: 'Завершён',
-  demo: 'Демонстрационный',
+  demo: 'Пример',
 }
 
 export const ASSUMPTION_LABELS: Record<string, string> = {
@@ -52,7 +52,7 @@ export const ASSUMPTION_LABELS: Record<string, string> = {
   current_labor_cost_year: 'Годовые затраты на персонал, ₽/год',
   labor_reduction_share: 'Ожидаемая доля сокращения трудозатрат (допущение)',
   additional_revenue: 'Дополнительная выручка, ₽/год',
-  raas_monthly_per_robot: 'Аренда (RaaS) в месяц на робота, ₽',
+  raas_monthly_per_robot: 'Аренда в месяц на робота, ₽',
   unit_price: 'Цена решения, ₽',
   unit_price_assumed: 'Допущение цены решения',
   unit_price_origin: 'Источник цены',
@@ -64,7 +64,7 @@ export const ASSUMPTION_LABELS: Record<string, string> = {
   productivity_ops_per_hour: 'Производительность в расчёте, оп/ч',
   productivity_origin: 'Источник производительности',
   productivity_model_fallback: 'Производительность — допущение модели (50 оп/ч)',
-  productivity_model_fallback_note: 'Пояснение к fallback производительности',
+  productivity_model_fallback_note: 'Пояснение к запасной производительности модели',
   robots_count: 'Количество роботов',
   software_cost: 'Стоимость ПО, ₽',
   maintenance_year: 'Обслуживание, ₽/год',
@@ -91,16 +91,16 @@ export const BREAKDOWN_LABELS: Record<string, string> = {
   charging_stations_count: 'Число зарядных станций',
   current_labor: 'Текущие затраты на труд',
   current_cost_reduction: 'Снижение текущих затрат',
-  incremental_opex: 'Прирост OPEX',
+  incremental_opex: 'Прирост эксплуатационных расходов',
   additional_revenue: 'Дополнительная выручка',
 }
 
 export const FORMULA_LABELS: Record<string, string> = {
   robots_count: 'Количество роботов',
   количество_роботов: 'Количество роботов',
-  capex: 'Капитальные затраты (CAPEX)',
-  opex: 'Эксплуатационные расходы (OPEX)',
-  opex_annual: 'Эксплуатационные расходы (OPEX), ₽/год',
+  capex: 'Капитальные затраты',
+  opex: 'Эксплуатационные расходы',
+  opex_annual: 'Эксплуатационные расходы, ₽/год',
   annual_effect: 'Годовой экономический эффект',
   net_annual_effect: 'Чистый годовой экономический эффект',
   gross_operating_effect: 'Валовой операционный эффект',
@@ -108,12 +108,12 @@ export const FORMULA_LABELS: Record<string, string> = {
   net_effect: 'Чистый годовой эффект',
   payback: 'Срок окупаемости',
   payback_years: 'Срок окупаемости',
-  roi: 'Рентабельность инвестиций (ROI)',
-  roi_percent: 'Рентабельность инвестиций (ROI)',
-  roi_horizon: 'Рентабельность за горизонт анализа (ROI)',
-  tco: 'Совокупная стоимость владения в границах модели (TCO)',
-  npv: 'Чистая приведённая стоимость (NPV)',
-  irr: 'Внутренняя норма доходности (IRR)',
+  roi: 'Рентабельность инвестиций',
+  roi_percent: 'Рентабельность инвестиций',
+  roi_horizon: 'Рентабельность за горизонт анализа',
+  tco: 'Совокупная стоимость владения в границах модели',
+  npv: 'Чистая приведённая стоимость',
+  irr: 'Внутренняя норма доходности',
   depreciation: 'Амортизация',
   annual_effect_with_depreciation: 'Годовой эффект с учётом амортизации',
   fleet_capacity: 'Расчётная пропускная способность парка',
@@ -121,17 +121,17 @@ export const FORMULA_LABELS: Record<string, string> = {
   cf: 'Денежный поток',
 }
 
-/** Краткие KPI-подписи для карточек (с расшифровкой акронима). */
+/** Краткие KPI-подписи для карточек. */
 export const METRIC_LABELS: Record<string, string> = {
-  capex: 'Капитальные затраты (CAPEX)',
-  opex: 'Эксплуатационные расходы (OPEX)',
-  opex_year: 'Эксплуатационные расходы (OPEX) / год',
+  capex: 'Капитальные затраты',
+  opex: 'Эксплуатационные расходы',
+  opex_year: 'Эксплуатационные расходы / год',
   annual_effect: 'Годовой экономический эффект',
   payback: 'Срок окупаемости',
-  roi: 'Рентабельность инвестиций (ROI)',
-  tco: 'Совокупная стоимость владения (TCO)',
-  npv: 'Чистая приведённая стоимость (NPV)',
-  irr: 'Внутренняя норма доходности (IRR)',
+  roi: 'Рентабельность инвестиций',
+  tco: 'Совокупная стоимость владения',
+  npv: 'Чистая приведённая стоимость',
+  irr: 'Внутренняя норма доходности',
   robots_count: 'Количество роботов',
   depreciation: 'Амортизация',
   fleet_capacity: 'Пропускная способность парка',
@@ -320,8 +320,8 @@ export const AVAILABILITY_STATUS_LABELS: Record<string, string> = {
 
 export const ACQUISITION_MODEL_LABELS: Record<string, string> = {
   purchase: 'Покупка',
-  raas: 'Аренда (RaaS)',
-  both: 'Покупка и аренда (RaaS)',
+  raas: 'Аренда',
+  both: 'Покупка и аренда',
   lease: 'Лизинг',
 }
 
@@ -343,7 +343,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'project.delete': 'Удаление проекта',
   'project.copy': 'Копирование проекта',
   'project.params_import': 'Импорт параметров проекта',
-  'demo.clone': 'Копирование демо-проекта',
+  'demo.clone': 'Копирование примера проекта',
   'scenario.update': 'Обновление сценария',
   'economics.calculate': 'Расчёт экономики',
   'matching.run': 'Запуск подбора',
@@ -382,7 +382,7 @@ export const ENTITY_TYPE_LABELS: Record<string, string> = {
   scenario: 'Сценарий',
 }
 
-/** Происхождение значения в экономике / what-if */
+/** Происхождение значения в экономике и анализе «что если» */
 export const VALUE_SOURCE_LABELS: Record<string, string> = {
   assumption: 'Допущение',
   default: 'Допущение',
@@ -415,7 +415,7 @@ export function confirmationLevelLabel(value?: string | null): string {
 export function dataOriginLabel(value?: string | null): string {
   if (value === 'source') return 'Исходные материалы'
   if (value === 'enriched') return 'Обогащённые данные'
-  return 'Демонстрационные данные'
+  return 'Данные каталога платформы'
 }
 
 /** Подсказка для бейджа происхождения */
@@ -426,7 +426,7 @@ export function dataOriginTooltip(value?: string | null): string {
   if (value === 'enriched') {
     return 'Карточка из исходных материалов, дополнена сведениями из DOCX-примеров'
   }
-  return 'Демонстрационные данные используются для показа возможностей платформы'
+  return 'Данные из каталога платформы'
 }
 
 export function matchStatusLabel(value?: string | null): string {
@@ -656,7 +656,7 @@ export function catalogStatsLabel(total: number, hasSourceData: boolean): string
   if (hasSourceData) {
     return `Каталог из исходных материалов. Всего в базе (с учётом фильтров): ${total}.`
   }
-  return 'Демонстрационный каталог. После импорта исходных материалов отобразятся решения из файла catalog_export_v4.csv.'
+  return 'Платформенный каталог. После импорта исходных материалов отобразятся решения из файла catalog_export_v4.csv.'
 }
 
 export function matchStatusIcon(status?: string | null): string {

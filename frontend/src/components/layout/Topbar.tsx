@@ -1,8 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, Menu, Settings, UserRound } from 'lucide-react'
+import { LogOut, Menu, Moon, Settings, Sun, UserRound } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
+import { useThemeStore } from '../../store/themeStore'
 import { Button } from '../ui/Button'
-import { Badge } from '../ui/Badge'
+import { StatusPill } from '../ui/StatusPill'
 
 interface TopbarProps {
   onMenuClick?: () => void
@@ -11,6 +12,8 @@ interface TopbarProps {
 export function Topbar({ onMenuClick }: TopbarProps) {
   const navigate = useNavigate()
   const { user, isGuest, logout } = useAuthStore()
+  const theme = useThemeStore((s) => s.theme)
+  const toggleTheme = useThemeStore((s) => s.toggleTheme)
 
   const handleLogout = async () => {
     await logout()
@@ -18,8 +21,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   return (
-    <header className="flex h-12 items-center justify-between border-b border-steel-200 bg-white/90 px-3 backdrop-blur-sm sm:px-5">
-      <div className="flex items-center gap-2">
+    <header
+      className="flex shrink-0 items-center justify-between border-b border-[var(--nc-border-subtle)] bg-[var(--nc-bg-elevated)]/95 px-3 backdrop-blur sm:px-4"
+      style={{ height: 'var(--nc-topbar-h)' }}
+    >
+      <div className="flex min-w-0 items-center gap-2">
         <Button
           variant="ghost"
           size="sm"
@@ -29,17 +35,34 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <p className="hidden text-sm text-steel-500 lg:block">Рабочее пространство оценки</p>
+        <p className="nc-meta hidden truncate lg:block">
+          Предынвестиционная оценка · план · экономика · симуляция
+        </p>
       </div>
-      <div className="flex items-center gap-2 sm:gap-3">
-        {isGuest && <Badge variant="warning">Гостевой режим</Badge>}
-        <div className="flex items-center gap-2 text-sm text-steel-700">
-          <UserRound className="h-4 w-4 text-steel-400" />
-          <span className="max-w-[8rem] truncate sm:max-w-none">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+          title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+          data-testid="theme-toggle"
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          <span className="hidden sm:inline">{theme === 'dark' ? 'Светлая' : 'Тёмная'}</span>
+        </Button>
+        {isGuest && (
+          <StatusPill tone="warning" title="Гостевая сессия ограничена по сроку">
+            Гость
+          </StatusPill>
+        )}
+        <div className="flex min-w-0 items-center gap-1.5 text-sm text-[var(--nc-text)]">
+          <UserRound className="h-4 w-4 shrink-0 text-[var(--nc-muted)]" aria-hidden />
+          <span className="max-w-[7rem] truncate sm:max-w-[12rem] text-[var(--nc-ink)]">
             {user?.full_name || user?.email || 'Пользователь'}
           </span>
         </div>
-        <Link to="/app/settings">
+        <Link to="/app/settings" className="lg:hidden">
           <Button variant="ghost" size="sm" aria-label="Настройки">
             <Settings className="h-4 w-4" />
           </Button>

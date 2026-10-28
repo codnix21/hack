@@ -1,17 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, ExternalLink, FileSpreadsheet, FileText, Link2, Play, Share2 } from 'lucide-react'
 import { economicsApi, matchingApi, visualizationApi } from '../../api/economics'
 import { projectsApi } from '../../api/projects'
 import { getFriendlyError } from '../../api/client'
 import { useAuthStore } from '../../store/authStore'
+import { useThemeStore } from '../../store/themeStore'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { formatCurrency, formatNumber, formatPayback, formatPercent } from '../../utils/format'
 import { matchStatusLabel, metricLabel, workModeLabel } from '../../utils/labels'
 import { toastError, toastSuccess } from '../../store/toastStore'
-import type { Project } from '../../types'
+import { zoneFill, zoneStroke } from '../warehouse/drawHelpers'
+import type { Project, VisualizationLayout } from '../../types'
 
 interface Props {
   project: Project
@@ -115,18 +117,32 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
 
   return (
     <div className="space-y-5">
-      <div className="rounded border border-steel-800 bg-ink px-6 py-7 text-white sm:px-7 sm:py-8">
-        <p className="nc-section-label text-brand-400">Итог для руководства</p>
-        <h2 className="mt-2 font-display text-2xl font-semibold leading-snug break-words sm:text-3xl">
+      <div className="nc-command-frame relative overflow-hidden px-6 py-7 sm:px-7 sm:py-8">
+        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--nc-accent)]">
+          Итог для руководства
+        </p>
+        <h2 className="mt-2 font-display text-2xl font-semibold leading-snug break-words text-[var(--nc-ink)] sm:text-3xl">
           {project.name}
         </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-steel-300">
+        <p className="nc-body mt-2 max-w-2xl">
           {project.description || 'Предварительная оценка роботизации склада'}
         </p>
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-steel-400">
-          {area != null && <span>Площадь ≈ {formatNumber(area, 0)} м²</span>}
-          {project.work_mode && <span>· Режим {workModeLabel(project.work_mode)}</span>}
-          {project.region && <span>· {project.region}</span>}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {area != null && (
+            <span className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-2.5 py-1 font-mono text-[11px] text-[var(--nc-text)]">
+              Площадь ≈ {formatNumber(area, 0)} м²
+            </span>
+          )}
+          {project.work_mode && (
+            <span className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-2.5 py-1 font-mono text-[11px] text-[var(--nc-text)]">
+              Режим {workModeLabel(project.work_mode)}
+            </span>
+          )}
+          {project.region && (
+            <span className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-2.5 py-1 font-mono text-[11px] text-[var(--nc-text)]">
+              {project.region}
+            </span>
+          )}
           {isGuest && <Badge variant="warning">Гостевая сессия</Badge>}
         </div>
       </div>
@@ -221,7 +237,7 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
                   href={shareUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 items-center gap-2 rounded border border-steel-300 px-3 text-sm hover:bg-steel-50"
+                  className="inline-flex h-10 items-center gap-2 rounded border border-[var(--nc-border)] px-3 text-sm text-[var(--nc-text)] hover:bg-[var(--nc-surface-hover)]"
                 >
                   <ExternalLink className="h-4 w-4" />
                   Открыть
@@ -236,28 +252,61 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
       </div>
 
       {shareUrl && (
-        <p className="flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p className="flex items-center gap-2 rounded border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
           <Link2 className="h-4 w-4" />
           Публичная ссылка (только чтение): {shareUrl}
         </p>
       )}
 
+      {econ && (
+        <div
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          data-testid="report-kpi-strip"
+        >
+          <HeroKpi label={metricLabel('capex')} value={formatCurrency(econ.capex?.capex)} />
+          <HeroKpi
+            label={metricLabel('annual_effect')}
+            value={formatCurrency(
+              econ.annual_effect?.net_annual_effect ?? econ.annual_effect?.annual_effect,
+            )}
+          />
+          <HeroKpi label={metricLabel('payback')} value={formatPayback(econ.payback)} />
+          <HeroKpi
+            label={metricLabel('roi')}
+            value={
+              econ.roi?.roi_percent != null
+                ? formatPercent(Number(econ.roi.roi_percent))
+                : 'Нет данных'
+            }
+          />
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Параметры склада">
-          <dl className="space-y-2 text-sm">
-            <Row k="Площадь" v={area != null ? `${formatNumber(area, 0)} м²` : 'Не задана'} />
-            <Row k="Ширина" v={params.area_width_m != null ? `${params.area_width_m} м` : '—'} />
-            <Row k="Длина" v={params.area_length_m != null ? `${params.area_length_m} м` : '—'} />
-            <Row
-              k="Пиковая нагрузка"
-              v={params.peak_demand != null ? `${params.peak_demand} оп/ч` : '—'}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ParamTile label="Площадь" value={area != null ? `${formatNumber(area, 0)} м²` : 'Не задана'} />
+            <ParamTile
+              label="Ширина"
+              value={params.area_width_m != null ? `${params.area_width_m} м` : '—'}
             />
-            <Row k="Проходы" v={params.aisle_width_mm != null ? `${params.aisle_width_mm} мм` : '—'} />
-          </dl>
+            <ParamTile
+              label="Длина"
+              value={params.area_length_m != null ? `${params.area_length_m} м` : '—'}
+            />
+            <ParamTile
+              label="Пиковая нагрузка"
+              value={params.peak_demand != null ? `${params.peak_demand} оп/ч` : '—'}
+            />
+            <ParamTile
+              label="Проходы"
+              value={params.aisle_width_mm != null ? `${params.aisle_width_mm} мм` : '—'}
+            />
+          </div>
         </Card>
 
         <Card title="Ключевые показатели для решения">
-          {econQuery.isLoading && <p className="text-sm text-steel-500">Расчёт…</p>}
+          {econQuery.isLoading && <p className="text-sm text-[var(--nc-muted)]">Расчёт…</p>}
           {econ && (
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <Kpi label={metricLabel('robots_count')} value={formatNumber(econ.robots_count)} />
@@ -292,28 +341,31 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
 
       <Card title="План склада" subtitle="Вид сверху по сохранённой геометрии">
         {layoutQuery.data ? (
-          <div className="overflow-hidden rounded border border-steel-100 bg-steel-50 p-3">
-            <MiniPlan layout={layoutQuery.data} />
-          </div>
+          <MiniPlan layout={layoutQuery.data} />
         ) : (
-          <p className="text-sm text-steel-500">План загружается…</p>
+          <p className="text-sm text-[var(--nc-muted)]">План загружается…</p>
         )}
       </Card>
 
       <Card title="Выбранные решения">
         {selected.length === 0 ? (
-          <p className="text-sm text-steel-500">Запустите подбор и отметьте модели.</p>
+          <p className="text-sm text-[var(--nc-muted)]">Запустите подбор и отметьте модели.</p>
         ) : (
-          <ul className="space-y-2 text-sm">
+          <ul className="grid gap-2 sm:grid-cols-2">
             {selected.map((r) => (
-              <li key={r.robot_id} className="flex justify-between border-b border-steel-50 py-2">
-                <span className="font-medium">{r.robot_name || `#${r.robot_id}`}</span>
-                <span className="text-steel-500">
+              <li
+                key={r.robot_id}
+                className="rounded border border-[var(--nc-border-subtle)] border-l-[3px] border-l-[var(--nc-accent)] bg-[var(--nc-surface-muted)] px-3 py-2.5"
+              >
+                <p className="font-medium text-[var(--nc-ink)]">
+                  {r.robot_name || `#${r.robot_id}`}
+                </p>
+                <p className="mt-0.5 text-sm text-[var(--nc-text)]">
                   {r.recommended_count != null
                     ? `${r.recommended_count} ед.`
                     : matchStatusLabel(r.status)}
                   {r.robot_price_rub != null ? ` · ${formatCurrency(r.robot_price_rub)}` : ''}
-                </span>
+                </p>
               </li>
             ))}
           </ul>
@@ -322,46 +374,50 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
 
       <Card title="Сравнение альтернатив парка" subtitle="Оценочные конфигурации">
         {fleetQuery.data?.rows ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-xs uppercase text-steel-500">
-                <tr>
-                  <th className="px-2 py-1 text-left">Конфиг.</th>
-                  <th className="px-2 py-1 text-left">CAPEX</th>
-                  <th className="px-2 py-1 text-left">Годовой эффект</th>
-                  <th className="px-2 py-1 text-left">Окупаемость</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fleetQuery.data.rows.map((r) => (
-                  <tr key={r.code} className="border-t border-steel-100">
-                    <td className="px-2 py-1.5">{r.name_ru}</td>
-                    <td className="px-2 py-1.5">{formatCurrency(r.economics.capex?.capex)}</td>
-                    <td className="px-2 py-1.5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {fleetQuery.data.rows.map((r) => (
+              <div
+                key={r.code}
+                className="rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-3"
+              >
+                <p className="font-medium text-[var(--nc-ink)]">{r.name_ru}</p>
+                <dl className="mt-2 space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-[var(--nc-muted)]">Капитальные затраты</dt>
+                    <dd className="font-medium tabular-nums text-[var(--nc-text)]">
+                      {formatCurrency(r.economics.capex?.capex)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-[var(--nc-muted)]">Годовой эффект</dt>
+                    <dd className="font-medium tabular-nums text-[var(--nc-text)]">
                       {formatCurrency(r.economics.annual_effect?.annual_effect)}
-                    </td>
-                    <td className="px-2 py-1.5">
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-[var(--nc-muted)]">Окупаемость</dt>
+                    <dd className="font-medium tabular-nums text-[var(--nc-text)]">
                       {formatPayback(r.economics.payback)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            ))}
           </div>
         ) : (
-          <p className="text-sm text-steel-500">Нет данных сравнения</p>
+          <p className="text-sm text-[var(--nc-muted)]">Нет данных сравнения</p>
         )}
       </Card>
 
       <Card title="Допущения и ограничения">
-        <ul className="list-disc space-y-1 pl-5 text-sm text-steel-700">
+        <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--nc-text)]">
           <li>Финансовые показатели — предварительная оценка, не коммерческое предложение.</li>
           <li>Доля снижения затрат на труд задаётся пользователем, это не отраслевая статистика.</li>
-          <li>Симуляция — дискретно-событийная демонстрация, не цифровой двойник.</li>
+          <li>Симуляция — дискретно-событийная модель, не цифровой двойник.</li>
           <li>Отсутствующие ТТХ в каталоге не подменяются выдуманными значениями.</li>
           {econ?.assumption_flags?.unit_price_assumed ? (
             <li>
-              Цена робота отсутствует в каталоге — в расчёте использовано демо-допущение
+              Цена робота отсутствует в каталоге — в расчёте использовано допущение
               стоимости (не коммерческое предложение).
             </li>
           ) : null}
@@ -376,67 +432,112 @@ export function PresentationPanel({ project, projectId, onEdit, onSimulate }: Pr
   )
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function HeroKpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-steel-500">{k}</dt>
-      <dd className="font-medium">{v}</dd>
+    <div className="relative overflow-hidden rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-3">
+      <span
+        className="absolute inset-y-0 left-0 w-1 bg-[var(--nc-accent)]"
+        aria-hidden
+      />
+      <p className="pl-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--nc-muted)]">
+        {label}
+      </p>
+      <p className="mt-1 pl-2 font-display text-xl font-semibold tabular-nums text-[var(--nc-ink)]">
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function ParamTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-2">
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--nc-muted)]">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-medium text-[var(--nc-ink)]">{value}</p>
     </div>
   )
 }
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-steel-100 bg-steel-50/60 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wide text-steel-400">{label}</p>
-      <p className="mt-0.5 font-display text-lg font-semibold tabular-nums">{value}</p>
+    <div className="rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-[var(--nc-text)]">{label}</p>
+      <p className="mt-0.5 font-display text-lg font-semibold tabular-nums text-[var(--nc-ink)]">
+        {value}
+      </p>
     </div>
   )
 }
 
-function MiniPlan({ layout }: { layout: { width: number; height: number; zones: { x: number; y: number; w: number; h: number; color?: string }[]; routes: { points: { x: number; y: number }[] }[] } }) {
-  // Толщина линий в координатах плана — доля от диагонали, чтобы не плыла при любом размере
+function MiniPlan({ layout }: { layout: VisualizationLayout }) {
+  const theme = useThemeStore((s) => s.theme)
+  const gridId = useId().replace(/:/g, '')
+  // Толщина линий в координатах плана — доля от размера, чтобы не плыла при любом масштабе
   const unit = Math.max(layout.width, layout.height) / 400
+  const gridStep = Math.max(24, Math.round(Math.min(layout.width, layout.height) / 16))
+
   return (
-    <div className="flex min-h-[280px] w-full items-center justify-center">
+    <div
+      key={theme}
+      className="overflow-hidden rounded border border-[var(--nc-border)] bg-[var(--nc-canvas)]"
+    >
       <svg
-        width={layout.width}
-        height={layout.height}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         preserveAspectRatio="xMidYMid meet"
-        className="h-auto max-h-[min(70vh,520px)] w-auto max-w-full bg-white shadow-sm"
+        className="block h-auto max-h-[min(56vh,440px)] w-full"
         role="img"
         aria-label="План склада"
       >
+        <defs>
+          <pattern
+            id={gridId}
+            width={gridStep}
+            height={gridStep}
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d={`M ${gridStep} 0 L 0 0 0 ${gridStep}`}
+              fill="none"
+              stroke="var(--nc-canvas-grid)"
+              strokeWidth={1}
+            />
+          </pattern>
+        </defs>
+        <rect width={layout.width} height={layout.height} fill="var(--nc-canvas)" />
+        <rect width={layout.width} height={layout.height} fill={`url(#${gridId})`} />
         <rect
-          x={0}
-          y={0}
-          width={layout.width}
-          height={layout.height}
-          fill="#f8fafc"
-          stroke="#cbd5e1"
-          strokeWidth={unit}
+          x={unit}
+          y={unit}
+          width={layout.width - unit * 2}
+          height={layout.height - unit * 2}
+          fill="none"
+          stroke="var(--nc-accent-line)"
+          strokeWidth={unit * 1.2}
         />
         {layout.zones.map((z, i) => (
           <rect
-            key={i}
+            key={z.id || i}
             x={z.x}
             y={z.y}
             width={z.w}
             height={z.h}
-            fill={z.color || '#cbd5e1'}
-            opacity={0.85}
-            stroke="#64748b"
-            strokeWidth={unit * 0.8}
+            fill={zoneFill(z.type, z.color)}
+            stroke={zoneStroke(z.type)}
+            strokeWidth={unit * 0.9}
+            rx={unit * 0.6}
           />
         ))}
         {layout.routes.map((r, i) => (
           <polyline
-            key={i}
+            key={r.id || i}
             fill="none"
-            stroke="#ea580c"
-            strokeWidth={unit * 2}
-            strokeDasharray={`${unit * 6} ${unit * 4}`}
+            stroke="var(--nc-route)"
+            strokeWidth={unit * 2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={`${unit * 7} ${unit * 4}`}
             points={r.points.map((p) => `${p.x},${p.y}`).join(' ')}
           />
         ))}

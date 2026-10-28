@@ -17,12 +17,13 @@ describe('suggestNextStep', () => {
     expect(s.ctaLabel).toMatch(/параметр/i)
   })
 
-  it('suggests layout when params ready but plan missing', () => {
-    const s = suggestNextStep({ object: 'done', layout: 'ready', selection: 'ready' })
-    expect(s.step).toBe('layout')
+  it('suggests matching before layout when params ready', () => {
+    const s = suggestNextStep({ object: 'done', layout: 'idle', selection: 'ready' })
+    expect(s.step).toBe('selection')
+    expect(s.ctaLabel).toMatch(/подбор/i)
   })
 
-  it('suggests matching when params and layout ready', () => {
+  it('suggests matching when params done and layout done', () => {
     const s = suggestNextStep({ object: 'done', layout: 'done', selection: 'ready' })
     expect(s.step).toBe('selection')
   })
@@ -38,7 +39,17 @@ describe('suggestNextStep', () => {
     expect(s.ctaLabel).toMatch(/экономик/i)
   })
 
-  it('suggests visualization then report when economics done', () => {
+  it('suggests layout after economics when plan missing', () => {
+    const s = suggestNextStep({
+      object: 'done',
+      layout: 'idle',
+      selection: 'done',
+      economics: 'done',
+    })
+    expect(s.step).toBe('layout')
+  })
+
+  it('suggests visualization then report when economics and layout done', () => {
     const s = suggestNextStep({
       object: 'done',
       layout: 'done',

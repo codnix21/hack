@@ -115,7 +115,7 @@ export function UnsavedChangesGuard({
         </>
       }
     >
-      <p className="text-sm leading-relaxed text-steel-700" data-testid="unsaved-guard-dialog">
+      <p className="text-sm leading-relaxed text-[var(--nc-text)]" data-testid="unsaved-guard-dialog">
         {description}
       </p>
     </Modal>

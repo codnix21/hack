@@ -35,10 +35,10 @@ export function RequiredInputsBanner({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink">
+          <p className="text-sm font-semibold text-[var(--nc-ink)]">
             Минимальные данные: {filled_required} из {total_required}
           </p>
-          <p className="mt-0.5 text-xs text-steel-600">
+          <p className="mt-0.5 text-sm leading-snug text-[var(--nc-text)]">
             {ready
               ? 'Базовый расчёт экономики доступен. Дополнительные поля необязательны.'
               : `Заполните ещё ${remaining} ${remaining === 1 ? 'поле' : 'поля'} для расчёта экономики.`}
@@ -58,8 +58,8 @@ export function RequiredInputsBanner({
               type="button"
               className={`nc-focusable rounded border px-2 py-0.5 text-xs ${
                 c.filled
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : 'border-amber-200 bg-amber-50 text-amber-950'
+                  ? 'border-[rgba(198,242,58,0.4)] bg-[var(--nc-lime-soft)] text-[var(--nc-lime)]'
+                  : 'border-[rgba(245,193,74,0.4)] bg-[var(--nc-warning-soft)] text-[var(--nc-warning)]'
               }`}
               title={localizeUserFacingWarning(c.reason)}
               onClick={() => onGoField?.(c.field)}
@@ -76,17 +76,17 @@ export function RequiredInputsBanner({
       </ul>
 
       {!ready && missing.length > 0 && (
-        <ul className="mt-2 space-y-1 text-xs text-amber-950">
+        <ul className="mt-2 space-y-1 text-xs text-[var(--nc-warning)]">
           {missing.map((c: ChecklistItem) => (
             <li key={`m-${c.field}`}>
               <button
                 type="button"
-                className="font-medium text-brand-800 hover:underline"
+                className="font-medium text-[var(--nc-link)] hover:underline"
                 onClick={() => onGoField?.(c.field)}
               >
                 {c.label}
               </button>
-              <span className="text-steel-600">
+              <span className="text-[var(--nc-text)]">
                 {' '}
                 — {localizeUserFacingWarning(c.reason)}
               </span>
@@ -96,7 +96,7 @@ export function RequiredInputsBanner({
       )}
 
       {capabilities && (
-        <p className="mt-2 text-[11px] text-steel-500">
+        <p className="mt-2 text-xs leading-snug text-[var(--nc-text)]">
           Доступно:{' '}
           {[
             ready ? 'экономика' : null,

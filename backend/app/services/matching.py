@@ -5,6 +5,39 @@ from __future__ import annotations
 import math
 from typing import Any, Optional
 
+# Коды из каталога/параметров → подписи в замечаниях подбора (UI на русском).
+_OBJECT_TYPE_RU: dict[str, str] = {
+    "warehouse": "склад",
+    "airport": "аэропорт",
+    "medical": "медучреждение",
+}
+
+_PROCESS_RU: dict[str, str] = {
+    "transport": "транспортировка",
+    "picking": "комплектация",
+    "towing": "буксировка",
+    "cleaning": "уборка",
+    "forklift": "погрузка вилочным",
+    "stacking": "штабелирование",
+    "yard": "двор / открытая площадка",
+    "delivery": "доставка",
+    "assembly": "сборка",
+}
+
+
+def _ru_object_type(code: Any) -> str:
+    key = str(code or "").strip().lower()
+    return _OBJECT_TYPE_RU.get(key, str(code))
+
+
+def _ru_process(code: Any) -> str:
+    key = str(code or "").strip().lower()
+    return _PROCESS_RU.get(key, str(code))
+
+
+def _ru_list(codes: list[Any] | tuple[Any, ...] | set[Any], mapper) -> str:
+    return ", ".join(mapper(c) for c in codes)
+
 
 def _get_param(params: dict, *keys, default=None):
     for k in keys:
@@ -124,8 +157,8 @@ def match_robot_to_project(
     if object_type_code and allowed_object_types:
         if object_type_code not in allowed_object_types:
             exclusions.append(
-                f"✕ Несоответствие типа объекта: требуется «{object_type_code}», "
-                f"решение поддерживает: {', '.join(map(str, allowed_object_types))}"
+                f"✕ Несоответствие типа объекта: требуется «{_ru_object_type(object_type_code)}», "
+                f"решение поддерживает: {_ru_list(allowed_object_types, _ru_object_type)}"
             )
             score -= 40
     elif object_type_code and not allowed_object_types:
@@ -284,11 +317,13 @@ def match_robot_to_project(
         matched = [p for p in required_processes if p in supported]
         if not matched:
             exclusions.append(
-                f"✕ Нет поддержки требуемых процессов: {', '.join(map(str, required_processes))}"
+                f"✕ Нет поддержки требуемых процессов: {_ru_list(required_processes, _ru_process)}"
             )
             score -= 35
         else:
-            reasons.append(f"✓ Поддерживаемые процессы: {', '.join(map(str, matched))}")
+            reasons.append(
+                f"✓ Поддерживаемые процессы: {_ru_list(matched, _ru_process)}"
+            )
             score += 5 * len(matched)
     elif required_processes and not supported:
         status = _mark_needs_review(status)

@@ -103,7 +103,7 @@ export function economicsChecklist(
       label: 'Пиковая нагрузка',
       filled: peak != null && peak > 0,
       category: 'required',
-      reason: 'Число роботов и CAPEX',
+      reason: 'Число роботов и капитальные затраты',
     },
     {
       field: 'current_labor_cost_year',
@@ -117,7 +117,7 @@ export function economicsChecklist(
       label: 'Цена решения',
       filled: hasPriceSource(params, opts),
       category: 'conditional',
-      reason: 'Нужна цена из каталога или вручную — для расчёта CAPEX',
+      reason: 'Нужна цена из каталога или вручную — для расчёта капитальных затрат',
     },
   ]
 }
@@ -189,7 +189,7 @@ export function fieldRequirement(
     return {
       required: true,
       category: 'required',
-      reason: 'Нужна для расчёта числа роботов и CAPEX',
+      reason: 'Нужна для расчёта числа роботов и капитальных затрат',
     }
   }
   if (key === 'current_labor_cost_year') {

@@ -157,7 +157,7 @@ export function CatalogPage() {
     if (dataOrigin)
       chips.push({
         key: 'data_origin',
-        label: dataOrigin === 'source' ? 'Исходные материалы' : 'Демонстрационные',
+        label: dataOrigin === 'source' ? 'Исходные материалы' : 'Каталог платформы',
       })
     if (solutionTypeId)
       chips.push({
@@ -236,7 +236,7 @@ export function CatalogPage() {
     <div>
       <PageHeader
         title="Каталог решений"
-        subtitle={`${total} по фильтрам · ${sourceCount} исходных · ${demoCount} демо`}
+        subtitle={`${total} по фильтрам · ${sourceCount} исходных · ${demoCount} платформенных`}
         crumbs={[
           { label: 'Обзор', to: '/app' },
           { label: 'Каталог решений' },
@@ -252,7 +252,7 @@ export function CatalogPage() {
 
       <div className="mb-3 flex flex-wrap items-end gap-2">
         <div className="relative min-w-0 flex-1 basis-40 sm:basis-64">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-steel-400" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--nc-muted)]" />
           <Input
             className="pl-8"
             placeholder="Поиск…"
@@ -268,7 +268,7 @@ export function CatalogPage() {
             onChange={(e) => patchParams({ data_origin: e.target.value }, true)}
             options={[
               { value: 'source', label: 'Исходные материалы' },
-              { value: 'demo', label: 'Демонстрационные' },
+              { value: 'demo', label: 'Каталог платформы' },
             ]}
           />
         </div>
@@ -331,7 +331,7 @@ export function CatalogPage() {
               onChange={(e) => patchParams({ data_origin: e.target.value }, true)}
               options={[
                 { value: 'source', label: 'Исходные материалы' },
-                { value: 'demo', label: 'Демонстрационные' },
+                { value: 'demo', label: 'Каталог платформы' },
               ]}
             />
           </div>
@@ -462,7 +462,7 @@ export function CatalogPage() {
             <button
               key={chip.key}
               type="button"
-              className="nc-focusable inline-flex items-center gap-1 rounded border border-steel-200 bg-white px-2 py-0.5 text-xs text-steel-700 hover:border-steel-400"
+              className="nc-focusable inline-flex items-center gap-1 rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-2 py-0.5 text-xs text-[var(--nc-text)] hover:border-[var(--nc-border-strong)]"
               onClick={() => clearActiveFilter(chip.key)}
               aria-label={`Сбросить фильтр: ${chip.label}`}
             >
@@ -493,7 +493,7 @@ export function CatalogPage() {
         <>
           <div className="page-surface hidden overflow-x-auto md:block">
             <table className="nc-table min-w-full">
-              <thead className="border-b border-steel-200 bg-steel-50/80">
+              <thead className="border-b border-[var(--nc-border)] bg-[var(--nc-surface-muted)]">
                 <tr>
                   <th>Решение</th>
                   <th>Производитель</th>
@@ -511,11 +511,11 @@ export function CatalogPage() {
                     r.payload_kg == null ||
                     r.price_rub == null
                   return (
-                    <tr key={r.id} className="hover:bg-steel-50/80">
+                    <tr key={r.id} className="hover:bg-[var(--nc-surface-hover)]">
                       <td className="max-w-[14rem]">
                         <button
                           type="button"
-                          className="nc-focusable text-left font-medium text-brand-800 hover:underline"
+                          className="nc-focusable text-left font-medium text-[var(--nc-link)] hover:underline"
                           title={r.name}
                           aria-label={`Открыть карточку: ${r.name}`}
                           onClick={() => navigate(`/app/catalog/${r.id}`)}
@@ -527,7 +527,7 @@ export function CatalogPage() {
                         )}
                       </td>
                       <td
-                        className="max-w-[9rem] truncate text-steel-600"
+                        className="max-w-[9rem] truncate text-[var(--nc-text)]"
                         title={
                           (r.manufacturer_id != null && manufacturerMap.get(r.manufacturer_id)) ||
                           'Не указано'
@@ -537,7 +537,7 @@ export function CatalogPage() {
                           'Не указано'}
                       </td>
                       <td
-                        className="max-w-[8rem] truncate text-steel-600"
+                        className="max-w-[8rem] truncate text-[var(--nc-text)]"
                         title={
                           (r.solution_type_id != null && solutionMap.get(r.solution_type_id)) ||
                           undefined
@@ -589,12 +589,12 @@ export function CatalogPage() {
               <li key={r.id} className="nc-panel p-3">
                 <button
                   type="button"
-                  className="text-left text-sm font-semibold text-ink"
+                  className="text-left text-sm font-semibold text-[var(--nc-ink)]"
                   onClick={() => navigate(`/app/catalog/${r.id}`)}
                 >
                   {r.name}
                 </button>
-                <p className="mt-0.5 text-xs text-steel-500">
+                <p className="mt-0.5 text-xs text-[var(--nc-muted)]">
                   {(r.manufacturer_id != null && manufacturerMap.get(r.manufacturer_id)) ||
                     'Производитель не указан'}
                   {' · '}

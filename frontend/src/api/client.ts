@@ -1,7 +1,8 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios'
 import type { ApiErrorBody } from '../types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+/** Относительный /api — Vite proxy и nginx; абсолютный URL только через VITE_API_URL. */
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 const PYDANTIC_MSG_RU: Record<string, string> = {
   'Field required': 'Обязательное поле не заполнено',

@@ -19,9 +19,9 @@ export function Table<T>({ columns, rows, rowKey, empty, onRowClick }: TableProp
   if (!rows.length && empty) return <>{empty}</>
 
   return (
-    <div className="overflow-x-auto rounded border border-steel-100">
+    <div className="overflow-x-auto rounded border border-[var(--nc-border-subtle)]">
       <table className="nc-table min-w-full text-left">
-        <thead className="border-b border-steel-200 bg-steel-50/80">
+        <thead className="border-b border-[var(--nc-border)] bg-[var(--nc-surface-muted)]">
           <tr>
             {columns.map((c) => (
               <th key={c.key} className={c.className ?? ''}>
@@ -35,8 +35,8 @@ export function Table<T>({ columns, rows, rowKey, empty, onRowClick }: TableProp
             <tr
               key={String(rowKey(row))}
               onClick={() => onRowClick?.(row)}
-              className={`border-b border-steel-100 last:border-0 ${
-                onRowClick ? 'cursor-pointer hover:bg-steel-50' : ''
+              className={`border-b border-[var(--nc-border-subtle)] last:border-0 ${
+                onRowClick ? 'cursor-pointer hover:bg-[var(--nc-surface-hover)]' : ''
               }`}
             >
               {columns.map((c) => (

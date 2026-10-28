@@ -24,11 +24,11 @@ describe('LandingPage', () => {
     expect(screen.getAllByText('NETCORE').length).toBeGreaterThanOrEqual(1)
     expect(
       screen.getByRole('heading', {
-        name: /Оценка роботизации склада до закупки оборудования/i,
+        name: /Предынвестиционная оценка роботизации для инженеров и руководителей/i,
       }),
     ).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Смотреть демо/i }).length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('button', { name: /Создать проект/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Открыть пример/i })).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /^Войти$/i }).length).toBeGreaterThanOrEqual(1)
   })
 })

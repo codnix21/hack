@@ -72,6 +72,24 @@ def test_object_type_mismatch():
     r = match_robot_to_project(_robot(), {"required_payload_kg": 100}, "airport")
     assert r["status"] == "excluded"
     assert any("типа объекта" in x for x in r["exclusion_reasons"])
+    # В замечаниях — русские названия, не сырые коды
+    joined = " ".join(r["exclusion_reasons"])
+    assert "аэропорт" in joined
+    assert "склад" in joined
+    assert "airport" not in joined
+    assert "warehouse" not in joined
+
+
+def test_process_mismatch_reasons_in_russian():
+    r = match_robot_to_project(
+        _robot(supported_processes=["transport"]),
+        {"required_payload_kg": 100, "required_processes": ["cleaning"]},
+        "warehouse",
+    )
+    assert r["status"] == "excluded"
+    joined = " ".join(r["exclusion_reasons"])
+    assert "уборка" in joined
+    assert "cleaning" not in joined
 
 
 def test_operating_conditions_temperature():

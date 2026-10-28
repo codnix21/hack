@@ -54,6 +54,7 @@ import {
   parseInputsIncompleteDetail,
   type InputIssue,
 } from '../../utils/requiredInputs'
+import { useChartTheme } from '../../utils/chartTheme'
 import { Badge } from '../ui/Badge'
 import { Callout } from '../ui/Callout'
 import axios from 'axios'
@@ -186,6 +187,7 @@ export function EconomicsPanel({
   const [explainData, setExplainData] = useState<EconomicsExplainResponse | null>(null)
   const [showAllScenarioCols, setShowAllScenarioCols] = useState(false)
   const [inputIssues, setInputIssues] = useState<InputIssue[]>([])
+  const charts = useChartTheme()
 
   const paramsForAttention = useQuery({
     queryKey: ['project-params', projectId],
@@ -398,7 +400,7 @@ export function EconomicsPanel({
           <p className="font-medium">Недостаточно данных для расчёта экономики</p>
           <p className="mt-1 text-sm">
             Минимальные данные: {localReadiness.filled_required} из{' '}
-            {localReadiness.total_required}. Заполните обязательные поля — демо-подстановки не
+            {localReadiness.total_required}. Заполните обязательные поля — подстановки по умолчанию не
             используются.
           </p>
           <ul className="mt-2 space-y-1 text-sm">
@@ -408,12 +410,12 @@ export function EconomicsPanel({
                 <li key={c.field}>
                   <button
                     type="button"
-                    className="font-medium text-brand-800 hover:underline"
+                    className="font-medium text-[var(--nc-link)] hover:underline"
                     onClick={() => onGoField?.(c.field)}
                   >
                     {c.label}
                   </button>
-                  <span className="text-steel-600"> — {c.reason}</span>
+                  <span className="text-[var(--nc-text)]"> — {c.reason}</span>
                 </li>
               ))}
           </ul>
@@ -452,12 +454,12 @@ export function EconomicsPanel({
                 <li key={`${issue.field}-${issue.code}`}>
                   <button
                     type="button"
-                    className="font-medium text-brand-800 hover:underline"
+                    className="font-medium text-[var(--nc-link)] hover:underline"
                     onClick={() => onGoField?.(issue.field)}
                   >
                     {issue.field}
                   </button>
-                  <span className="text-steel-600"> — {issue.message}</span>
+                  <span className="text-[var(--nc-text)]"> — {issue.message}</span>
                 </li>
               ))}
             </ul>
@@ -507,12 +509,12 @@ export function EconomicsPanel({
   const breakdownEntries = lastResult
     ? [
         ...Object.entries(lastResult.capex?.breakdown || {}).map(([k, v]) => ({
-          group: 'CAPEX',
+          group: 'Капитальные затраты',
           key: k,
           value: v,
         })),
         ...Object.entries(lastResult.opex?.breakdown || {}).map(([k, v]) => ({
-          group: 'OPEX',
+          group: 'Эксплуатационные расходы',
           key: k,
           value: v,
         })),
@@ -548,8 +550,8 @@ export function EconomicsPanel({
           </div>
           <p className="nc-body mt-0.5 text-xs">
             {isEconomics
-              ? 'CAPEX, эффект и окупаемость сценария «Покупка».'
-              : 'Сценарии «без роботов / покупка / RaaS» и чувствительность.'}
+              ? 'Инвестиции, эффект и окупаемость сценария «Покупка».'
+              : 'Сценарии «без роботов / покупка / аренда» и чувствительность.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -597,7 +599,7 @@ export function EconomicsPanel({
               <li key={`${issue.field}-${issue.code}`}>
                 <button
                   type="button"
-                  className="text-brand-800 hover:underline"
+                  className="text-[var(--nc-link)] hover:underline"
                   onClick={() => onGoField?.(issue.field)}
                 >
                   {issue.message}
@@ -663,12 +665,12 @@ export function EconomicsPanel({
             <details
               className={`rounded border px-3 py-2 text-sm ${
                 lastResult.fleet_capacity.meets_peak_demand
-                  ? 'border-steel-200 bg-steel-50 text-steel-800'
-                  : 'border-amber-300 bg-amber-50 text-amber-950'
+                  ? 'border-[var(--nc-border)] bg-[var(--nc-surface-muted)] text-[var(--nc-ink)]'
+                  : 'border-[rgba(245,193,74,0.45)] bg-[var(--nc-warning-soft)] text-[var(--nc-warning)]'
               }`}
               open={!lastResult.fleet_capacity.meets_peak_demand}
             >
-              <summary className="cursor-pointer font-medium">
+              <summary className="cursor-pointer font-medium text-[var(--nc-ink)]">
                 {metricLabel('fleet_capacity')}
                 {!lastResult.fleet_capacity.meets_peak_demand
                   ? ' — парк не покрывает пик'
@@ -731,9 +733,9 @@ export function EconomicsPanel({
               </div>
             </details>
           )}
-          <details className="rounded border border-steel-200 bg-white px-3 py-2">
-            <summary className="cursor-pointer text-sm font-medium text-ink">
-              Дополнительные показатели (OPEX, ROI, TCO)
+          <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
+              Дополнительные показатели (эксплуатация, рентабельность, совокупная стоимость)
             </summary>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <Kpi
@@ -775,24 +777,24 @@ export function EconomicsPanel({
                 hint={
                   typeof lastResult?.tco?.tco_note === 'string'
                     ? String(lastResult.tco.tco_note)
-                    : 'CAPEX + OPEX × горизонт; без оставшегося ручного труда'
+                    : 'Капитальные + эксплуатационные × горизонт; без оставшегося ручного труда'
                 }
               />
             </div>
           </details>
           {lastResult?.cost_comparison && (
-            <div className="rounded border border-steel-200 bg-steel-50 px-3 py-2 text-sm text-steel-700">
-              <p className="font-medium text-steel-900">Структура затрат (прозрачность)</p>
+            <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-3 py-2 text-sm text-[var(--nc-text)]">
+              <p className="font-medium text-[var(--nc-ink)]">Структура затрат (прозрачность)</p>
               <ul className="mt-1 grid gap-1 sm:grid-cols-2">
                 <li>
-                  Инвестиции (CAPEX):{' '}
+                  Инвестиции:{' '}
                   {formatCurrency(
                     (lastResult.cost_comparison as { initial_investment?: number })
                       .initial_investment,
                   )}
                 </li>
                 <li>
-                  OPEX / год:{' '}
+                  Эксплуатационные расходы / год:{' '}
                   {formatCurrency(
                     (lastResult.cost_comparison as { annual_opex?: number }).annual_opex,
                   )}
@@ -821,12 +823,12 @@ export function EconomicsPanel({
           {lastResult?.depreciation?.applicable &&
             lastResult.depreciation.annual_depreciation != null && (
               <div
-                className="rounded border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-steel-800"
+                className="rounded border border-[rgba(245,193,74,0.4)] bg-[var(--nc-warning-soft)] px-3 py-2 text-sm text-[var(--nc-ink)]"
                 data-testid="depreciation-block"
               >
-                <p className="font-medium text-steel-900">Амортизация CAPEX (бухгалтерская)</p>
-                <p className="mt-1 text-xs text-steel-600">
-                  Не денежный отток. Не вычитается из NPV / IRR / денежных потоков.
+                <p className="font-medium text-[var(--nc-ink)]">Амортизация капитальных затрат (бухгалтерская)</p>
+                <p className="mt-1 text-xs text-[var(--nc-text)]">
+                  Не денежный отток. Не вычитается из чистой приведённой стоимости, внутренней нормы доходности и денежных потоков.
                 </p>
                 <ul className="mt-2 grid gap-1 sm:grid-cols-2">
                   <li>
@@ -864,7 +866,7 @@ export function EconomicsPanel({
                   </li>
                 </ul>
                 {lastResult.annual_effect?.accounting_note && (
-                  <p className="mt-2 text-xs text-steel-600">
+                  <p className="mt-2 text-xs text-[var(--nc-text)]">
                     {String(lastResult.annual_effect.accounting_note)}
                   </p>
                 )}
@@ -872,14 +874,14 @@ export function EconomicsPanel({
             )}
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <Card title="Состав CAPEX">
+            <Card title="Состав капитальных затрат">
               {Object.keys(lastResult?.capex?.breakdown || {}).length === 0 ? (
-                <p className="text-sm text-steel-500">Запустите расчёт.</p>
+                <p className="text-sm text-[var(--nc-muted)]">Запустите расчёт.</p>
               ) : (
                 <>
-                  <p className="mb-2 text-xs text-steel-500">
+                  <p className="mb-2 text-xs text-[var(--nc-muted)]">
                     Статьи с пометкой «допущение» — доли модели, не КП поставщика. Сумма статей
-                    должна равняться итоговому CAPEX.
+                    должна равняться итоговым капитальным затратам.
                   </p>
                   <dl className="space-y-2 text-sm">
                     {Object.entries(lastResult!.capex!.breakdown!).map(([k, v]) => {
@@ -888,15 +890,15 @@ export function EconomicsPanel({
                       return (
                         <div
                           key={k}
-                          className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                          className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5"
                         >
-                          <dt className="text-steel-500">
+                          <dt className="text-[var(--nc-muted)]">
                             {breakdownLabel(k)}
                             {assumed ? (
                               <span className="ml-1 text-xs text-amber-700">(допущение)</span>
                             ) : null}
                           </dt>
-                          <dd className="font-medium text-steel-800">
+                          <dd className="font-medium text-[var(--nc-ink)]">
                             {formatBreakdownValue(k, v)}
                           </dd>
                         </div>
@@ -906,18 +908,18 @@ export function EconomicsPanel({
                 </>
               )}
             </Card>
-            <Card title="Состав OPEX / год">
+            <Card title="Состав эксплуатационных расходов / год">
               {Object.keys(lastResult?.opex?.breakdown || {}).length === 0 ? (
-                <p className="text-sm text-steel-500">Запустите расчёт.</p>
+                <p className="text-sm text-[var(--nc-muted)]">Запустите расчёт.</p>
               ) : (
                 <dl className="space-y-2 text-sm">
                   {Object.entries(lastResult!.opex!.breakdown!).map(([k, v]) => (
                     <div
                       key={k}
-                      className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                      className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5"
                     >
-                      <dt className="text-steel-500">{breakdownLabel(k)}</dt>
-                      <dd className="font-medium text-steel-800">{formatBreakdownValue(k, v)}</dd>
+                      <dt className="text-[var(--nc-muted)]">{breakdownLabel(k)}</dt>
+                      <dd className="font-medium text-[var(--nc-ink)]">{formatBreakdownValue(k, v)}</dd>
                     </div>
                   ))}
                 </dl>
@@ -926,7 +928,7 @@ export function EconomicsPanel({
           </div>
 
           <Card title="Допущения модели">
-            <p className="mb-3 text-xs text-steel-500">
+            <p className="mb-3 text-xs text-[var(--nc-muted)]">
               {valueSourceLabel('assumption')} — значения по умолчанию. Изменить ключевые параметры
               можно во вкладке «Анализ сценариев».
             </p>
@@ -936,14 +938,14 @@ export function EconomicsPanel({
                 .map(([k, v]) => (
                   <div
                     key={k}
-                    className="flex justify-between gap-4 border-b border-steel-100 py-1.5"
+                    className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5"
                   >
-                    <dt className="text-steel-500">{assumptionLabel(k)}</dt>
-                    <dd className="font-medium text-steel-800">{String(v)}</dd>
+                    <dt className="text-[var(--nc-muted)]">{assumptionLabel(k)}</dt>
+                    <dd className="font-medium text-[var(--nc-ink)]">{String(v)}</dd>
                   </div>
                 ))}
               {Object.keys(assumptions).length === 0 && (
-                <p className="text-steel-500 sm:col-span-2">Запустите расчёт.</p>
+                <p className="text-[var(--nc-muted)] sm:col-span-2">Запустите расчёт.</p>
               )}
             </dl>
           </Card>
@@ -974,8 +976,8 @@ export function EconomicsPanel({
           hint="По денежным потокам; менее 1 года — в месяцах"
         />
       </div>
-      <details className="rounded border border-steel-200 bg-white px-3 py-2">
-        <summary className="cursor-pointer text-sm font-medium">
+      <details className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2">
+        <summary className="cursor-pointer text-sm font-medium text-[var(--nc-ink)]">
           Дополнительные показатели сценария
         </summary>
         <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -992,7 +994,7 @@ export function EconomicsPanel({
             value={best?.roi != null ? formatPercent(Number(best.roi)) : 'Нет данных'}
           />
           <Kpi
-            title="Изменение CAPEX (анализ «что если»)"
+            title="Изменение капитальных затрат (анализ «что если»)"
             value={altDelta ? formatCurrency(altDelta.capex) : 'Нет данных'}
             hint="Разница после изменения допущений"
           />
@@ -1030,7 +1032,7 @@ export function EconomicsPanel({
               payback: {
                 header: metricLabel('payback'),
                 render: (s) =>
-                  s.id === 'raas' ? 'Не применяется к RaaS' : s.payback_display || 'Нет данных',
+                  s.id === 'raas' ? 'Не применяется к аренде' : s.payback_display || 'Нет данных',
               },
               npv: {
                 header: metricLabel('npv'),
@@ -1047,7 +1049,7 @@ export function EconomicsPanel({
                 render: (s) => formatCurrency(s.opex_yearly),
               },
               raas: {
-                header: 'Платежи RaaS / год',
+                header: 'Платежи аренды / год',
                 render: (s) =>
                   s.id !== 'raas'
                     ? '—'
@@ -1089,13 +1091,13 @@ export function EconomicsPanel({
           rows={scenarios}
           rowKey={(s) => s.id}
         />
-        <p className="mt-2 text-xs text-steel-500">
-          По умолчанию — пять показателей для решения. ROI для RaaS не применяется. NPV и окупаемость
+        <p className="mt-2 text-xs text-[var(--nc-muted)]">
+          По умолчанию — пять показателей для решения. Рентабельность для аренды не применяется. Чистая приведённая стоимость и окупаемость
           — из backend; при отсутствии данных показывается «Нет данных», не ноль.
         </p>
         {Object.keys(assumptions).length > 0 && (
-          <details className="mt-4 rounded border border-steel-200 bg-steel-50 px-3 py-2 text-sm text-steel-800">
-            <summary className="cursor-pointer font-medium text-ink">
+          <details className="mt-4 rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-3 py-2 text-sm text-[var(--nc-ink)]">
+            <summary className="cursor-pointer font-medium text-[var(--nc-ink)]">
               Ключевые допущения модели (общие для сценариев)
             </summary>
             <ul className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -1126,32 +1128,57 @@ export function EconomicsPanel({
             })}
           />
         </div>
-        <div className="mt-6 h-80">
+        <div className="mt-6 h-80 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] p-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: 12, left: 8, bottom: 48 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d5dae2" />
+              <CartesianGrid strokeDasharray="2 6" stroke={charts.grid} vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: charts.tick }}
                 interval={0}
                 angle={-18}
                 textAnchor="end"
                 height={56}
+                axisLine={{ stroke: charts.grid }}
               />
               <YAxis
-                tick={{ fontSize: 11 }}
+                tick={{ fontSize: 11, fill: charts.tick }}
                 width={72}
+                axisLine={{ stroke: charts.grid }}
                 tickFormatter={(v) =>
                   Math.abs(Number(v)) >= 1_000_000
                     ? `${(Number(v) / 1_000_000).toFixed(0)} млн`
                     : String(v)
                 }
               />
-              <Tooltip formatter={(v) => formatCurrency(Number(v ?? 0))} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Годовой эффект" fill="#2f5d8c" />
-              <Bar dataKey={chartCapexKey} fill="#667690" />
-              <Bar dataKey={chartOpexKey} fill="#8fb6d6" />
+              <Tooltip
+                formatter={(v) => formatCurrency(Number(v ?? 0))}
+                contentStyle={{
+                  background: charts.tooltipBg,
+                  border: `1px solid ${charts.tooltipBorder}`,
+                  borderRadius: 2,
+                  color: charts.tick,
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: charts.tick }} />
+              <Bar
+                dataKey="Годовой эффект"
+                fill={charts.effect}
+                radius={[2, 2, 0, 0]}
+                maxBarSize={36}
+              />
+              <Bar
+                dataKey={chartCapexKey}
+                fill={charts.capex}
+                radius={[2, 2, 0, 0]}
+                maxBarSize={36}
+              />
+              <Bar
+                dataKey={chartOpexKey}
+                fill={charts.opex}
+                radius={[2, 2, 0, 0]}
+                maxBarSize={36}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -1159,7 +1186,7 @@ export function EconomicsPanel({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title="Допущения">
-          <p className="mb-3 text-xs text-steel-500">
+          <p className="mb-3 text-xs text-[var(--nc-muted)]">
             {valueSourceLabel('assumption')} — значения модели по умолчанию. После «что если» часть
             параметров помечается как «{valueSourceLabel('user')}».
           </p>
@@ -1177,19 +1204,19 @@ export function EconomicsPanel({
                 ])
                 const source = whatIfDirty && userKeys.has(k) ? 'user' : 'assumption'
                 return (
-                  <div key={k} className="flex justify-between gap-4 border-b border-steel-100 py-1.5">
-                    <dt className="text-steel-500">
+                  <div key={k} className="flex justify-between gap-4 border-b border-[var(--nc-border-subtle)] py-1.5">
+                    <dt className="text-[var(--nc-muted)]">
                       {assumptionLabel(k)}
-                      <span className="ml-2 text-[10px] uppercase tracking-wide text-steel-400">
+                      <span className="ml-2 text-[10px] uppercase tracking-wide text-[var(--nc-muted)]">
                         {valueSourceLabel(source)}
                       </span>
                     </dt>
-                    <dd className="font-medium text-steel-800">{String(v)}</dd>
+                    <dd className="font-medium text-[var(--nc-ink)]">{String(v)}</dd>
                   </div>
                 )
               })}
             {Object.keys(assumptions).length === 0 && (
-              <p className="text-steel-500">Запустите расчёт, чтобы увидеть допущения.</p>
+              <p className="text-[var(--nc-muted)]">Запустите расчёт, чтобы увидеть допущения.</p>
             )}
           </dl>
         </Card>
@@ -1205,7 +1232,7 @@ export function EconomicsPanel({
           }
         >
           <div className="space-y-4">
-            <p className="text-xs text-steel-500">
+            <p className="text-xs text-[var(--nc-muted)]">
               Ползунки — «{valueSourceLabel('user')}». Исходные значения модели — «
               {valueSourceLabel('assumption')}».
             </p>
@@ -1277,12 +1304,12 @@ export function EconomicsPanel({
               onChange={(v) => setWhatIf((p) => ({ ...p, labor_cost_factor: v }))}
             />
             {(whatIfMut.isPending || sensitivityMut.isPending) && (
-              <p className="text-xs text-steel-500">Пересчёт…</p>
+              <p className="text-xs text-[var(--nc-muted)]">Пересчёт…</p>
             )}
             {(basePurchase || altPurchase || altDelta) && (
-              <div className="overflow-x-auto rounded-lg border border-steel-200">
+              <div className="overflow-x-auto rounded-lg border border-[var(--nc-border)]">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="bg-steel-50 text-xs uppercase text-steel-500">
+                  <thead className="bg-[var(--nc-surface-muted)] text-xs uppercase text-[var(--nc-muted)]">
                     <tr>
                       <th className="px-3 py-2">Показатель</th>
                       <th className="px-3 py-2">База</th>
@@ -1293,11 +1320,11 @@ export function EconomicsPanel({
                   <tbody>
                     {(
                       [
-                        ['CAPEX', 'capex', true],
-                        ['OPEX / год', 'opex_yearly', true],
+                        ['Капитальные затраты', 'capex', true],
+                        ['Эксплуатация / год', 'opex_yearly', true],
                         ['Годовой эффект', 'annual_effect', true],
-                        ['TCO', 'tco', true],
-                        ['ROI', 'roi', false],
+                        ['Совокупная стоимость', 'tco', true],
+                        ['Рентабельность', 'roi', false],
                         ['Окупаемость', 'payback_years', false],
                       ] as const
                     ).map(([title, key, money]) => {
@@ -1305,8 +1332,8 @@ export function EconomicsPanel({
                       const n = kpiValue(altPurchase || basePurchase, key)
                       const isPayback = key === 'payback_years'
                       return (
-                        <tr key={key} className="border-t border-steel-100">
-                          <td className="px-3 py-2 text-steel-700">{title}</td>
+                        <tr key={key} className="border-t border-[var(--nc-border-subtle)]">
+                          <td className="px-3 py-2 text-[var(--nc-text)]">{title}</td>
                           <td className="px-3 py-2 font-medium">
                             {isPayback
                               ? kpiPaybackDisplay(basePurchase)
@@ -1334,13 +1361,13 @@ export function EconomicsPanel({
               </div>
             )}
             {altDelta && (
-              <dl className="space-y-1 text-sm text-steel-700">
+              <dl className="space-y-1 text-sm text-[var(--nc-text)]">
                 <div className="flex justify-between">
-                  <dt>Δ CAPEX</dt>
+                  <dt>Δ капитальных затрат</dt>
                   <dd>{formatCurrency(altDelta.capex)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Δ OPEX</dt>
+                  <dt>Δ эксплуатации</dt>
                   <dd>{formatCurrency(altDelta.opex_annual)}</dd>
                 </div>
                 <div className="flex justify-between">
@@ -1386,49 +1413,49 @@ export function EconomicsPanel({
       )}
 
       <Modal open={explainOpen} onClose={() => setExplainOpen(false)} title="Как рассчитано" size="lg">
-        <div className="space-y-4 text-sm text-steel-700">
+        <div className="space-y-4 text-sm text-[var(--nc-text)]">
           {explainSteps ? (
             explainSteps.map((step, i) => (
-              <div key={i} className="rounded-lg border border-steel-200 p-3">
-                <p className="font-semibold text-steel-900">
+              <div key={i} className="rounded-lg border border-[var(--nc-border)] p-3">
+                <p className="font-semibold text-[var(--nc-ink)]">
                   {i + 1}. {step.title || 'Шаг'}
                 </p>
-                {step.description && <p className="mt-1 text-steel-600">{step.description}</p>}
+                {step.description && <p className="mt-1 text-[var(--nc-text)]">{step.description}</p>}
                 {step.formula && (
-                  <p className="mt-1 font-mono text-xs text-brand-800">{step.formula}</p>
+                  <p className="mt-1 font-mono text-xs text-[var(--nc-link)]">{step.formula}</p>
                 )}
                 {step.value != null && (
-                  <p className="mt-1 text-steel-800">Результат: {String(step.value)}</p>
+                  <p className="mt-1 text-[var(--nc-ink)]">Результат: {String(step.value)}</p>
                 )}
               </div>
             ))
           ) : (
             <>
-              <p className="text-steel-500">
+              <p className="text-[var(--nc-muted)]">
                 Подробное пошаговое объяснение недоступно — показаны формулы и разбивка последнего расчёта.
               </p>
               {(formulaEntries.length
                 ? formulaEntries
                 : [
                     {
-                      name: 'CAPEX',
+                      name: 'Капитальные затраты',
                       expression: 'оборудование + инфраструктура + ПО + интеграция',
                       description: '',
                     },
                   ]
               ).map((f) => (
-                <div key={f.name} className="rounded-lg border border-steel-200 p-3">
-                  <p className="font-semibold text-steel-900">{formulaLabel(f.name)}</p>
-                  <p className="mt-1 font-mono text-xs text-brand-800">{f.expression}</p>
+                <div key={f.name} className="rounded-lg border border-[var(--nc-border)] p-3">
+                  <p className="font-semibold text-[var(--nc-ink)]">{formulaLabel(f.name)}</p>
+                  <p className="mt-1 font-mono text-xs text-[var(--nc-link)]">{f.expression}</p>
                 </div>
               ))}
               {breakdownEntries.length > 0 && (
-                <div className="rounded-lg border border-steel-200 p-3">
-                  <p className="mb-2 font-semibold text-steel-900">Разбивка последнего расчёта</p>
+                <div className="rounded-lg border border-[var(--nc-border)] p-3">
+                  <p className="mb-2 font-semibold text-[var(--nc-ink)]">Разбивка последнего расчёта</p>
                   <dl className="space-y-1">
                     {breakdownEntries.map((b) => (
                       <div key={`${b.group}-${b.key}`} className="flex justify-between gap-3">
-                        <dt className="text-steel-500">
+                        <dt className="text-[var(--nc-muted)]">
                           {b.group}: {breakdownLabel(b.key)}
                         </dt>
                         <dd className="font-medium">
@@ -1442,7 +1469,7 @@ export function EconomicsPanel({
             </>
           )}
           {formulasQuery.data?.description && (
-            <p className="text-steel-500">{formulasQuery.data.description}</p>
+            <p className="text-[var(--nc-muted)]">{formulasQuery.data.description}</p>
           )}
         </div>
       </Modal>
@@ -1461,40 +1488,58 @@ function SensitivityChart({
   formatX: (v: number | string) => string
   labelX: (l: unknown) => string
 }) {
+  const charts = useChartTheme()
   if (!data.length) return null
   return (
     <div>
-      <p className="mb-2 text-sm font-medium text-steel-700">{title}</p>
-      <div className="h-64">
+      <p className="mb-2 text-sm font-medium text-[var(--nc-text)]">{title}</p>
+      <div className="h-64 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] p-2">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#d5dae2" />
+            <CartesianGrid strokeDasharray="2 6" stroke={charts.grid} vertical={false} />
             <XAxis
               dataKey="value"
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: 10, fill: charts.tick }}
               tickFormatter={(v) => formatX(v as number | string)}
+              axisLine={{ stroke: charts.grid }}
             />
-            <YAxis tick={{ fontSize: 10 }} />
+            <YAxis
+              tick={{ fontSize: 10, fill: charts.tick }}
+              axisLine={{ stroke: charts.grid }}
+              tickFormatter={(v) =>
+                Math.abs(Number(v)) >= 1_000_000
+                  ? `${(Number(v) / 1_000_000).toFixed(1)} млн`
+                  : String(v)
+              }
+            />
             <Tooltip
               formatter={(v) => formatCurrency(Number(v ?? 0))}
               labelFormatter={(l) => labelX(l)}
+              contentStyle={{
+                background: charts.tooltipBg,
+                border: `1px solid ${charts.tooltipBorder}`,
+                borderRadius: 2,
+                color: charts.tick,
+              }}
             />
-            <Legend />
+            <Legend wrapperStyle={{ fontSize: 12, color: charts.tick }} />
             <Line
               type="monotone"
               dataKey="annual_effect"
               name="Годовой эффект"
-              stroke="#2f5d8c"
-              strokeWidth={2}
-              dot={false}
+              stroke={charts.effect}
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: charts.effect }}
+              activeDot={{ r: 5 }}
             />
             <Line
               type="monotone"
               dataKey="tco"
-              name="TCO"
-              stroke="#5a92c0"
-              strokeWidth={2}
-              dot={false}
+              name="Совокупная стоимость"
+              stroke={charts.tco}
+              strokeWidth={2.5}
+              dot={{ r: 3, fill: charts.tco }}
+              activeDot={{ r: 5 }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -1516,12 +1561,12 @@ function Kpi({
 }) {
   return (
     <div className="nc-panel px-3 py-2.5">
-      <p className="text-[11px] text-steel-500">{title}</p>
-      <p className="mt-0.5 font-display text-lg font-semibold tabular-nums text-ink">
+      <p className="text-[11px] text-[var(--nc-muted)]">{title}</p>
+      <p className="mt-0.5 font-display text-lg font-semibold tabular-nums text-[var(--nc-ink)]">
         {value}
-        {unit ? <span className="ml-1 text-sm font-normal text-steel-500">{unit}</span> : null}
+        {unit ? <span className="ml-1 text-sm font-normal text-[var(--nc-muted)]">{unit}</span> : null}
       </p>
-      {hint ? <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-steel-500">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[var(--nc-muted)]">{hint}</p> : null}
     </div>
   )
 }
@@ -1546,15 +1591,15 @@ function Slider({
   return (
     <label className="block">
       <div className="mb-1 flex justify-between text-sm">
-        <span className="text-steel-700">
+        <span className="text-[var(--nc-text)]">
           {label}
           {source && (
-            <span className="ml-2 text-[10px] uppercase tracking-wide text-steel-400">
+            <span className="ml-2 text-[10px] uppercase tracking-wide text-[var(--nc-muted)]">
               {valueSourceLabel(source)}
             </span>
           )}
         </span>
-        <span className="font-medium text-steel-900">
+        <span className="font-medium text-[var(--nc-ink)]">
           {value}
           {unit}
         </span>

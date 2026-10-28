@@ -7,8 +7,10 @@ import { getFriendlyError } from '../api/client'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
-import { Badge } from '../components/ui/Badge'
-import { SkeletonRows } from '../components/ui/Skeleton'
+import { StatusPill } from '../components/ui/StatusPill'
+import { LoadingState } from '../components/ui/LoadingState'
+import { ErrorState } from '../components/ui/ErrorState'
+import { Callout } from '../components/ui/Callout'
 import { Modal } from '../components/ui/Modal'
 import { Select } from '../components/ui/Select'
 import { projectsApi } from '../api/projects'
@@ -166,9 +168,17 @@ export function RobotDetailPage() {
       .filter(Boolean)
   }, [params])
 
-  if (robotQuery.isLoading) return <SkeletonRows rows={10} />
+  if (robotQuery.isLoading) return <LoadingState rows={10} label="Загрузка карточки…" />
   if (robotQuery.isError) {
-    return <p className="text-sm text-red-600">{getFriendlyError(robotQuery.error)}</p>
+    return (
+      <div className="page-surface">
+        <ErrorState
+          title="Не удалось загрузить карточку"
+          description={getFriendlyError(robotQuery.error)}
+          onRetry={() => void robotQuery.refetch()}
+        />
+      </div>
+    )
   }
 
   const r = robotQuery.data!
@@ -385,10 +395,10 @@ export function RobotDetailPage() {
     <div>
       <PageHeader
         title={r.name}
-        subtitle={r.purpose || 'Карточка технического задания по решению'}
+        subtitle={r.purpose || 'Карточка решения: ТТХ и происхождение данных'}
         crumbs={[
-          { label: 'Панель управления', to: '/app' },
-          { label: 'Каталог решений', to: '/app/catalog' },
+          { label: 'Обзор', to: '/app' },
+          { label: 'Каталог роботов', to: '/app/catalog' },
           { label: r.name },
         ]}
         actions={
@@ -412,27 +422,32 @@ export function RobotDetailPage() {
               }}
             >
               <GitCompare className="h-4 w-4" />
-              Добавить к сравнению
+              К сравнению
             </Button>
             <Button onClick={() => setProjectModal(true)}>
               <FolderPlus className="h-4 w-4" />
-              Использовать в проекте
+              В расчёт (проект)
             </Button>
           </>
         }
       />
 
+      <Callout variant="info" className="mb-3" title="Сравнение ≠ расчёт">
+        «К сравнению» добавляет модель в глобальную таблицу ТТХ. «В расчёт» назначает решение в
+        выбранный проект для экономики — это разные действия.
+      </Callout>
+
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        {manufacturerName && <Badge variant="info">{manufacturerName}</Badge>}
-        {solutionName && <Badge>{solutionName}</Badge>}
-        <Badge variant="warning">{confirmationLevelLabel(r.confirmation_level)}</Badge>
-        <Badge
-          variant={r.data_origin === 'source' ? 'success' : 'warning'}
+        {manufacturerName && <StatusPill tone="info">{manufacturerName}</StatusPill>}
+        {solutionName && <StatusPill tone="neutral">{solutionName}</StatusPill>}
+        <StatusPill tone="warning">{confirmationLevelLabel(r.confirmation_level)}</StatusPill>
+        <StatusPill
+          tone={r.data_origin === 'source' ? 'success' : 'warning'}
           title={dataOriginTooltip(r.data_origin)}
         >
           {dataOriginLabel(r.data_origin)}
-        </Badge>
-        {r.data_confidence && <Badge variant="info">{r.data_confidence}</Badge>}
+        </StatusPill>
+        {r.data_confidence && <StatusPill tone="info">{r.data_confidence}</StatusPill>}
       </div>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -451,8 +466,8 @@ export function RobotDetailPage() {
           { label: 'Скорость', value: ttxOrMissing(r.speed_mps, formatMps(r.speed_mps)) },
         ].map((k) => (
           <div key={k.label} className="nc-panel px-3 py-2">
-            <p className="text-[11px] text-steel-500">{k.label}</p>
-            <p className="mt-0.5 text-sm font-semibold tabular-nums text-ink">{k.value}</p>
+            <p className="text-[11px] text-[var(--nc-muted)]">{k.label}</p>
+            <p className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--nc-ink)]">{k.value}</p>
           </div>
         ))}
       </div>
@@ -469,23 +484,23 @@ export function RobotDetailPage() {
                   {filled.map((row) => (
                     <div
                       key={row.label}
-                      className="flex justify-between gap-3 border-b border-steel-100 py-1"
+                      className="flex justify-between gap-3 border-b border-[var(--nc-border-subtle)] py-1"
                     >
-                      <dt className="text-steel-500">{row.label}</dt>
-                      <dd className="text-right font-medium text-steel-800 break-words">{row.value}</dd>
+                      <dt className="text-[var(--nc-muted)]">{row.label}</dt>
+                      <dd className="text-right font-medium text-[var(--nc-ink)] break-words">{row.value}</dd>
                     </div>
                   ))}
                 </dl>
               ) : (
-                <p className="text-sm text-steel-500">Нет заполненных полей в этой группе.</p>
+                <p className="text-sm text-[var(--nc-muted)]">Нет заполненных полей в этой группе.</p>
               )}
               {missing.length > 0 && (
-                <details className="mt-2 rounded border border-steel-100 bg-steel-50/60 px-2 py-1.5">
-                  <summary className="cursor-pointer text-xs font-medium text-steel-600">
+                <details className="mt-2 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-2 py-1.5">
+                  <summary className="cursor-pointer text-xs font-medium text-[var(--nc-muted)]">
                     Нет данных: {missing.length}{' '}
                     {missing.length === 1 ? 'поле' : 'полей'}
                   </summary>
-                  <ul className="mt-1.5 space-y-0.5 text-xs text-steel-500">
+                  <ul className="mt-1.5 space-y-0.5 text-xs text-[var(--nc-muted)]">
                     {missing.map((row) => (
                       <li key={row.label}>
                         {row.label} — {NO_SOURCE_DATA}
@@ -502,7 +517,7 @@ export function RobotDetailPage() {
       <Modal
         open={projectModal}
         onClose={() => setProjectModal(false)}
-        title="Использовать в проекте"
+        title="Назначить в расчёт проекта"
         footer={
           <>
             <Button variant="outline" onClick={() => setProjectModal(false)}>
@@ -513,14 +528,18 @@ export function RobotDetailPage() {
               loading={attachMut.isPending}
               onClick={() => attachMut.mutate()}
             >
-              Использовать для расчёта
+              В расчёт
             </Button>
           </>
         }
       >
-        {projectsQuery.isLoading && <SkeletonRows rows={3} />}
+        {projectsQuery.isLoading && <LoadingState rows={3} label="Загрузка проектов…" />}
         {projectsQuery.isError && (
-          <p className="text-sm text-red-600">{getFriendlyError(projectsQuery.error)}</p>
+          <ErrorState
+            title="Не удалось загрузить проекты"
+            description={getFriendlyError(projectsQuery.error)}
+            onRetry={() => void projectsQuery.refetch()}
+          />
         )}
         {projectsQuery.data && (
           <Select
@@ -531,13 +550,13 @@ export function RobotDetailPage() {
             options={projectsQuery.data.map((p) => ({ value: p.id, label: p.name }))}
           />
         )}
-        <p className="mt-3 text-sm text-steel-600">
-          Решение будет базой CAPEX/OPEX в выбранном проекте. Затем откроется экономика — нажмите
+        <p className="mt-3 text-sm text-[var(--nc-muted)]">
+          Решение будет базой капитальных и эксплуатационных затрат в выбранном проекте. Затем откроется экономика — нажмите
           «Рассчитать».
         </p>
-        <p className="mt-2 text-sm text-steel-500">
+        <p className="mt-2 text-sm text-[var(--nc-muted)]">
           Нет нужного проекта?{' '}
-          <Link to="/app/projects/new" className="text-brand-700 hover:underline">
+          <Link to="/app/projects/new" className="text-[var(--nc-link)] hover:underline">
             Создать проект
           </Link>
         </p>

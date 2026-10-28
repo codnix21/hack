@@ -169,7 +169,7 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
 
   return (
     <div className="space-y-5" data-testid="import-flow">
-      <ol className="flex flex-wrap gap-2 text-xs font-medium text-steel-500">
+      <ol className="flex flex-wrap gap-2 text-xs font-medium text-[var(--nc-muted)]">
         {[
           ['file', 'Выбор файла'],
           ['preview', 'Просмотр и сопоставление'],
@@ -179,7 +179,9 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
           <li
             key={id}
             className={`rounded-md px-2.5 py-1 ${
-              step === id ? 'bg-brand-100 text-brand-800' : 'bg-steel-100'
+              step === id
+                ? 'bg-[var(--nc-accent-soft)] text-[var(--nc-ink)]'
+                : 'bg-[var(--nc-surface-muted)] text-[var(--nc-muted)]'
             }`}
           >
             {label}
@@ -189,9 +191,9 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
 
       {step === 'file' && (
         <div className="space-y-4">
-          <div className="rounded border border-steel-200 bg-white p-4">
-            <p className="font-medium text-steel-900">1. Скачайте шаблон Excel</p>
-            <p className="mt-1 text-sm text-steel-600">
+          <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4">
+            <p className="font-medium text-[var(--nc-ink)]">1. Скачайте шаблон Excel</p>
+            <p className="mt-1 text-sm text-[var(--nc-muted)]">
               Откройте лист «Параметры» и заполните жёлтую колонку «Значение». Названия параметров и
               единицы уже указаны — менять их не нужно.
             </p>
@@ -207,10 +209,10 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
             </Button>
           </div>
 
-          <div className="rounded border border-dashed border-steel-300 bg-steel-50/60 p-8 text-center">
-            <Upload className="mx-auto mb-3 h-8 w-8 text-steel-400" />
-            <p className="font-medium text-steel-900">2. Загрузите заполненный файл</p>
-            <p className="mt-1 text-sm text-steel-600">
+          <div className="rounded border border-dashed border-[var(--nc-border-strong)] bg-[var(--nc-surface-muted)] p-8 text-center">
+            <Upload className="mx-auto mb-3 h-8 w-8 text-[var(--nc-faint)]" />
+            <p className="font-medium text-[var(--nc-ink)]">2. Загрузите заполненный файл</p>
+            <p className="mt-1 text-sm text-[var(--nc-muted)]">
               Excel по шаблону (лист «Параметры») или CSV/Excel с колонками параметров. Максимум 10 МБ.
               Форматы: .xlsx, .xls, .csv. DWG не поддерживается.
             </p>
@@ -223,7 +225,7 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
               aria-label="Выберите файл для импорта"
             />
             {file && (
-              <p className="mt-2 text-sm text-steel-700" data-testid="import-file-meta">
+              <p className="mt-2 text-sm text-[var(--nc-text)]" data-testid="import-file-meta">
                 {file.name} · {formatBytes(file.size)} · {file.type || 'тип не указан'}
               </p>
             )}
@@ -242,7 +244,7 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
 
       {step === 'preview' && preview && (
         <>
-          <div className="rounded border border-steel-200 bg-white px-3 py-2 text-sm text-steel-700">
+          <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] px-3 py-2 text-sm text-[var(--nc-text)]">
             <p data-testid="import-file-meta">
               Файл: <strong>{preview.filename || file?.name}</strong>
               {(preview.file_size_bytes != null || file?.size != null) && (
@@ -254,7 +256,7 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
               )}
             </p>
             {isKeyValue && (
-              <p className="mt-1 text-steel-500">
+              <p className="mt-1 text-[var(--nc-muted)]">
                 Формат «Параметр / Значение» — сопоставление колонок не требуется. Неизвестные строки
                 не скрываются.
               </p>
@@ -281,16 +283,16 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
           )}
 
           {preview.parsed_params && Object.keys(preview.parsed_params).length > 0 && (
-            <div className="rounded border border-steel-200 bg-steel-50/50 p-3">
-              <p className="mb-2 text-sm font-medium text-ink">Распознанные значения</p>
+            <div className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)]/50 p-3">
+              <p className="mb-2 text-sm font-medium text-[var(--nc-ink)]">Распознанные значения</p>
               <ul className="grid gap-1 text-sm sm:grid-cols-2">
                 {Object.entries(preview.parsed_params)
                   .filter(([k]) => !k.startsWith('_'))
                   .slice(0, 24)
                   .map(([k, v]) => (
-                    <li key={k} className="flex justify-between gap-2 border-b border-steel-100 py-0.5">
-                      <span className="text-steel-600">{objectParamLabel(k, paramSchema)}</span>
-                      <span className="font-mono text-ink">{String(v)}</span>
+                    <li key={k} className="flex justify-between gap-2 border-b border-[var(--nc-border-subtle)] py-0.5">
+                      <span className="text-[var(--nc-muted)]">{objectParamLabel(k, paramSchema)}</span>
+                      <span className="font-mono text-[var(--nc-ink)]">{String(v)}</span>
                     </li>
                   ))}
               </ul>
@@ -304,8 +306,8 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
             </Callout>
           )}
 
-          <div className="overflow-hidden rounded border border-steel-200">
-            <p className="border-b border-steel-100 bg-steel-50 px-3 py-1.5 text-xs text-steel-600">
+          <div className="overflow-hidden rounded border border-[var(--nc-border)]">
+            <p className="border-b border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-3 py-1.5 text-xs text-[var(--nc-muted)]">
               В таблице — исходные имена колонок файла. Под ними — распознанный параметр NETCORE (если
               сопоставлен).
             </p>
@@ -317,8 +319,8 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
                   key: c,
                   header: (
                     <span className="flex flex-col gap-0.5">
-                      <span className="font-medium text-ink">{c}</span>
-                      <span className="text-[11px] font-normal normal-case text-steel-500">
+                      <span className="font-medium text-[var(--nc-ink)]">{c}</span>
+                      <span className="text-[11px] font-normal normal-case text-[var(--nc-muted)]">
                         {hint
                           ? `→ ${hint}`
                           : mapped === 'ignore'
@@ -337,7 +339,7 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
 
           {!isKeyValue && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-ink">Сопоставление столбцов</p>
+              <p className="text-sm font-medium text-[var(--nc-ink)]">Сопоставление столбцов</p>
               <div className="grid gap-3 md:grid-cols-2">
                 {preview.columns.map((col) => (
                   <Select
@@ -375,17 +377,17 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
       {step === 'validation' && validation && (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-steel-200 bg-white p-4">
-              <p className="text-xs text-steel-500">Строк в файле</p>
-              <p className="mt-1 text-2xl font-semibold text-steel-900">{validation.row_count}</p>
+            <div className="rounded-lg border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4">
+              <p className="text-xs text-[var(--nc-muted)]">Строк в файле</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--nc-ink)]">{validation.row_count}</p>
             </div>
-            <div className="rounded-lg border border-steel-200 bg-white p-4">
-              <p className="text-xs text-steel-500">Распознано параметров</p>
-              <p className="mt-1 text-2xl font-semibold text-steel-900">{recognizedCount}</p>
+            <div className="rounded-lg border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4">
+              <p className="text-xs text-[var(--nc-muted)]">Распознано параметров</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--nc-ink)]">{recognizedCount}</p>
             </div>
-            <div className="rounded-lg border border-steel-200 bg-white p-4">
-              <p className="text-xs text-steel-500">Будут перезаписаны</p>
-              <p className="mt-1 text-2xl font-semibold text-steel-900">
+            <div className="rounded-lg border border-[var(--nc-border)] bg-[var(--nc-surface)] p-4">
+              <p className="text-xs text-[var(--nc-muted)]">Будут перезаписаны</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--nc-ink)]">
                 {validation.will_overwrite?.length || 0}
               </p>
             </div>
@@ -423,14 +425,14 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
           )}
 
           {validation.parsed_params && (
-            <div className="rounded border border-steel-200 p-3">
+            <div className="rounded border border-[var(--nc-border)] p-3">
               <p className="mb-2 text-sm font-medium">Итоговая сводка перед применением</p>
               <ul className="grid gap-1 text-sm sm:grid-cols-2">
                 {Object.entries(validation.parsed_params)
                   .filter(([k]) => !k.startsWith('_'))
                   .map(([k, v]) => (
                     <li key={k} className="flex justify-between gap-2">
-                      <span className="text-steel-600">{objectParamLabel(k, paramSchema)}</span>
+                      <span className="text-[var(--nc-muted)]">{objectParamLabel(k, paramSchema)}</span>
                       <span className="font-mono">{String(v)}</span>
                     </li>
                   ))}
@@ -464,12 +466,12 @@ export function ImportFlow({ projectId }: ImportFlowProps) {
           </Callout>
           {importedKeys.length > 0 && (
             <div>
-              <p className="mb-2 text-sm text-steel-600">Обновлено параметров: {importedKeys.length}</p>
+              <p className="mb-2 text-sm text-[var(--nc-muted)]">Обновлено параметров: {importedKeys.length}</p>
               <ul className="flex flex-wrap gap-1.5">
                 {importedKeys.map((k) => (
                   <li
                     key={k}
-                    className="rounded border border-steel-200 bg-steel-50 px-2 py-0.5 text-xs text-steel-800"
+                    className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] px-2 py-0.5 text-xs text-[var(--nc-ink)]"
                   >
                     {objectParamLabel(k, paramSchema)}
                   </li>

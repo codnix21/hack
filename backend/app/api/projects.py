@@ -68,7 +68,7 @@ def _ensure_access(user: Optional[User], project: Project, write: bool = False):
         if project.is_demo:
             raise HTTPException(
                 403,
-                detail="Демонстрационный проект только для просмотра. Создайте копию, чтобы редактировать.",
+                detail="Пример проекта только для просмотра. Создайте копию, чтобы редактировать.",
             )
         if project.owner_id != user.id:
             raise HTTPException(403, detail="Нет доступа к проекту")
@@ -233,7 +233,7 @@ def delete_project(
     project = _get_project(db, project_id)
     _ensure_access(user, project, write=True)
     if project.is_demo and user.role != "admin":
-        raise HTTPException(403, detail="Нельзя удалить демо-проект")
+        raise HTTPException(403, detail="Нельзя удалить пример проекта")
     db.query(ProjectSolution).filter(ProjectSolution.project_id == project_id).delete()
     db.query(Scenario).filter(Scenario.project_id == project_id).delete()
     db.query(Calculation).filter(Calculation.project_id == project_id).delete()

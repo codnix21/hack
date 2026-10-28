@@ -109,7 +109,7 @@ const WAREHOUSE_FIELDS: FieldDef[] = [
     type: 'number',
     group: 'ops',
     required: true,
-    hint: 'От неё зависят число роботов и CAPEX.',
+    hint: 'От неё зависят число роботов и капитальные затраты.',
     example: '6800',
   },
   {
@@ -443,16 +443,16 @@ function FieldHint({
 }) {
   if (!hint && !example && !required && !reason) return null
   return (
-    <p className="mt-1 text-xs text-steel-500">
+    <p className="mt-1 text-xs leading-snug text-[var(--nc-text)]">
       {required ? (
-        <span className="font-medium text-brand-800">{requiredBadge(category)} </span>
+        <span className="font-medium text-[var(--nc-warning)]">{requiredBadge(category)} </span>
       ) : null}
-      {reason ? <span className="text-steel-600">{reason}. </span> : null}
+      {reason ? <span className="text-[var(--nc-text)]">{reason}. </span> : null}
       {hint}
       {example && (
-        <span className="text-steel-400">
+        <span className="text-[var(--nc-muted)]">
           {' '}
-          Пример: <span className="font-mono text-steel-600">{example}</span>
+          Пример: <span className="font-mono text-[var(--nc-muted)]">{example}</span>
         </span>
       )}
     </p>
@@ -574,7 +574,7 @@ export function ObjectParamsForm({
   return (
     <div id="object-params-form" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-steel-500">
+        <p className="text-xs leading-snug text-[var(--nc-text)]">
           {compactMode
             ? 'Компактный режим: поля для базового расчёта. Остальные значения сохраняются.'
             : 'Полный список параметров объекта.'}
@@ -595,22 +595,22 @@ export function ObjectParamsForm({
         const open = openGroups[g.id] ?? true
         const filled = g.fields.filter((f) => values[f.key] != null && values[f.key] !== '').length
         return (
-          <div key={g.id} className="rounded border border-steel-200 bg-white">
+          <div key={g.id} className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface)]">
             <button
               type="button"
-              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-steel-50/80"
+              className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-[var(--nc-surface-hover)]"
               onClick={() => setOpenGroups((s) => ({ ...s, [g.id]: !open }))}
               aria-expanded={open}
             >
-              <span className="font-display text-sm font-semibold uppercase tracking-wide text-ink">
+              <span className="font-display text-sm font-semibold uppercase tracking-wide text-[var(--nc-ink)]">
                 {g.title}
               </span>
-              <span className="font-mono text-[11px] text-steel-500">
+              <span className="font-mono text-[11px] text-[var(--nc-text)]">
                 {filled}/{g.fields.length} · {open ? 'Свернуть' : 'Развернуть'}
               </span>
             </button>
             {open && (
-              <div className="grid gap-4 border-t border-steel-100 px-4 py-4 md:grid-cols-2">
+              <div className="grid gap-4 border-t border-[var(--nc-border-subtle)] px-4 py-4 md:grid-cols-2">
                 {g.fields.map((f) => {
                   const req = fieldRequirement(f.key, values, priceOpts)
                   const isReq = req.required || Boolean(f.required)
@@ -640,8 +640,8 @@ export function ObjectParamsForm({
                           reason={req.reason}
                           category={req.category}
                         />
-                        {err ? <p className="mt-0.5 text-xs text-red-600">{err}</p> : null}
-                        <p className="mt-0.5 text-[11px] text-steel-400">{source}</p>
+                        {err ? <p className="mt-0.5 text-xs text-[var(--nc-danger)]">{err}</p> : null}
+                        <p className="mt-0.5 text-[11px] text-[var(--nc-muted)]">{source}</p>
                       </div>
                     )
                   }
@@ -676,7 +676,7 @@ export function ObjectParamsForm({
                           reason={req.reason}
                           category={req.category}
                         />
-                        {err ? <p className="mt-0.5 text-xs text-red-600">{err}</p> : null}
+                        {err ? <p className="mt-0.5 text-xs text-[var(--nc-danger)]">{err}</p> : null}
                       </div>
                     )
                   }
@@ -704,7 +704,7 @@ export function ObjectParamsForm({
                           reason={req.reason}
                           category={req.category}
                         />
-                        <p className="mt-0.5 text-[11px] text-steel-400">{source}</p>
+                        <p className="mt-0.5 text-[11px] text-[var(--nc-muted)]">{source}</p>
                       </div>
                     )
                   }
@@ -740,7 +740,7 @@ export function ObjectParamsForm({
                         reason={req.reason}
                         category={req.category}
                       />
-                      <p className="mt-0.5 text-[11px] text-steel-400">{source}</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--nc-muted)]">{source}</p>
                     </div>
                   )
                 })}

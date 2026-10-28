@@ -10,21 +10,22 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 active:translate-y-px',
-  secondary: 'bg-ink text-white hover:bg-ink-soft active:translate-y-px',
-  ghost: 'bg-transparent text-steel-700 hover:bg-steel-100',
-  danger: 'bg-red-700 text-white hover:bg-red-800',
+  primary:
+    'bg-brand-500 text-[var(--nc-inverse)] font-semibold hover:bg-brand-400 active:translate-y-px shadow-[0_0_0_1px_rgba(240,115,22,0.45)]',
+  secondary:
+    'bg-ink-raised text-[var(--nc-ink)] border border-[var(--nc-border-strong)] hover:bg-ink-mute active:translate-y-px',
+  ghost: 'bg-transparent text-[var(--nc-text)] hover:bg-[var(--nc-surface-hover)] hover:text-[var(--nc-ink)]',
+  danger: 'bg-[var(--nc-danger)] text-[var(--nc-ink)] font-semibold hover:brightness-110',
   outline:
-    'border border-steel-300 bg-white text-steel-800 hover:border-steel-400 hover:bg-steel-50',
-  /** Контур на тёмном фоне (hero) — без конфликта bg-white + text-white */
+    'border border-[var(--nc-border-strong)] bg-transparent text-[var(--nc-ink)] hover:border-brand-500/60 hover:bg-signal-soft',
   outlineOnDark:
-    'border border-white/40 bg-transparent text-white hover:border-white/70 hover:bg-white/10',
+    'border border-white/30 bg-transparent text-white hover:border-brand-400 hover:bg-[var(--nc-surface)]/5',
 }
 
 const sizes: Record<Size, string> = {
   sm: 'h-8 px-2.5 text-sm',
   md: 'h-9 px-3.5 text-sm',
-  lg: 'h-10 px-4 text-base',
+  lg: 'h-11 px-5 text-base',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -32,7 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       disabled={disabled || loading}
-      className={`nc-focusable inline-flex items-center justify-center gap-2 rounded font-medium transition focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`nc-focusable inline-flex items-center justify-center gap-2 rounded-[var(--nc-radius)] font-medium transition focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-45 ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {loading && (

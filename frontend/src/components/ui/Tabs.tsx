@@ -16,7 +16,7 @@ interface TabsProps {
 
 export function Tabs({ items, value, onChange, className = '' }: TabsProps) {
   return (
-    <div className={`flex flex-wrap gap-1 border-b border-steel-200 ${className}`}>
+    <div className={`flex flex-wrap gap-1 border-b border-[var(--nc-border-subtle)] ${className}`}>
       {items.map((item) => {
         const active = item.id === value
         return (
@@ -27,8 +27,8 @@ export function Tabs({ items, value, onChange, className = '' }: TabsProps) {
             onClick={() => onChange(item.id)}
             className={`inline-flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
               active
-                ? 'border-brand-600 text-ink'
-                : 'border-transparent text-steel-500 hover:text-steel-800'
+                ? 'border-brand-500 text-[var(--nc-ink)]'
+                : 'border-transparent text-[var(--nc-text)] hover:text-[var(--nc-ink)]'
             } disabled:cursor-not-allowed disabled:opacity-40`}
           >
             {item.icon}

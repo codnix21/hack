@@ -37,24 +37,26 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <button
         type="button"
-        className="absolute inset-0 bg-steel-950/40"
+        className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
         aria-label="Закрыть"
         onClick={onClose}
       />
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative z-10 w-full ${sizes[size]} rounded border border-steel-200 bg-white shadow-lift`}
+        className={`relative z-10 w-full ${sizes[size]} rounded-[var(--nc-radius-lg)] border border-[var(--nc-border)] bg-[var(--nc-surface)] shadow-lift`}
       >
-        <div className="flex items-center justify-between border-b border-steel-100 px-5 py-3.5">
-          <h2 className="nc-title-sm">{title}</h2>
+        <div className="flex items-center justify-between border-b border-[var(--nc-border-subtle)] px-5 py-3.5">
+          <h2 className="nc-title-sm text-[var(--nc-ink)]">{title}</h2>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Закрыть">
             <X className="h-4 w-4" />
           </Button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-steel-100 px-5 py-4">{footer}</div>
+          <div className="flex justify-end gap-2 border-t border-[var(--nc-border-subtle)] px-5 py-4">
+            {footer}
+          </div>
         )}
       </div>
     </div>
@@ -116,7 +118,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <div className="text-sm leading-relaxed text-steel-700">{description}</div>
+      <div className="text-sm leading-relaxed text-[var(--nc-text)]">{description}</div>
     </Modal>
   )
 }

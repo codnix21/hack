@@ -17,6 +17,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
+    HRFlowable,
     KeepTogether,
     Paragraph,
     SimpleDocTemplate,
@@ -24,6 +25,15 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+
+# Visual identity for PDF (print-friendly, not dark UI)
+_PDF_ORANGE = colors.Color(0.94, 0.45, 0.09)  # #f07316
+_PDF_INK = colors.Color(0.08, 0.09, 0.12)
+_PDF_MUTED = colors.Color(0.35, 0.38, 0.45)
+_PDF_HEADER = colors.Color(0.12, 0.15, 0.20)
+_PDF_ROW_ALT = colors.Color(0.97, 0.97, 0.98)
+_PDF_CARD = colors.Color(0.98, 0.96, 0.93)
+_PDF_CARD_LINE = colors.Color(0.94, 0.45, 0.09)
 
 
 _FONT_REGISTERED = False
@@ -38,14 +48,14 @@ STATUS_LABELS_RU = {
 }
 
 METRIC_LABELS_RU = {
-    "capex": "Капитальные затраты (CAPEX)",
-    "opex": "Эксплуатационные расходы (OPEX)",
-    "opex_annual": "Эксплуатационные расходы (OPEX)",
-    "roi": "Рентабельность инвестиций (ROI)",
-    "roi_percent": "Рентабельность инвестиций (ROI)",
-    "tco": "Совокупная стоимость владения (TCO)",
-    "npv": "Чистая приведённая стоимость (NPV)",
-    "irr": "Внутренняя норма доходности (IRR)",
+    "capex": "Капитальные затраты",
+    "opex": "Эксплуатационные расходы",
+    "opex_annual": "Эксплуатационные расходы",
+    "roi": "Рентабельность инвестиций",
+    "roi_percent": "Рентабельность инвестиций",
+    "tco": "Совокупная стоимость владения",
+    "npv": "Чистая приведённая стоимость",
+    "irr": "Внутренняя норма доходности",
     "payback": "Срок окупаемости",
     "annual_effect": "Годовой экономический эффект",
     "cf": "Денежный поток",
@@ -79,7 +89,7 @@ ASSUMPTION_LABELS_RU = {
     "current_labor_cost_year": "Годовые затраты на персонал",
     "labor_reduction_share": "Ожидаемая доля сокращения трудозатрат",
     "additional_revenue": "Дополнительная выручка",
-    "raas_monthly_per_robot": "Аренда (RaaS) в месяц на робота",
+    "raas_monthly_per_robot": "Аренда в месяц на робота",
     "unit_price": "Цена решения",
     "peak_demand": "Пиковая нагрузка",
     "productivity": "Производительность",
@@ -209,7 +219,7 @@ PROJECT_FIELD_LABELS = {
     "work_mode": "Режим работы",
     "status": "Статус",
     "description": "Описание",
-    "is_demo": "Демонстрационный проект",
+    "is_demo": "Пример проекта",
     "object_type": "Тип объекта",
     "industry": "Отрасль",
     "created_at": "Создан",
@@ -222,8 +232,8 @@ ECONOMICS_DESCRIPTIONS = {
     "opex_annual": "Эксплуатационные затраты в год",
     "annual_effect": "Ожидаемый чистый эффект за год",
     "payback_years": "Ориентировочный период возврата инвестиций",
-    "roi_percent": "Возврат инвестиций относительно CAPEX",
-    "tco": "TCO роботизации (CAPEX + OPEX роботов × горизонт; без оставшегося ручного труда)",
+    "roi_percent": "Возврат инвестиций относительно капитальных затрат",
+    "tco": "Совокупная стоимость владения (капитальные + эксплуатационные × горизонт; без оставшегося ручного труда)",
 }
 
 BREAKDOWN_LABELS_RU = {
@@ -247,18 +257,18 @@ BREAKDOWN_LABELS_RU = {
 FORMULA_LABELS_RU = {
     "robots_count": "Количество роботов",
     "количество_роботов": "Количество роботов",
-    "capex": "Капитальные затраты (CAPEX)",
-    "opex": "Эксплуатационные затраты (OPEX)",
+    "capex": "Капитальные затраты",
+    "opex": "Эксплуатационные затраты",
     "annual_effect": "Годовой эффект",
     "payback": "Срок окупаемости",
-    "roi": "Рентабельность инвестиций (ROI)",
-    "roi_horizon": "Рентабельность за горизонт анализа (ROI)",
-    "tco": "TCO роботизации (без оставшегося ручного труда)",
-    "npv": "Чистая приведённая стоимость (NPV)",
-    "irr": "Внутренняя норма доходности (IRR)",
+    "roi": "Рентабельность инвестиций",
+    "roi_horizon": "Рентабельность за горизонт анализа",
+    "tco": "Совокупная стоимость владения (без оставшегося ручного труда)",
+    "npv": "Чистая приведённая стоимость",
+    "irr": "Внутренняя норма доходности",
     "gross_effect": "Валовой операционный эффект",
     "net_effect": "Чистый годовой эффект",
-    "depreciation": "Амортизация CAPEX",
+    "depreciation": "Амортизация капитальных затрат",
     "annual_effect_with_depreciation": "Годовой эффект с учётом амортизации",
 }
 
@@ -267,7 +277,7 @@ PROJECT_STATUS_RU = {
     "active": "Активный",
     "archived": "Архив",
     "completed": "Завершён",
-    "demo": "Демонстрационный",
+    "demo": "Каталог платформы",
 }
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E79")
@@ -348,7 +358,7 @@ def _origin_label(origin: Optional[str], is_demo: bool = False) -> str:
     if origin == "enriched":
         return "Обогащённые данные"
     if is_demo or origin == "demo" or not origin:
-        return "Демонстрационные данные"
+        return "Каталог платформы"
     return str(origin)
 
 
@@ -373,7 +383,7 @@ _VALUE_LABELS_RU = {
     "airport": "Аэропорт",
     "medical": "Медицинское учреждение",
     "purchase": "Покупка",
-    "raas": "Аренда (RaaS)",
+    "raas": "Аренда",
     "both": "Покупка и аренда",
 }
 
@@ -497,7 +507,7 @@ def _status_ru(status: Optional[str]) -> str:
 
 def _project_status_ru(status: Optional[str], is_demo: bool = False) -> str:
     if is_demo:
-        return "Демонстрационный"
+        return "Пример"
     if not status:
         return "Нет данных"
     return PROJECT_STATUS_RU.get(str(status), str(status))
@@ -847,7 +857,7 @@ def export_project_excel(
     cover_rows = [
         ("Тип объекта", object_type),
         ("Дата формирования", today),
-        ("Статус проекта", "Демонстрационный проект" if is_demo else "Рабочий проект"),
+        ("Статус проекта", "Пример" if is_demo else "Рабочий проект"),
         ("Регион", _dash(getattr(project, "region", None))),
         ("Режим работы", _work_mode_ru(getattr(project, "work_mode", None))),
         ("", ""),
@@ -905,9 +915,7 @@ def export_project_excel(
             (
                 "Примечание",
                 (
-                    "Отчёт подготовлен для ознакомления. Демонстрационные данные не заменяют исходные материалы проекта."
-                    if is_demo
-                    else "Значения рассчитаны платформой на основе параметров проекта и каталога решений."
+                    "Значения рассчитаны платформой на основе параметров проекта и каталога решений."
                 ),
             ),
         ]
@@ -931,7 +939,7 @@ def export_project_excel(
         ("Режим работы", _dash(getattr(project, "work_mode", None))),
         ("Статус", _project_status_ru(getattr(project, "status", None), is_demo=is_demo)),
         ("Описание", _dash(getattr(project, "description", None))),
-        ("Тип данных", "Демонстрационные данные" if is_demo else "Рабочие данные проекта"),
+        ("Тип данных", "Данные проекта"),
     ]:
         ws_proj.append([label, value])
     _style_table(ws_proj, wrap_cols={2}, auto_filter=False)
@@ -1044,7 +1052,7 @@ def export_project_excel(
     ws_sim = wb.create_sheet("Симуляция")
     ws_sim.append(["Показатель", "Значение", "Примечание"])
     sim_note = (
-        "Дискретно-событийная демонстрационная модель по сохранённому плану; "
+        "Дискретно-событийная модель по сохранённому плану; "
         "не полноценная физическая симуляция."
     )
     robots_n = _econ_value(economics, "robots_count") if economics else None
@@ -1134,7 +1142,7 @@ def export_project_excel(
                     "Оставшийся ручной труд",
                     _format_money(rem),
                     "₽/год",
-                    "Не входит в TCO роботизации",
+                    "Не входит в совокупную стоимость владения",
                 ]
             )
         if outlay is not None:
@@ -1143,7 +1151,7 @@ def export_project_excel(
                     "Полный денежный выход",
                     _format_money(outlay),
                     "₽",
-                    "TCO + оставшийся труд × горизонт",
+                    "Совокупная стоимость + оставшийся труд × горизонт",
                 ]
             )
         years = (economics.get("inputs") or {}).get("years") if isinstance(economics.get("inputs"), dict) else tco_block.get("years")
@@ -1156,7 +1164,7 @@ def export_project_excel(
                     "Горизонт анализа",
                     _dash(years),
                     "лет",
-                    "Годы для TCO / NPV / денежного потока",
+                    "Годы для совокупной стоимости / ЧПС / денежного потока",
                 ]
             )
         if discount is not None:
@@ -1165,7 +1173,7 @@ def export_project_excel(
                     "Ставка дисконтирования",
                     f"{float(discount) * 100:.1f}",
                     "%",
-                    "Допущение модели для NPV",
+                    "Допущение модели для чистой приведённой стоимости",
                 ]
             )
         npv_v = economics.get("npv", {}).get("npv") if isinstance(economics.get("npv"), dict) else None
@@ -1188,7 +1196,7 @@ def export_project_excel(
         )
         dep = economics.get("depreciation") if isinstance(economics.get("depreciation"), dict) else {}
         if dep.get("applicable") and dep.get("annual_depreciation") is not None:
-            ws_econ.append(["Амортизация CAPEX (бухгалтерская)", "", "", ""])
+            ws_econ.append(["Амортизация капитальных затрат (бухгалтерская)", "", "", ""])
             method_raw = dep.get("method_label_ru") or dep.get("method") or "straight_line"
             method_label = METRIC_LABELS_RU.get(str(method_raw), method_raw)
             ws_econ.append(
@@ -1220,7 +1228,7 @@ def export_project_excel(
                     "Амортизация / год",
                     _format_money(dep.get("annual_depreciation")),
                     "₽/год",
-                    "Не входит в денежный поток / NPV / IRR",
+                    "Не входит в денежный поток / ЧПС / ВНД",
                 ]
             )
             effect = economics.get("annual_effect") if isinstance(economics.get("annual_effect"), dict) else {}
@@ -1259,7 +1267,7 @@ def export_project_excel(
         capex_block = economics.get("capex") if isinstance(economics.get("capex"), dict) else {}
         breakdown = capex_block.get("breakdown") or {}
         if breakdown:
-            ws_econ.append(["Состав CAPEX", "", "", ""])
+            ws_econ.append(["Состав капитальных затрат", "", "", ""])
             sources = capex_block.get("component_sources") or {}
             for k, v in breakdown.items():
                 if k == "ops_staff_count":
@@ -1283,7 +1291,7 @@ def export_project_excel(
             if capex_block.get("breakdown_matches_total") is False:
                 ws_econ.append(
                     [
-                        "⚠ Сумма статей ≠ CAPEX",
+                        "⚠ Сумма статей ≠ капитальным затратам",
                         _format_money(capex_block.get("breakdown_sum")),
                         "₽",
                         "Внутренняя проверка не пройдена",
@@ -1292,7 +1300,7 @@ def export_project_excel(
         opex_block = economics.get("opex") if isinstance(economics.get("opex"), dict) else {}
         ob = opex_block.get("breakdown") or {}
         if ob:
-            ws_econ.append(["Состав OPEX", "", "", ""])
+            ws_econ.append(["Состав эксплуатационных расходов", "", "", ""])
             for k, v in ob.items():
                 unit = "чел" if k == "ops_staff_count" else "₽/год"
                 ws_econ.append(
@@ -1305,7 +1313,7 @@ def export_project_excel(
                 )
     _style_table(ws_econ, wrap_cols={4}, money_cols={2}, auto_filter=False)
     for r in range(2, ws_econ.max_row + 1):
-        if ws_econ.cell(r, 1).value in {"Состав CAPEX", "Состав OPEX"}:
+        if ws_econ.cell(r, 1).value in {"Состав капитальных затрат", "Состав эксплуатационных расходов"}:
             for c in range(1, 5):
                 ws_econ.cell(r, c).fill = SECTION_FILL
                 ws_econ.cell(r, c).font = Font(bold=True, color="1F4E79")
@@ -1339,13 +1347,13 @@ def export_project_excel(
         [
             "Сценарий",
             "Роботов",
-            "CAPEX, ₽",
-            "OPEX, ₽/год",
+            "Капитальные затраты, ₽",
+            "Эксплуатационные расходы, ₽/год",
             "Годовой эффект, ₽",
             "Окупаемость, лет",
-            "ROI, %",
-            "TCO, ₽",
-            "NPV, ₽",
+            "Рентабельность, %",
+            "Совокупная стоимость владения, ₽",
+            "Чистая приведённая стоимость, ₽",
         ]
     )
     for sc in scenarios or []:
@@ -1376,13 +1384,13 @@ def export_project_excel(
         alt = what_if.get("alternative") or {}
         delta = what_if.get("delta") or {}
         metrics = [
-            ("CAPEX, ₽", "capex", True),
-            ("OPEX, ₽/год", "opex_annual", True),
+            ("Капитальные затраты, ₽", "capex", True),
+            ("Эксплуатационные расходы, ₽/год", "opex_annual", True),
             ("Годовой эффект, ₽", "annual_effect", True),
             ("Количество роботов", "robots_count", False),
             ("Срок окупаемости, лет", "payback_years", False),
-            ("ROI, %", "roi_percent", False),
-            ("TCO, ₽", "tco", True),
+            ("Рентабельность, %", "roi_percent", False),
+            ("Совокупная стоимость владения, ₽", "tco", True),
         ]
         for title, key, money in metrics:
             getter = _what_if_metric_getter(key)
@@ -1425,11 +1433,11 @@ def export_project_excel(
     else:
         ws_wi.append(
             [
-                "Анализ «что если» ещё не выполнялся",
+                "Анализ «что если» ещё не сохранялся",
                 "—",
                 "—",
                 "—",
-                "Откройте раздел экономики и измените параметры",
+                "Измените допущения на шаге «Сценарии и что если» и скачайте отчёт снова",
             ]
         )
     _style_table(ws_wi, money_cols={2, 3, 4}, percent_cols={5}, auto_filter=False)
@@ -1514,9 +1522,9 @@ def export_project_excel(
         ws_src.append(
             [
                 "Источник",
-                "Демонстрационные данные платформы",
+                "Каталог платформы",
                 "—",
-                "Используются для показа возможностей, не заменяют исходные материалы",
+                "Данные проекта",
             ]
         )
     if ws_src.max_row == 1:
@@ -1558,9 +1566,19 @@ def export_project_pdf(
         "RuTitle",
         parent=styles["Title"],
         fontName=font_name,
-        fontSize=16,
-        leading=20,
-        spaceAfter=6,
+        fontSize=18,
+        leading=22,
+        textColor=_PDF_INK,
+        spaceAfter=4,
+    )
+    brand_style = ParagraphStyle(
+        "RuBrand",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=9,
+        leading=12,
+        textColor=_PDF_ORANGE,
+        spaceAfter=2,
     )
     h2_style = ParagraphStyle(
         "RuH2",
@@ -1568,7 +1586,8 @@ def export_project_pdf(
         fontName=font_name,
         fontSize=12,
         leading=16,
-        spaceBefore=8,
+        textColor=_PDF_INK,
+        spaceBefore=10,
         spaceAfter=4,
     )
     normal_style = ParagraphStyle(
@@ -1577,6 +1596,7 @@ def export_project_pdf(
         fontName=font_name,
         fontSize=10,
         leading=13,
+        textColor=_PDF_INK,
     )
     small_style = ParagraphStyle(
         "RuSmall",
@@ -1584,6 +1604,23 @@ def export_project_pdf(
         fontName=font_name,
         fontSize=8,
         leading=11,
+        textColor=_PDF_INK,
+    )
+    kpi_label_style = ParagraphStyle(
+        "RuKpiLabel",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=7.5,
+        leading=9,
+        textColor=_PDF_MUTED,
+    )
+    kpi_value_style = ParagraphStyle(
+        "RuKpiValue",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=11,
+        leading=14,
+        textColor=_PDF_INK,
     )
     footer_style = ParagraphStyle(
         "RuFooter",
@@ -1591,7 +1628,7 @@ def export_project_pdf(
         fontName=font_name,
         fontSize=8,
         leading=11,
-        textColor=colors.grey,
+        textColor=_PDF_MUTED,
     )
 
     def esc(text: Any) -> str:
@@ -1605,6 +1642,15 @@ def export_project_pdf(
     def p(text: Any, style: ParagraphStyle = normal_style) -> Paragraph:
         return Paragraph(esc(text), style)
 
+    header_cell_style = ParagraphStyle(
+        "RuHeaderCell",
+        parent=styles["Normal"],
+        fontName=font_name,
+        fontSize=8,
+        leading=11,
+        textColor=colors.white,
+    )
+
     def make_table(data: list[list[Any]], col_widths: Optional[list] = None) -> Table:
         # Wrap long cells as Paragraphs for Cyrillic wrapping
         wrapped: list[list[Any]] = []
@@ -1614,29 +1660,91 @@ def export_project_pdf(
                 if isinstance(cell, Paragraph):
                     new_row.append(cell)
                 else:
-                    style = small_style if r_idx > 0 else normal_style
+                    style = header_cell_style if r_idx == 0 else small_style
                     new_row.append(Paragraph(esc(_dash(cell)), style))
             wrapped.append(new_row)
         table = Table(wrapped, colWidths=col_widths, hAlign="LEFT")
-        table.setStyle(
+        style_cmds: list = [
+            ("FONTNAME", (0, 0), (-1, -1), font_name),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("BACKGROUND", (0, 0), (-1, 0), _PDF_HEADER),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.Color(0.75, 0.78, 0.82)),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+        for i in range(1, len(wrapped)):
+            if i % 2 == 0:
+                style_cmds.append(("BACKGROUND", (0, i), (-1, i), _PDF_ROW_ALT))
+        table.setStyle(TableStyle(style_cmds))
+        return table
+
+    def _kpi_card(label: str, value: Any) -> Table:
+        card = Table(
+            [
+                [Paragraph(esc(label), kpi_label_style)],
+                [Paragraph(f"<b>{esc(_dash(value))}</b>", kpi_value_style)],
+            ],
+            colWidths=[78 * mm],
+        )
+        card.setStyle(
             TableStyle(
                 [
-                    ("FONTNAME", (0, 0), (-1, -1), font_name),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.92, 0.92, 0.92)),
-                    ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                    ("BACKGROUND", (0, 0), (-1, -1), _PDF_CARD),
+                    ("BOX", (0, 0), (-1, -1), 1.2, _PDF_CARD_LINE),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 3),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
                 ]
             )
         )
-        return table
+        return card
+
+    def kpi_strip(cards: list[tuple[str, Any]]) -> Table:
+        """Compact visual KPI grid (label + value cards), not a data dump."""
+        grid_rows: list[list[Any]] = []
+        for i in range(0, len(cards), 2):
+            left = _kpi_card(*cards[i])
+            right = _kpi_card(*cards[i + 1]) if i + 1 < len(cards) else Spacer(1, 1)
+            row_t = Table([[left, right]], colWidths=[80 * mm, 80 * mm])
+            row_t.setStyle(
+                TableStyle(
+                    [
+                        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                        ("TOPPADDING", (0, 0), (-1, -1), 0),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ]
+                )
+            )
+            grid_rows.append([row_t])
+        wrap = Table(grid_rows, colWidths=[160 * mm])
+        wrap.setStyle(
+            TableStyle(
+                [
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        return wrap
 
     def section(title: str, flowables: list) -> KeepTogether:
-        return KeepTogether([p(title, h2_style), *flowables, Spacer(1, 6)])
+        bar = HRFlowable(
+            width="100%",
+            thickness=2.2,
+            color=_PDF_ORANGE,
+            spaceBefore=2,
+            spaceAfter=6,
+            hAlign="LEFT",
+        )
+        return KeepTogether([p(title, h2_style), bar, *flowables, Spacer(1, 6)])
 
     is_demo = bool(getattr(project, "is_demo", False))
     economics = economics if isinstance(economics, dict) else None
@@ -1652,25 +1760,69 @@ def export_project_pdf(
     story: list = []
 
     # Title page
+    story.append(p("NETCORE · промышленный командный центр", brand_style))
     story.append(p(PLATFORM_NAME, title_style))
+    story.append(
+        HRFlowable(
+            width="100%",
+            thickness=3,
+            color=_PDF_ORANGE,
+            spaceBefore=2,
+            spaceAfter=8,
+            hAlign="LEFT",
+        )
+    )
     story.append(p(f"Проект: {getattr(project, 'name', None) or 'Нет данных'}", normal_style))
     story.append(p(f"Дата: {today}", normal_style))
     story.append(
         p(
-            "Демонстрационный отчёт" if is_demo else "Отчёт по проекту",
+            "Отчёт по проекту",
             normal_style,
         )
     )
-    if is_demo:
-        story.append(
-            p(
-                "Демонстрационные данные — не замена исходных материалов проекта.",
-                normal_style,
-            )
-        )
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 8))
 
-    # Резюме
+    # Visual KPI strip (same numbers as before — presentation only)
+    npv_val = (
+        (economics or {}).get("npv", {}).get("npv")
+        if isinstance((economics or {}).get("npv"), dict)
+        else None
+    )
+    irr_val = (
+        (economics or {}).get("irr", {}).get("irr")
+        if isinstance((economics or {}).get("irr"), dict)
+        else None
+    )
+    story.append(
+        section(
+            "Ключевые показатели",
+            [
+                kpi_strip(
+                    [
+                        (_metric_ru("capex"), _econ_value(economics, "capex")),
+                        (
+                            f"{_metric_ru('opex')} / год",
+                            _econ_value(economics, "opex_annual"),
+                        ),
+                        (
+                            f"{_metric_ru('roi')}, %",
+                            _econ_value(economics, "roi_percent"),
+                        ),
+                        (
+                            f"{_metric_ru('payback')}, лет",
+                            _econ_value(economics, "payback_years"),
+                        ),
+                        (_metric_ru("npv"), npv_val),
+                        (f"{_metric_ru('irr')}, %", irr_val),
+                        ("Количество роботов", _econ_value(economics, "robots_count")),
+                        ("Подходящих решений", counts["suitable"]),
+                    ]
+                )
+            ],
+        )
+    )
+
+    # Резюме — детальная таблица
     resume_rows = [
         ["Показатель", "Значение"],
         ["Всего решений", counts["total"]],
@@ -1687,7 +1839,7 @@ def export_project_pdf(
             _dash(_econ_value(economics, "tco")),
         ],
         [
-            "Полный денежный выход (TCO + оставшийся труд × горизонт)",
+            "Полный денежный выход (Совокупная стоимость + оставшийся труд × горизонт)",
             _dash(
                 (economics or {}).get("tco", {}).get("total_outlay_with_remaining_labor")
                 if isinstance((economics or {}).get("tco"), dict)
@@ -1702,22 +1854,8 @@ def export_project_pdf(
             f"{_metric_ru('payback')}, лет",
             _dash(_econ_value(economics, "payback_years")),
         ],
-        [
-            _metric_ru("npv"),
-            _dash(
-                (economics or {}).get("npv", {}).get("npv")
-                if isinstance((economics or {}).get("npv"), dict)
-                else None
-            ),
-        ],
-        [
-            f"{_metric_ru('irr')}, %",
-            _dash(
-                (economics or {}).get("irr", {}).get("irr")
-                if isinstance((economics or {}).get("irr"), dict)
-                else None
-            ),
-        ],
+        [_metric_ru("npv"), _dash(npv_val)],
+        [f"{_metric_ru('irr')}, %", _dash(irr_val)],
         ["Количество роботов", _dash(_econ_value(economics, "robots_count"))],
     ]
     story.append(
@@ -1787,16 +1925,16 @@ def export_project_pdf(
             scenario_name = {
                 "baseline": "Без роботизации",
                 "purchase": "Покупка оборудования",
-                "raas": "Аренда (RaaS)",
+                "raas": "Аренда",
             }.get(scenario_name, scenario_name)
     econ_data.append(["Сценарий", _dash(scenario_name), "—", "Активный сценарий"])
     for key, title, unit, desc_key in [
         ("robots_count", "Количество роботов", "шт", "robots_count"),
-        ("capex", "Капитальные затраты (CAPEX)", "₽", "capex"),
-        ("opex_annual", "Эксплуатационные затраты (OPEX)", "₽/год", "opex_annual"),
+        ("capex", "Капитальные затраты", "₽", "capex"),
+        ("opex_annual", "Эксплуатационные затраты", "₽/год", "opex_annual"),
         ("annual_effect", "Годовой эффект", "₽/год", "annual_effect"),
-        ("tco", "Совокупная стоимость владения (TCO)", "₽", "tco"),
-        ("roi_percent", "Рентабельность инвестиций (ROI)", "%", "roi_percent"),
+        ("tco", "Совокупная стоимость владения", "₽", "tco"),
+        ("roi_percent", "Рентабельность инвестиций", "%", "roi_percent"),
         ("payback_years", "Срок окупаемости", "лет", "payback_years"),
     ]:
         econ_data.append(
@@ -1811,7 +1949,7 @@ def export_project_pdf(
     if dep.get("applicable") and dep.get("annual_depreciation") is not None:
         econ_data.append(
             [
-                "Амортизация CAPEX / год",
+                "Амортизация капитальных затрат / год",
                 _dash(dep.get("annual_depreciation")),
                 "₽/год",
                 "Бухгалтерский расход; не денежный отток",
@@ -1832,7 +1970,7 @@ def export_project_pdf(
                     "Годовой эффект с амортизацией",
                     _dash(effect.get("with_depreciation")),
                     "₽/год",
-                    "Денежный эффект − амортизация; не используется в NPV/IRR",
+                    "Денежный эффект − амортизация; не используется в ЧПС/ВНД",
                 ]
             )
     story.append(
@@ -1884,66 +2022,70 @@ def export_project_pdf(
             )
         )
 
-    # Сценарии (if provided)
-    if scenarios:
-        sc_data = [
-            [
-                "Сценарий",
-                "Роботы",
-                "CAPEX, ₽",
-                "OPEX, ₽/год",
-                "Годовой эффект, ₽",
-                "ROI, %",
-                "Окупаемость, лет",
-                "NPV, ₽",
-            ]
+    # Сценарии — всегда в отчёте (пустая таблица с пояснением, если данных нет)
+    sc_data = [
+        [
+            "Сценарий",
+            "Роботы",
+            "Капитальные затраты, ₽",
+            "Эксплуатационные расходы, ₽/год",
+            "Годовой эффект, ₽",
+            "Рентабельность, %",
+            "Окупаемость, лет",
+            "Чистая приведённая стоимость, ₽",
         ]
-        code_map = {
-            "baseline": "Без роботизации",
-            "purchase": "Покупка оборудования",
-            "raas": "Аренда (RaaS)",
-        }
-        for sc in scenarios:
-            m = _scenario_metrics(sc.get("results") or {})
-            code = sc.get("code")
-            name = sc.get("name_ru") or code_map.get(str(code or ""), code)
-            sc_data.append(
-                [
-                    _dash(name),
-                    _dash(m.get("robots_count")),
-                    _dash(m.get("capex")),
-                    _dash(m.get("opex_annual")),
-                    _dash(m.get("annual_effect")),
-                    _dash(m.get("roi_percent")),
-                    _dash(m.get("payback_years")),
-                    _dash(m.get("npv")),
-                ]
-            )
-        story.append(
-            section(
-                "Сравнение сценариев",
-                [
-                    make_table(
-                        sc_data,
-                        col_widths=[
-                            32 * mm,
-                            14 * mm,
-                            22 * mm,
-                            22 * mm,
-                            22 * mm,
-                            14 * mm,
-                            14 * mm,
-                            20 * mm,
-                        ],
-                    ),
-                    p(
-                        "Увеличение числа роботов не всегда даёт пропорциональный рост "
-                        "производительности: ограничивают проходы, узкие места маршрутов и спрос.",
-                        normal_style,
-                    ),
-                ],
-            )
+    ]
+    code_map = {
+        "baseline": "Без роботизации",
+        "purchase": "Покупка оборудования",
+        "raas": "Роботы как услуга",
+    }
+    wrote_sc = 0
+    for sc in scenarios or []:
+        m = _scenario_metrics(sc.get("results") or {})
+        if not m:
+            continue
+        code = sc.get("code")
+        name = sc.get("name_ru") or code_map.get(str(code or ""), code)
+        sc_data.append(
+            [
+                _dash(name),
+                _dash(m.get("robots_count")),
+                _dash(m.get("capex")),
+                _dash(m.get("opex_annual")),
+                _dash(m.get("annual_effect")),
+                _dash(m.get("roi_percent")),
+                _dash(m.get("payback_years")),
+                _dash(m.get("npv")),
+            ]
         )
+        wrote_sc += 1
+    if wrote_sc == 0:
+        sc_data.append(["Нет данных по сценариям", "—", "—", "—", "—", "—", "—", "—"])
+    story.append(
+        section(
+            "Сравнение сценариев",
+            [
+                make_table(
+                    sc_data,
+                    col_widths=[
+                        32 * mm,
+                        14 * mm,
+                        22 * mm,
+                        22 * mm,
+                        22 * mm,
+                        14 * mm,
+                        14 * mm,
+                        20 * mm,
+                    ],
+                ),
+                p(
+                    "Сравнение сценариев «без роботизации / покупка / аренда» по текущим параметрам проекта.",
+                    small_style,
+                ),
+            ],
+        )
+    )
 
     # What-if
     wi_items: list = []
@@ -1953,10 +2095,13 @@ def export_project_pdf(
         alt = what_if.get("alternative") or {}
         delta = what_if.get("delta") or {}
         for title, key in [
-            ("Капитальные затраты (CAPEX)", "capex"),
-            ("Эксплуатационные затраты (OPEX), год", "opex_annual"),
+            ("Капитальные затраты", "capex"),
+            ("Эксплуатационные затраты, год", "opex_annual"),
             ("Годовой эффект", "annual_effect"),
             ("Роботов", "robots_count"),
+            ("Срок окупаемости, лет", "payback_years"),
+            ("Рентабельность, %", "roi_percent"),
+            ("Совокупная стоимость владения, ₽", "tco"),
         ]:
             getter = _what_if_metric_getter(key)
             b = getter(base) if isinstance(base, dict) else None
@@ -1975,8 +2120,22 @@ def export_project_pdf(
                 pct = None
             wi_data.append([title, _dash(b), _dash(a), _dash(d), _dash(pct)])
         wi_items.append(make_table(wi_data, col_widths=[55 * mm, 25 * mm, 25 * mm, 25 * mm, 25 * mm]))
+        changes = what_if.get("changes") or {}
+        if isinstance(changes, dict) and changes:
+            ch_data = [["Допущение", "Значение"]]
+            for k, v in changes.items():
+                ch_data.append([_assumption_label(str(k)), _format_share_or_number(str(k), v)])
+            wi_items.append(Spacer(1, 4))
+            wi_items.append(p("Изменённые допущения", normal_style))
+            wi_items.append(make_table(ch_data, col_widths=[80 * mm, 80 * mm]))
     else:
-        wi_items.append(p("Нет сохранённого анализа «что если»", normal_style))
+        wi_items.append(
+            p(
+                "Анализ «что если» ещё не сохранялся. Откройте «Сценарии и что если», "
+                "измените допущения — затем снова скачайте отчёт.",
+                normal_style,
+            )
+        )
     story.append(section("Анализ «что если»", wi_items))
 
     # Допущения — только модельные (без ds_* и сырых ключей датасета)
@@ -2009,7 +2168,7 @@ def export_project_pdf(
         if isinstance(src, dict):
             kind = src.get("kind") or "справочник"
             if str(kind).lower() == "demo":
-                kind = "Демонстрационные данные"
+                kind = "Каталог платформы"
             src_data.append(
                 [
                     _dash(src.get("name")),
@@ -2032,15 +2191,6 @@ def export_project_pdf(
             seen_files.add(sf)
             any_src = True
             src_data.append([sf, "—", _origin_label(s.get("data_origin"))])
-    if is_demo:
-        any_src = True
-        src_data.append(
-            [
-                "Демонстрационные данные платформы",
-                "—",
-                "Демонстрационные данные",
-            ]
-        )
     if not any_src:
         src_data.append(["Нет данных", "—", "—"])
     story.append(
@@ -2060,17 +2210,23 @@ def export_project_pdf(
     )
     story.append(
         p(
-            "Демонстрационные данные помечены отдельно; исходные материалы — в каталоге исходных материалов.",
+            "Источники данных указаны в разделе «Источники».",
             footer_style,
         )
     )
 
     def _on_page(canvas, _doc):
         canvas.saveState()
-        canvas.setFont(font_name, 8)
-        canvas.setFillColor(colors.grey)
+        # top accent line
+        canvas.setStrokeColor(_PDF_ORANGE)
+        canvas.setLineWidth(2)
+        canvas.line(15 * mm, A4[1] - 10 * mm, A4[0] - 15 * mm, A4[1] - 10 * mm)
+        canvas.setFont(font_name, 7.5)
+        canvas.setFillColor(_PDF_MUTED)
+        canvas.drawString(15 * mm, A4[1] - 8 * mm, "NETCORE")
         page_no = canvas.getPageNumber()
-        canvas.drawCentredString(A4[0] / 2, 10 * mm, f"Страница {page_no}")
+        canvas.drawRightString(A4[0] - 15 * mm, A4[1] - 8 * mm, f"Стр. {page_no}")
+        canvas.drawCentredString(A4[0] / 2, 10 * mm, f"Страница {page_no} · предынвестиционная оценка")
         canvas.restoreState()
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)

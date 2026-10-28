@@ -203,7 +203,7 @@ export function ProjectsPage() {
         <div className="page-surface">
           <EmptyState
             title="Проектов пока нет"
-            description="Создайте проект склада или откройте демонстрационный сценарий и сделайте копию."
+            description="Создайте проект склада или откройте пример сценария и сделайте копию."
             actionLabel="Создать проект"
             onAction={() => navigate('/app/projects/new')}
           />
@@ -214,11 +214,11 @@ export function ProjectsPage() {
         <div className="page-surface overflow-hidden">
           <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
             {pageItems.map((p) => (
-              <article key={p.id} className="rounded border border-steel-200 bg-steel-50/40 p-4">
+              <article key={p.id} className="rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-4">
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-display font-semibold text-steel-900">{p.name}</h3>
-                    <p className="mt-1 text-xs text-steel-500">
+                    <h3 className="font-display font-semibold text-[var(--nc-ink)]">{p.name}</h3>
+                    <p className="mt-1 text-xs text-[var(--nc-muted)]">
                       {(p.object_type_id != null && objectTypeMap.get(p.object_type_id)) ||
                         'Тип не задан'}{' '}
                       · обновлён {formatDate(p.updated_at)}
@@ -226,13 +226,13 @@ export function ProjectsPage() {
                     {(p.summary?.area_m2 != null ||
                       p.summary?.robots_count != null ||
                       p.summary?.capex != null) && (
-                      <p className="mt-1 text-xs text-steel-600">
+                      <p className="mt-1 text-xs text-[var(--nc-text)]">
                         {p.summary.area_m2 != null ? `${p.summary.area_m2} м²` : null}
                         {p.summary.robots_count != null
                           ? ` · ${p.summary.robots_count} роботов`
                           : null}
                         {p.summary.capex != null
-                          ? ` · CAPEX ${Math.round(p.summary.capex / 1e6)} млн ₽`
+                          ? ` · инвестиции ${Math.round(p.summary.capex / 1e6)} млн ₽`
                           : null}
                         {p.summary.payback_years != null
                           ? ` · окупаемость ${p.summary.payback_years} лет`
@@ -244,9 +244,9 @@ export function ProjectsPage() {
                     {p.is_demo && (
                       <Badge
                         variant="warning"
-                        title="Демонстрационные данные используются для показа возможностей платформы"
+                        title="Данные каталога платформы используются для показа возможностей"
                       >
-                        Демонстрационные данные
+                        Пример
                       </Badge>
                     )}
                     <Badge variant={statusVariant[p.status as keyof typeof statusVariant] || 'default'}>
@@ -255,7 +255,7 @@ export function ProjectsPage() {
                   </div>
                 </div>
                 {p.description && (
-                  <p className="mb-3 line-clamp-2 text-sm text-steel-600">{p.description}</p>
+                  <p className="mb-3 line-clamp-2 text-sm text-[var(--nc-text)]">{p.description}</p>
                 )}
                 <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" onClick={() => navigate(`/app/projects/${p.id}`)}>

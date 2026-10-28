@@ -187,20 +187,20 @@ export function ProjectCreatePage() {
         ]}
       />
 
-      <div className="mb-4 flex items-center gap-2 text-sm text-steel-500">
-        <span className={wizardStep === 1 ? 'font-semibold text-brand-700' : ''}>1. Тип объекта</span>
+      <div className="mb-4 flex items-center gap-2 text-sm text-[var(--nc-muted)]">
+        <span className={wizardStep === 1 ? 'font-semibold text-[var(--nc-accent)]' : ''}>1. Тип объекта</span>
         <ChevronRight className="h-4 w-4" />
-        <span className={wizardStep === 2 ? 'font-semibold text-brand-700' : ''}>2. Сведения</span>
+        <span className={wizardStep === 2 ? 'font-semibold text-[var(--nc-accent)]' : ''}>2. Сведения</span>
       </div>
 
       {wizardStep === 1 && !isEdit && (
         <Card title="Какой объект вы оцениваете?">
-          <p className="mb-4 text-sm text-steel-600">
+          <p className="mb-4 text-sm text-[var(--nc-text)]">
             Выберите тип — от него зависят параметры, доступные решения каталога и глубина сценария.
           </p>
-          {objectTypesQuery.isLoading && <p className="text-sm text-steel-500">Загрузка типов…</p>}
+          {objectTypesQuery.isLoading && <p className="text-sm text-[var(--nc-muted)]">Загрузка типов…</p>}
           {errors.object_type_id && (
-            <p className="mb-3 text-sm text-red-600">{errors.object_type_id}</p>
+            <p className="mb-3 text-sm text-[var(--nc-danger)]">{errors.object_type_id}</p>
           )}
           <div className="grid gap-3 sm:grid-cols-3">
             {objectTypes.map((ot) => {
@@ -227,14 +227,14 @@ export function ProjectCreatePage() {
                   }}
                   className={`rounded border p-4 text-left transition ${
                     active
-                      ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-400'
-                      : 'border-steel-200 bg-white hover:border-steel-300'
+                      ? 'border-[var(--nc-accent)] bg-[var(--nc-surface-selected)] ring-1 ring-[var(--nc-accent-line)]'
+                      : 'border-[var(--nc-border)] bg-[var(--nc-surface)] hover:border-[var(--nc-border-strong)]'
                   }`}
                 >
-                  <Icon className={`h-6 w-6 ${active ? 'text-brand-600' : 'text-steel-400'}`} />
-                  <p className="mt-3 font-display text-base font-semibold text-ink">{ot.name_ru}</p>
-                  <p className="mt-1 text-xs text-steel-600">{help.blurb}</p>
-                  <p className="mt-2 text-[11px] text-steel-400">{help.depth}</p>
+                  <Icon className={`h-6 w-6 ${active ? 'text-[var(--nc-accent)]' : 'text-[var(--nc-faint)]'}`} />
+                  <p className="mt-3 font-display text-base font-semibold text-[var(--nc-ink)]">{ot.name_ru}</p>
+                  <p className="mt-1 text-xs text-[var(--nc-text)]">{help.blurb}</p>
+                  <p className="mt-2 text-[11px] text-[var(--nc-muted)]">{help.depth}</p>
                 </button>
               )
             })}
@@ -265,7 +265,7 @@ export function ProjectCreatePage() {
             {!isEdit && (
               <button
                 type="button"
-                className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-[var(--nc-link)] hover:underline"
                 onClick={() => setWizardStep(1)}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -283,10 +283,10 @@ export function ProjectCreatePage() {
               hint="Обязательное поле"
             />
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-steel-700">Описание задачи</span>
+              <span className="text-sm font-medium text-[var(--nc-ink)]">Описание задачи</span>
               <textarea
                 name="description"
-                className="min-h-[88px] w-full rounded border border-steel-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-400/40"
+                className="min-h-[88px] w-full rounded border border-[var(--nc-border)] bg-[var(--nc-surface-input)] px-3 py-2 text-sm text-[var(--nc-ink)] placeholder:text-[var(--nc-faint)] focus:border-[var(--nc-accent)] focus:outline-none focus:ring-1 focus:ring-[var(--nc-accent)]/40"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Что хотите автоматизировать и какие ограничения важны"

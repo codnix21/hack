@@ -3,11 +3,11 @@ import type { HTMLAttributes } from 'react'
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info'
 
 const styles: Record<BadgeVariant, string> = {
-  default: 'border-steel-300 bg-steel-50 text-steel-700',
-  success: 'border-emerald-700/30 bg-emerald-50 text-emerald-900',
-  warning: 'border-brand-600/35 bg-brand-50 text-brand-900',
-  danger: 'border-red-700/30 bg-red-50 text-red-800',
-  info: 'border-steel-400/40 bg-white text-steel-800',
+  default: 'border-[var(--nc-border)] bg-[var(--nc-surface-muted)] text-[var(--nc-text)]',
+  success: 'border-[rgba(198,242,58,0.4)] bg-[var(--nc-lime-soft)] text-[var(--nc-lime)]',
+  warning: 'border-[rgba(245,193,74,0.4)] bg-[var(--nc-warning-soft)] text-[var(--nc-warning)]',
+  danger: 'border-[rgba(255,107,107,0.4)] bg-[var(--nc-danger-soft)] text-[var(--nc-danger)]',
+  info: 'border-[rgba(122,175,255,0.4)] bg-[var(--nc-info-soft)] text-[var(--nc-info)]',
 }
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

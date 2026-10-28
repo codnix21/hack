@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { clickStage } from './helpers'
 
 /**
  * Минимальный набор → расчёт → изменение входа → требуется пересчёт.
@@ -65,7 +66,7 @@ test.describe('required inputs progressive entry', () => {
     })
 
     const stages = page.getByRole('navigation', { name: /Этапы проекта/i })
-    await stages.getByRole('button', { name: /Экономика/i }).click()
+    await clickStage(page, /Экономика/i)
 
     await expect(page.getByTestId('economics-inputs-incomplete')).toHaveCount(0, {
       timeout: 5_000,
@@ -83,7 +84,7 @@ test.describe('required inputs progressive entry', () => {
       await expect(page.getByTestId('economics-freshness-badge')).toBeVisible()
     })
 
-    await stages.getByRole('button', { name: /Объект|Данные/i }).first().click()
+    await clickStage(page, /Объект|Данные/i)
     await expect(banner).toBeVisible({ timeout: 15_000 })
     const peakAgain = page.locator('[data-param-field="peak_demand"] input').first()
     await peakAgain.fill('320')
@@ -93,7 +94,7 @@ test.describe('required inputs progressive entry', () => {
       timeout: 15_000,
     })
 
-    await stages.getByRole('button', { name: /Экономика/i }).click()
+    await clickStage(page, /Экономика/i)
     await expect(
       page.getByText(/Требуется пересчёт|устарел|пересчёт/i).first(),
     ).toBeVisible({ timeout: 30_000 })

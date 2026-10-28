@@ -62,7 +62,7 @@ export function suggestNextStep(
   if (statuses.economics !== 'done' && (statuses.selection === 'done' || statuses.selection === 'warning')) {
     return {
       title: 'Рассчитайте экономический эффект',
-      reason: 'Подбор выполнен — оцените CAPEX, эффект и окупаемость.',
+      reason: 'Подбор выполнен — оцените инвестиции, эффект и окупаемость.',
       ctaLabel: 'Открыть экономику',
       step: 'economics',
       stage: 'economics',
@@ -70,7 +70,7 @@ export function suggestNextStep(
   }
   if (statuses.economics === 'done' && statuses.visualization !== 'done') {
     return {
-      title: 'Посмотрите демонстрационную модель на плане',
+      title: 'Посмотрите симуляцию на плане',
       reason: 'DES иллюстрирует задания на схеме (не цифровой двойник). Затем можно сформировать отчёт.',
       ctaLabel: 'Открыть моделирование',
       step: 'visualization',

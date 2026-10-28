@@ -64,38 +64,38 @@ export function LoginPage() {
           <p className="mt-8 font-display text-5xl font-bold uppercase leading-none tracking-wide text-brand-400">
             NETCORE
           </p>
-          <p className="mt-4 max-w-sm text-base text-steel-300">
+          <p className="mt-4 max-w-sm text-base text-[var(--nc-faint)]">
             Промышленная платформа подбора AMR/AGV, расчёта эффекта и схемы работы на объекте.
           </p>
         </div>
-        <dl className="relative grid gap-4 font-mono text-xs uppercase tracking-[0.12em] text-steel-400">
+        <dl className="relative grid gap-4 font-mono text-xs uppercase tracking-[0.12em] text-[var(--nc-muted)]">
           <div className="border-l-2 border-brand-500 pl-3">
             <dt>Каталог</dt>
-            <dd className="mt-1 text-steel-200">исходные и демо-модели</dd>
+            <dd className="mt-1 text-[var(--nc-text)]">исходные и примеры моделей</dd>
           </div>
           <div className="border-l-2 border-white/20 pl-3">
             <dt>Экономика</dt>
-            <dd className="mt-1 text-steel-200">CAPEX · OPEX · ROI · TCO</dd>
+            <dd className="mt-1 text-[var(--nc-text)]">Инвестиции · эксплуатация · рентабельность · совокупная стоимость</dd>
           </div>
           <div className="border-l-2 border-white/20 pl-3">
             <dt>Визуализация</dt>
-            <dd className="mt-1 text-steel-200">2D-маршруты на плане</dd>
+            <dd className="mt-1 text-[var(--nc-text)]">2D-маршруты на плане</dd>
           </div>
         </dl>
       </aside>
 
-      <div className="flex flex-col justify-center bg-steel-50 px-6 py-12 sm:px-10">
+      <div className="flex flex-col justify-center bg-[var(--nc-surface-muted)] px-6 py-12 sm:px-10">
         <div className="mx-auto w-full max-w-md">
           <div className="mb-8 lg:hidden">
             <span className="brand-mark">NC</span>
-            <p className="mt-3 font-display text-3xl font-bold uppercase tracking-wide text-brand-600">
+            <p className="mt-3 font-display text-3xl font-bold uppercase tracking-wide text-[var(--nc-accent)]">
               NETCORE
             </p>
           </div>
-          <h1 className="font-display text-3xl font-semibold uppercase tracking-wide text-ink">
+          <h1 className="font-display text-3xl font-semibold uppercase tracking-wide text-[var(--nc-ink)]">
             Вход в систему
           </h1>
-          <p className="mt-2 text-sm text-steel-500">Рабочий доступ к проектам и каталогу</p>
+          <p className="mt-2 text-sm text-[var(--nc-muted)]">Рабочий доступ к проектам и каталогу</p>
 
           <div className="page-surface mt-8 p-6">
             <Tabs
@@ -145,7 +145,7 @@ export function LoginPage() {
 
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-steel-200" />
-              <span className="font-mono text-[10px] uppercase tracking-widest text-steel-400">или</span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--nc-muted)]">или</span>
               <div className="h-px flex-1 bg-steel-200" />
             </div>
 
@@ -154,8 +154,8 @@ export function LoginPage() {
             </Button>
           </div>
 
-          <p className="mt-6 text-center text-sm text-steel-500">
-            <Link to="/" className="text-brand-700 hover:underline">
+          <p className="mt-6 text-center text-sm text-[var(--nc-muted)]">
+            <Link to="/" className="text-[var(--nc-accent)] hover:underline">
               На главную
             </Link>
           </p>

@@ -98,7 +98,7 @@ export function formatPayback(
   if (simple != null && !Number.isNaN(Number(simple))) {
     const horizon = payback.horizon_years
     const prefix = horizon != null ? `> ${horizon} лет` : 'За горизонтом'
-    return `${prefix} · ≈ ${formatNumber(Number(simple), 1)} лет (CAPEX / годовой эффект)`
+    return `${prefix} · ≈ ${formatNumber(Number(simple), 1)} лет (инвестиции / годовой эффект)`
   }
   if (payback.message && /эффект\s*≤\s*0/i.test(payback.message)) {
     return 'Не определена (эффект ≤ 0)'

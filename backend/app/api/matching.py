@@ -192,7 +192,7 @@ def select_solution(
     if not _project_writable(user, project):
         raise HTTPException(
             403,
-            detail="Демонстрационный проект только для просмотра. Создайте копию, чтобы выбрать решение.",
+            detail="Пример проекта только для просмотра. Создайте копию, чтобы выбрать решение.",
         )
 
     row = _apply_economics_robot(db, project, body.robot_id)

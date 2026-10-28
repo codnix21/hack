@@ -19,10 +19,10 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded border border-steel-200 bg-steel-50 text-steel-500">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[var(--nc-radius)] border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] text-[var(--nc-muted)]">
         {icon ?? <Inbox className="h-6 w-6" />}
       </div>
-      <h3 className="nc-title-sm">{title}</h3>
+      <h3 className="nc-title-sm text-[var(--nc-ink)]">{title}</h3>
       {description ? <p className="nc-body mt-2 max-w-md">{description}</p> : null}
       {actionLabel && onAction && (
         <Button className="mt-5" onClick={onAction}>

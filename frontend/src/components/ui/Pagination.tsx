@@ -23,8 +23,8 @@ export function Pagination({
   const pages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-steel-200 bg-steel-50/50 px-4 py-3">
-      <p className="font-mono text-xs text-steel-600">{paginationLabel(page, pageSize, total)}</p>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-4 py-3">
+      <p className="font-mono text-xs text-[var(--nc-muted)]">{paginationLabel(page, pageSize, total)}</p>
       <div className="flex flex-wrap items-center gap-3">
         {onPageSizeChange && (
           <Select
@@ -56,7 +56,7 @@ export function Pagination({
             <ChevronLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Предыдущая</span>
           </Button>
-          <span className="min-w-[5rem] text-center text-sm text-steel-700">
+          <span className="min-w-[5rem] text-center text-sm text-[var(--nc-text)]">
             {page} / {pages}
           </span>
           <Button

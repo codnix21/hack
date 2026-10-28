@@ -136,12 +136,91 @@ def _latest_what_if(db: Session, project_id: int, economics: Optional[dict]) -> 
     return None
 
 
+_SCENARIO_ORDER = ("baseline", "purchase", "raas")
+_SCENARIO_NAMES = {
+    "baseline": "Без роботизации",
+    "purchase": "Покупка оборудования",
+    "raas": "Роботы как услуга",
+}
+
+
+def _scenario_has_metrics(results: Any) -> bool:
+    if not isinstance(results, dict) or not results:
+        return False
+    return any(
+        results.get(k) is not None
+        for k in ("capex", "opex", "annual_effect", "robots_count", "tco", "npv")
+    )
+
+
+def _scenarios_for_export(db: Session, project: Project) -> list[dict]:
+    """Сценарии для отчёта: из БД, иначе досчёт baseline/purchase/raas на лету."""
+    rows = {
+        s.code: {"code": s.code, "name_ru": s.name_ru, "results": s.results}
+        for s in db.query(Scenario).filter(Scenario.project_id == project.id).all()
+    }
+    need_live = [
+        code
+        for code in _SCENARIO_ORDER
+        if code not in rows or not _scenario_has_metrics(rows[code].get("results"))
+    ]
+    if need_live:
+        from app.api.economics import _ensure_economics_inputs, _resolve_inputs
+        from app.services.economics import calculate_scenario
+
+        try:
+            for code in need_live:
+                req = EconomicsRequest(scenario=code)
+                _ensure_economics_inputs(db, project, req)
+                inputs = _resolve_inputs(db, project, req)
+                result = calculate_scenario(
+                    scenario=inputs["scenario"],
+                    peak_demand=inputs["peak_demand"],
+                    productivity=inputs["productivity"],
+                    unit_price=inputs["unit_price"],
+                    software_cost=inputs["software_cost"],
+                    maintenance_year=inputs["maintenance_year"],
+                    implementation_cost=inputs["implementation_cost"],
+                    robots_count=inputs["robots_count"],
+                    utilization=inputs["utilization"],
+                    availability=inputs["availability"],
+                    reserve=inputs["reserve"],
+                    years=inputs["years"],
+                    assumptions=inputs["assumptions"],
+                    overrides=inputs["overrides"],
+                )
+                rows[code] = {
+                    "code": code,
+                    "name_ru": _SCENARIO_NAMES.get(code, code),
+                    "results": result,
+                }
+        except Exception:
+            # Не валим весь экспорт: отдадим то, что есть в БД
+            pass
+
+    out: list[dict] = []
+    for code in _SCENARIO_ORDER:
+        if code in rows and _scenario_has_metrics(rows[code].get("results")):
+            row = rows[code]
+            out.append(
+                {
+                    "code": code,
+                    "name_ru": row.get("name_ru") or _SCENARIO_NAMES.get(code, code),
+                    "results": row.get("results"),
+                }
+            )
+    # дополнительные (fleet_* и т.п.)
+    for code, row in rows.items():
+        if code in _SCENARIO_ORDER:
+            continue
+        if _scenario_has_metrics(row.get("results")):
+            out.append(row)
+    return out
+
+
 def _export_bundle(db: Session, project: Project) -> dict[str, Any]:
     solutions = _solutions_with_provenance(db, project)
-    scenarios = [
-        {"code": s.code, "name_ru": s.name_ru, "results": s.results}
-        for s in db.query(Scenario).filter(Scenario.project_id == project.id).all()
-    ]
+    scenarios = _scenarios_for_export(db, project)
     calc = (
         db.query(Calculation)
         .filter(Calculation.project_id == project.id)

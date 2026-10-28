@@ -167,7 +167,7 @@ class RobotOut(ORMModel):
         """Краткий статус полноты данных для UI."""
         origin = (self.data_origin or "demo").lower()
         if origin == "demo":
-            return "Демонстрационные данные"
+            return "Каталог платформы"
 
         has_company = self.manufacturer_id is not None or bool(
             (self.raw_data or {}).get("company") if isinstance(self.raw_data, dict) else False

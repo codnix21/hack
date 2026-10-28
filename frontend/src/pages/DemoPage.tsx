@@ -48,7 +48,7 @@ export function DemoPage() {
   const cloneMut = useMutation({
     mutationFn: demoApi.clone,
     onSuccess: (p) => {
-      toastSuccess('Демо-проект скопирован в ваши проекты')
+      toastSuccess('Пример скопирован в ваши проекты')
       qc.invalidateQueries({ queryKey: ['projects'] })
       navigate(`/app/projects/${p.id}?step=params`)
     },
@@ -58,11 +58,11 @@ export function DemoPage() {
   return (
     <div>
       <PageHeader
-        title="Демонстрационные проекты"
-        subtitle="Готовые сценарии для быстрого знакомства с платформой (демонстрационные данные)"
+        title="Примеры проектов"
+        subtitle="Готовые сценарии для быстрого знакомства с платформой"
         crumbs={[
           { label: 'Обзор', to: '/app' },
-          { label: 'Демонстрация' },
+          { label: 'Примеры' },
         ]}
       />
 
@@ -73,7 +73,7 @@ export function DemoPage() {
       {!query.isLoading && !query.isError && total === 0 && (
         <div className="page-surface">
           <EmptyState
-            title="Демонстрационные проекты недоступны"
+            title="Примеры проектов недоступны"
             description="Сервер не вернул готовые сценарии."
             actionLabel={isGuest ? undefined : 'Создать проект'}
             onAction={isGuest ? undefined : () => navigate('/app/projects/new')}
@@ -85,21 +85,21 @@ export function DemoPage() {
         <div className="page-surface overflow-hidden">
           <div className="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
             {pageItems.map((p) => (
-              <article key={p.id} className="rounded border border-steel-200 p-5">
+              <article key={p.id} className="rounded border border-[var(--nc-border)] p-5">
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <h3 className="font-display text-lg font-semibold text-steel-900">
-                    {p.name.startsWith('Демо') ? p.name : `Демо: ${p.name}`}
+                  <h3 className="font-display text-lg font-semibold text-[var(--nc-ink)]">
+                    {p.name}
                   </h3>
                   <div className="flex flex-col items-end gap-1">
-                    <Badge variant="warning">Демо</Badge>
+                    <Badge variant="warning">Пример</Badge>
                     <Badge variant="info">
                       {(p.object_type_id != null && objectTypeMap.get(p.object_type_id)) ||
                         'Сценарий'}
                     </Badge>
                   </div>
                 </div>
-                <p className="mb-4 text-sm text-steel-600">
-                  {p.description || 'Готовый демонстрационный сценарий'}
+                <p className="mb-4 text-sm text-[var(--nc-text)]">
+                  {p.description || 'Готовый сценарий'}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => navigate(`/app/projects/${p.id}?step=object`)}>

@@ -12,11 +12,11 @@ export function PageHeader({ title, subtitle, crumbs, actions }: PageHeaderProps
   return (
     <header className="mb-3 sm:mb-4">
       {crumbs && crumbs.length > 0 && <Breadcrumbs items={crumbs} />}
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-steel-200 pb-2.5 sm:gap-3 sm:pb-3">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--nc-border-subtle)] pb-3 sm:gap-3 sm:pb-4">
         <div className="min-w-0 flex-1">
-          <h1 className="nc-title break-words">{title}</h1>
+          <h1 className="nc-title break-words text-[var(--nc-ink)]">{title}</h1>
           {subtitle ? (
-            <p className="nc-body mt-0.5 max-w-3xl line-clamp-2" title={subtitle}>
+            <p className="nc-body mt-1 max-w-3xl line-clamp-2" title={subtitle}>
               {subtitle}
             </p>
           ) : null}

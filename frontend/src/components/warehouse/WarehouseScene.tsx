@@ -7,6 +7,8 @@ import { PHASE_LABEL_RU } from '../../simulation/simMetrics'
 import { Button } from '../ui/Button'
 import { Select } from '../ui/Select'
 import { Disclosure } from '../ui/Disclosure'
+import { Callout } from '../ui/Callout'
+import { StatusPill } from '../ui/StatusPill'
 import { Warehouse2D } from './Warehouse2D'
 import { WarehouseIsometric } from './WarehouseIsometric'
 import { RobotDetails } from './RobotDetails'
@@ -67,36 +69,38 @@ export function WarehouseScene({
     return sim.snapshot.robots.map((r) => ({ x: r.x, y: r.y }))
   }, [sim.layers.heatmap, sim.snapshot.robots])
 
+  const phaseTone =
+    phase === 'running'
+      ? 'success'
+      : phase === 'paused'
+        ? 'warning'
+        : phase === 'stalled'
+          ? 'danger'
+          : phase === 'completed'
+            ? 'neutral'
+            : 'idle'
+
   return (
     <div className="space-y-2" data-testid="warehouse-scene">
+      <Callout variant="warning" title="Симуляция сценария (DES)">
+        Не цифровой двойник и не телеметрия склада. Play/Pause/Reset управляют анимацией на плане;
+        «завершено» относится к заданиям модели, а не к внедрению на объекте.
+      </Callout>
+
       <div
         className="nc-panel px-2.5 py-2"
         data-testid="sim-kpi-panel"
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <span
-              className={`rounded px-2 py-1 font-mono text-[11px] uppercase tracking-wider ${
-                phase === 'running'
-                  ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
-                  : phase === 'paused'
-                    ? 'bg-amber-50 text-amber-900 ring-1 ring-amber-200'
-                    : phase === 'stalled'
-                      ? 'bg-red-50 text-red-800 ring-1 ring-red-200'
-                      : phase === 'completed'
-                        ? 'bg-steel-100 text-steel-700 ring-1 ring-steel-300'
-                        : 'bg-steel-50 text-steel-600 ring-1 ring-steel-200'
-              }`}
-              data-testid="sim-play-state"
-              data-phase={phase}
-            >
-              {playLabel}
+            <span data-testid="sim-play-state" data-phase={phase}>
+              <StatusPill tone={phaseTone}>{playLabel}</StatusPill>
             </span>
             <span
-              className="font-mono text-[11px] text-steel-500"
+              className="font-mono text-[11px] text-[var(--nc-muted)]"
               data-testid="sim-config-label"
             >
-              задания {metrics?.activeTasks ?? 0}/{metrics?.blockedTasks ?? 0}/
+              задания акт/блок/гот {metrics?.activeTasks ?? 0}/{metrics?.blockedTasks ?? 0}/
               {metrics?.completedTasks ?? 0}
               {sim.snapshot.robotsCapped
                 ? ` · на схеме ${sim.snapshot.visibleRobots} из ${sim.snapshot.totalRobots}`
@@ -153,14 +157,14 @@ export function WarehouseScene({
               />
             )}
             {onRobotsCountChange && (
-              <label className="flex items-center gap-1.5 text-xs text-steel-600">
+              <label className="flex items-center gap-1.5 text-xs text-[var(--nc-muted)]">
                 <span className="whitespace-nowrap">В модели</span>
                 <input
                   data-testid="sim-robots-count"
                   type="number"
                   min={0}
                   max={200}
-                  className="h-8 w-16 rounded border border-steel-300 px-1.5 text-sm"
+                  className="h-8 w-16 rounded border border-[var(--nc-border-strong)] px-1.5 text-sm"
                   value={activeRobots}
                   onChange={(e) => {
                     const n = Math.max(0, Math.min(200, Number(e.target.value) || 0))
@@ -175,11 +179,31 @@ export function WarehouseScene({
 
         {(sim.layoutStale ||
           (layout.raw?.meta?.route_warnings as string[] | undefined)?.length) && (
-          <p className="mt-2 text-xs text-amber-800" data-testid="sim-route-warnings">
+          <p className="mt-2 text-xs text-[var(--nc-warning)]" data-testid="sim-route-warnings">
             {sim.layoutStale
               ? 'План изменился — сцена пересобрана. '
               : ''}
             {((layout.raw?.meta?.route_warnings as string[]) || []).slice(0, 2).join(' ')}
+          </p>
+        )}
+        {(activeRobots !== sim.snapshot.visibleRobots || sim.snapshot.robotsCapped) && (
+          <p
+            className="mt-2 rounded border border-[rgba(245,193,74,0.55)] bg-[var(--nc-warning-soft)] px-2.5 py-2 text-xs leading-snug text-[var(--nc-ink)]"
+            data-testid="sim-robots-mismatch"
+            role="status"
+          >
+            <span className="font-semibold text-[var(--nc-warning)]">В модели: {activeRobots}</span>
+            {' · '}
+            <span className="font-semibold text-[var(--nc-ink)]">
+              на схеме: {sim.snapshot.visibleRobots}
+              {sim.snapshot.totalRobots != null && sim.snapshot.totalRobots !== sim.snapshot.visibleRobots
+                ? ` из ${sim.snapshot.totalRobots}`
+                : ''}
+            </span>
+            <span className="text-[var(--nc-text)]">
+              . Разница — ограничение анимации DES или ручная настройка «В модели»; на экономику не
+              влияет.
+            </span>
           </p>
         )}
       </div>
@@ -187,7 +211,7 @@ export function WarehouseScene({
       {/* Сцена + инспектор */}
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="nc-panel min-w-0 overflow-hidden">
-          <div className="bg-[#eef0f3] p-1.5 sm:p-2">
+          <div className="nc-canvas-surface p-1.5 sm:p-2">
             {view === '2d' && (
               <Warehouse2D
                 layout={layout}
@@ -217,7 +241,7 @@ export function WarehouseScene({
             {view === '3d' && (
               <Suspense
                 fallback={
-                  <div className="flex h-[420px] items-center justify-center text-sm text-steel-500">
+                  <div className="flex h-[420px] items-center justify-center text-sm text-[var(--nc-muted)]">
                     Загрузка 3D…
                   </div>
                 }
@@ -237,7 +261,7 @@ export function WarehouseScene({
             )}
           </div>
           {view === '3d' && (
-            <div className="flex flex-wrap gap-1 border-t border-steel-100 px-3 py-2">
+            <div className="flex flex-wrap gap-1 border-t border-[var(--nc-border-subtle)] px-3 py-2">
               {(
                 [
                   ['top', 'Сверху'],
@@ -265,10 +289,10 @@ export function WarehouseScene({
 
         <aside className="space-y-2 xl:sticky xl:top-3 xl:self-start">
           <details className="nc-panel xl:hidden">
-            <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-steel-800">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-[var(--nc-ink)]">
               Инспектор робота
             </summary>
-            <div className="border-t border-steel-100">
+            <div className="border-t border-[var(--nc-border-subtle)]">
               <RobotDetails
                 robot={sim.selectedRobot}
                 task={sim.selectedTask}
@@ -300,7 +324,7 @@ export function WarehouseScene({
       <div className="nc-panel">
         <button
           type="button"
-          className="nc-focusable flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-steel-800"
+          className="nc-focusable flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium text-[var(--nc-ink)]"
           onClick={() => setBottomOpen((v) => !v)}
           aria-expanded={bottomOpen}
         >
@@ -311,11 +335,11 @@ export function WarehouseScene({
               : ''}
           </span>
           <ChevronDown
-            className={`h-4 w-4 text-steel-400 transition ${bottomOpen ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 text-[var(--nc-faint)] transition ${bottomOpen ? 'rotate-180' : ''}`}
           />
         </button>
         {bottomOpen ? (
-          <div className="grid gap-3 border-t border-steel-100 p-3 lg:grid-cols-2">
+          <div className="grid gap-3 border-t border-[var(--nc-border-subtle)] p-3 lg:grid-cols-2">
             <WarehouseTasks
               snapshot={sim.snapshot}
               selectedTaskId={sim.selectedTaskId}
@@ -330,15 +354,15 @@ export function WarehouseScene({
         ) : null}
       </div>
 
-      <Disclosure title="Демонстрационная модель — ограничения">
-        <ul className="list-disc space-y-1 pl-4 text-xs text-steel-600" data-testid="sim-pathfinding-note">
+      <Disclosure title="Ограничения модели">
+        <ul className="list-disc space-y-1 pl-4 text-xs text-[var(--nc-muted)]" data-testid="sim-pathfinding-note">
           <li>DES не является цифровым двойником склада.</li>
           <li>
             На схеме анимируется не более 6 роботов; в конфигурации может быть больше (
             {activeRobots}).
           </li>
-          <li>Conflict avoidance демонстрационный (приоритет по id, ожидание с таймаутом).</li>
-          <li>Батарея и clearance — демо-параметры, не физическая валидация проходимости.</li>
+          <li>Разведение конфликтов упрощённое (приоритет по id, ожидание с таймаутом).</li>
+          <li>Батарея и clearance — параметры модели, не физическая валидация проходимости.</li>
           {typeof layout.raw?.meta?.pathfinding_note === 'string' ? (
             <li>{layout.raw.meta.pathfinding_note as string}</li>
           ) : null}
@@ -361,7 +385,7 @@ function Segmented({
 }) {
   return (
     <div
-      className="inline-flex overflow-hidden rounded border border-steel-300 bg-steel-50 p-0.5"
+      className="inline-flex overflow-hidden rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface-muted)] p-0.5"
       role="group"
       aria-label={ariaLabel}
     >
@@ -375,7 +399,7 @@ function Segmented({
             className={`min-w-[2.5rem] rounded px-2 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
               active
                 ? 'bg-ink text-white shadow-sm'
-                : 'text-steel-600 hover:bg-white hover:text-steel-900'
+                : 'text-[var(--nc-muted)] hover:bg-[var(--nc-surface)] hover:text-[var(--nc-ink)]'
             }`}
             onClick={() => onChange(item.id)}
           >

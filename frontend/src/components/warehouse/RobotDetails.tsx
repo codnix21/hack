@@ -23,9 +23,9 @@ export function RobotDetails({
   onSelectRobot,
 }: Props) {
   return (
-    <div className="overflow-hidden rounded border border-steel-200 bg-white shadow-panel">
+    <div className="overflow-hidden rounded border border-[var(--nc-border)] bg-[var(--nc-surface)] shadow-panel">
       {robots.length > 0 && (
-        <div className="flex gap-1 border-b border-steel-100 bg-steel-50/70 p-1.5">
+        <div className="flex gap-1 border-b border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] p-1.5">
           {robots.map((r) => {
             const active = selectedRobotId === r.id
             return (
@@ -36,8 +36,8 @@ export function RobotDetails({
                 aria-label={`Выбрать ${r.label}, ${STATUS_LABEL_RU[r.status]}`}
                 className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${
                   active
-                    ? 'bg-ink text-white'
-                    : 'text-steel-700 hover:bg-white'
+                    ? 'bg-[var(--nc-accent-soft)] text-[var(--nc-ink)] ring-1 ring-[var(--nc-accent-line)]'
+                    : 'text-[var(--nc-text)] hover:bg-[var(--nc-surface-hover)] hover:text-[var(--nc-ink)]'
                 }`}
                 onClick={() => onSelectRobot?.(r.id)}
               >
@@ -55,84 +55,99 @@ export function RobotDetails({
 
       {!robot ? (
         <div className="px-3 py-5 text-center">
-          <p className="text-sm font-medium text-steel-800">Робот не выбран</p>
-          <p className="mt-1 text-xs text-steel-500">
+          <p className="text-sm font-medium text-[var(--nc-ink)]">Робот не выбран</p>
+          <p className="mt-1 text-xs text-[var(--nc-text)]">
             Нажмите на AMR на схеме или выберите вкладку выше.
           </p>
         </div>
       ) : (
         <div className="p-3">
-          <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="mb-3 flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="nc-title-sm text-base">{robot.label}</p>
-              <p className="nc-body mt-0.5 text-xs">
-                {robot.type} · AMR
-              </p>
+              <p className="mt-0.5 text-xs text-[var(--nc-text)]">{robot.type} · AMR</p>
             </div>
             <StatusChip status={robot.status} />
           </div>
 
           <BatteryBar value={robot.battery} />
-          <p className="mt-0.5 text-[10px] text-steel-400">Заряд — демо-параметр</p>
 
           {robot.waitReason ? (
-            <p className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+            <p className="mt-2 rounded border border-[rgba(245,193,74,0.45)] bg-[var(--nc-warning-soft)] px-2 py-1.5 text-xs text-[var(--nc-warning)]">
               {robot.waitReason}
             </p>
           ) : null}
 
-          <dl className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <Metric
               label="Скорость"
               value={`${formatNumber(robot.speedMps * robot.speedFactor, 1)} м/с`}
-              demo
+              fill={Math.min(100, ((robot.speedMps * robot.speedFactor) / 2) * 100)}
+              accent="var(--nc-accent)"
             />
-            <Metric label="Груз" value={`${formatNumber(robot.cargoKg, 0)} кг`} demo />
-            <Metric label="Пройдено" value={`${formatNumber(robot.completedDistance, 1)} м`} demo />
-            <Metric label="Циклы" value={String(robot.cycles)} demo />
-          </dl>
+            <Metric
+              label="Груз"
+              value={`${formatNumber(robot.cargoKg, 0)} кг`}
+              fill={Math.min(100, robot.cargoKg / 5)}
+              accent="var(--nc-cyan)"
+            />
+            <Metric
+              label="Пройдено"
+              value={`${formatNumber(robot.completedDistance, 1)} м`}
+              fill={Math.min(100, robot.completedDistance / 2)}
+              accent="var(--nc-lime)"
+            />
+            <Metric
+              label="Циклы"
+              value={String(robot.cycles)}
+              fill={Math.min(100, robot.cycles * 20)}
+              accent="var(--nc-info)"
+            />
+          </div>
 
-          <div className="mt-2.5 rounded border border-steel-100 bg-steel-50/60 p-2">
-            <p className="nc-section-label mb-1">Задание</p>
+          <div className="mt-3 overflow-hidden rounded border border-[var(--nc-border)] bg-[var(--nc-surface-muted)]">
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--nc-border-subtle)] bg-[var(--nc-surface-raised)] px-2.5 py-1.5">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--nc-ink)]">
+                Задание
+              </p>
+              {task ? (
+                <span className="rounded border border-[rgba(198,242,58,0.35)] bg-[var(--nc-lime-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--nc-lime)]">
+                  {TASK_STATUS_RU[task.status]}
+                </span>
+              ) : null}
+            </div>
             {task ? (
-              <dl className="space-y-1.5 text-sm">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-steel-500">ID</dt>
-                  <dd className="font-medium text-steel-900">{task.id}</dd>
+              <div className="space-y-2.5 p-2.5">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <FlowNode label="Откуда" value={task.source} />
+                  <span className="font-mono text-sm text-[var(--nc-accent)]" aria-hidden>
+                    →
+                  </span>
+                  <FlowNode label="Куда" value={task.destination} align="right" />
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-steel-500">Статус</dt>
-                  <dd className="text-steel-800">{TASK_STATUS_RU[task.status]}</dd>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--nc-border-subtle)] pt-2 text-xs">
+                  <span className="font-mono text-[var(--nc-muted)]">ID {task.id}</span>
+                  {displayRouteLengthM(task) != null ? (
+                    <span className="font-semibold tabular-nums text-[var(--nc-ink)]">
+                      {formatNumber(displayRouteLengthM(task)!, 1)} м маршрута
+                    </span>
+                  ) : null}
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-steel-500">Откуда</dt>
-                  <dd className="text-right text-steel-800">{task.source}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-steel-500">Куда</dt>
-                  <dd className="text-right text-steel-800">{task.destination}</dd>
-                </div>
-                {displayRouteLengthM(task) != null ? (
-                  <div className="flex justify-between gap-2">
-                    <dt className="text-steel-500">Длина маршрута</dt>
-                    <dd className="text-steel-800">{formatNumber(displayRouteLengthM(task)!, 1)} м</dd>
-                  </div>
-                ) : null}
                 {task.blockedReason ? (
-                  <p className="pt-1 text-xs text-red-700">{task.blockedReason}</p>
+                  <p className="text-xs text-[var(--nc-danger)]">{task.blockedReason}</p>
                 ) : null}
-              </dl>
+              </div>
             ) : (
-              <p className="text-sm text-steel-500">Нет активного задания</p>
+              <p className="px-2.5 py-3 text-sm text-[var(--nc-text)]">Нет активного задания</p>
             )}
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm text-steel-700">
+          <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-sm text-[var(--nc-text)]">
             <input
               type="checkbox"
               checked={followRobot}
               onChange={(e) => onFollowChange(e.target.checked)}
-              className="h-4 w-4 rounded border-steel-300 text-brand-600 focus:ring-brand-500"
+              className="h-4 w-4 rounded border-[var(--nc-border)] text-[var(--nc-accent)] focus:ring-brand-500"
             />
             Следовать за роботом в 3D
           </label>
@@ -142,9 +157,28 @@ export function RobotDetails({
   )
 }
 
+function FlowNode({
+  label,
+  value,
+  align = 'left',
+}: {
+  label: string
+  value: string
+  align?: 'left' | 'right'
+}) {
+  return (
+    <div className={`min-w-0 rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface)] px-2 py-1.5 ${align === 'right' ? 'text-right' : ''}`}>
+      <p className="font-mono text-[9px] uppercase tracking-wider text-[var(--nc-muted)]">{label}</p>
+      <p className="truncate text-sm font-semibold text-[var(--nc-ink)]" title={value}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
 function StatusChip({ status }: { status: SimRobot['status'] }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-sm border border-steel-200 bg-white px-2 py-1 text-xs font-medium text-steel-800">
+    <span className="inline-flex items-center gap-1.5 rounded-sm border border-[var(--nc-border)] bg-[var(--nc-surface-raised)] px-2 py-1 text-xs font-medium text-[var(--nc-ink)]">
       <span
         className="h-2 w-2 rounded-full"
         style={{ backgroundColor: STATUS_COLOR[status] }}
@@ -157,15 +191,23 @@ function StatusChip({ status }: { status: SimRobot['status'] }) {
 
 function BatteryBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, value))
-  const tone = pct < 20 ? 'bg-red-600' : pct < 40 ? 'bg-amber-500' : 'bg-emerald-600'
+  const tone =
+    pct < 20 ? 'var(--nc-danger)' : pct < 40 ? 'var(--nc-warning)' : 'var(--nc-lime)'
   return (
-    <div>
-      <div className="mb-1 flex items-baseline justify-between text-sm">
-        <span className="text-steel-500">Батарея</span>
-        <span className="font-medium tabular-nums text-steel-900">{formatNumber(pct, 0)}%</span>
+    <div className="rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-2.5 py-2">
+      <div className="mb-1.5 flex items-baseline justify-between text-sm">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--nc-text)]">
+          Батарея
+        </span>
+        <span className="font-display text-base font-semibold tabular-nums text-[var(--nc-ink)]">
+          {formatNumber(pct, 0)}%
+        </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-steel-100" aria-hidden>
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+      <div className="h-2 overflow-hidden rounded-sm bg-[var(--nc-surface-hover)]" aria-hidden>
+        <div
+          className="h-full rounded-sm transition-[width] duration-500"
+          style={{ width: `${pct}%`, background: tone }}
+        />
       </div>
     </div>
   )
@@ -174,23 +216,26 @@ function BatteryBar({ value }: { value: number }) {
 function Metric({
   label,
   value,
-  demo,
+  fill,
+  accent,
 }: {
   label: string
   value: string
-  demo?: boolean
+  fill: number
+  accent: string
 }) {
+  const pct = Math.max(4, Math.min(100, fill))
   return (
-    <div className="rounded border border-steel-100 px-2.5 py-2">
-      <dt className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-steel-400">
+    <div className="rounded border border-[var(--nc-border-subtle)] bg-[var(--nc-surface-muted)] px-2.5 py-2">
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--nc-text)]">
         {label}
-        {demo ? (
-          <span className="rounded-sm bg-steel-100 px-1 py-px text-[9px] tracking-wide text-steel-400">
-            demo
-          </span>
-        ) : null}
-      </dt>
-      <dd className="mt-0.5 text-base font-semibold tabular-nums text-ink">{value}</dd>
+      </p>
+      <p className="mt-1 font-display text-lg font-semibold tabular-nums leading-none text-[var(--nc-ink)]">
+        {value}
+      </p>
+      <div className="mt-2 h-1 overflow-hidden rounded-sm bg-[var(--nc-surface-hover)]" aria-hidden>
+        <div className="h-full rounded-sm" style={{ width: `${pct}%`, background: accent }} />
+      </div>
     </div>
   )
 }

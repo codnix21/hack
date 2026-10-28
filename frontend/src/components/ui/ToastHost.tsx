@@ -13,10 +13,10 @@ export function ToastHost() {
           key={t.id}
           className={`pointer-events-auto flex items-start gap-3 rounded border px-4 py-3 shadow-lift ${
             t.type === 'error'
-              ? 'border-red-300 bg-red-50 text-red-900'
+              ? 'border-[rgba(255,107,107,0.45)] bg-[var(--nc-danger-soft)] text-[var(--nc-danger)]'
               : t.type === 'success'
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-                : 'border-steel-300 bg-white text-steel-900'
+                ? 'border-[rgba(198,242,58,0.4)] bg-[var(--nc-success-soft)] text-[var(--nc-lime)]'
+                : 'border-[var(--nc-border-strong)] bg-[var(--nc-surface)] text-[var(--nc-ink)]'
           }`}
         >
           <p className="flex-1 text-sm">{t.message}</p>

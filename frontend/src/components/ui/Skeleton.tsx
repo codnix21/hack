@@ -3,7 +3,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ className = '' }: SkeletonProps) {
-  return <div className={`animate-pulse rounded-md bg-steel-200/80 ${className}`} />
+  return <div className={`animate-pulse rounded-md bg-[var(--nc-surface-hover)] ${className}`} />
 }
 
 export function SkeletonRows({ rows = 5 }: { rows?: number }) {

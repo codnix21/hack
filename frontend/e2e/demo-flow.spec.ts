@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { clickStage, openDemoWarehouse } from './helpers'
 
 /**
  * Full demo smoke against live Docker stack (:3000) or Vite (:5173).
@@ -12,10 +13,12 @@ test.describe('demo flow', () => {
     await page.goto('/')
     await expect(page.getByText('NETCORE').first()).toBeVisible({ timeout: 30_000 })
     await expect(
-      page.getByRole('heading', { name: /Предынвестиционная оценка роботизации склада/i }),
+      page.getByRole('heading', {
+        name: /Предынвестиционная оценка роботизации для инженеров и руководителей/i,
+      }),
     ).toBeVisible({ timeout: 30_000 })
 
-    await page.getByRole('link', { name: /Войти/i }).click()
+    await page.getByRole('link', { name: /Войти/i }).first().click()
     await expect(page.getByRole('heading', { name: /Вход в систему/i })).toBeVisible()
 
     await page.getByLabel(/Электронная почта/i).fill('admin@demo.local')
@@ -24,23 +27,13 @@ test.describe('demo flow', () => {
 
     await expect(page).toHaveURL(/\/app/, { timeout: 30_000 })
 
-    await page.getByRole('link', { name: /Демонстрация/i }).first().click()
-    await expect(page.getByText(/Демонстрационные проекты|пример/i).first()).toBeVisible({
-      timeout: 30_000,
-    })
-
-    await page
-      .locator('article')
-      .filter({ hasText: /склад/i })
-      .getByRole('button', { name: /^Открыть$/i })
-      .click()
-    await expect(page).toHaveURL(/\/app\/projects\/\d+/, { timeout: 45_000 })
+    await openDemoWarehouse(page)
     const projectUrl = page.url().split('?')[0]
     const stages = page.getByRole('navigation', { name: /Этапы проекта/i })
     await expect(stages).toBeVisible({ timeout: 20_000 })
 
     // Selection
-    await stages.getByRole('button', { name: /Подбор/i }).click()
+    await clickStage(page, /Подбор/i)
     await expect(page.getByText(/Подбор|Запустить подбор/i).first()).toBeVisible({
       timeout: 15_000,
     })
@@ -53,7 +46,7 @@ test.describe('demo flow', () => {
     }
 
     // Economics + Explain + What-if
-    await stages.getByRole('button', { name: /Экономика/i }).click()
+    await clickStage(page, /Экономика/i)
     await expect(
       page.getByText(/Сравнение сценариев|Анализ «что если»|Пересчитать|CAPEX|Рассчитать экономику/i).first(),
     ).toBeVisible({ timeout: 60_000 })
@@ -77,13 +70,13 @@ test.describe('demo flow', () => {
     }
 
     // Visualization / simulation
-    await stages.getByRole('button', { name: /DES|Симуляция|Моделирование/i }).click()
+    await clickStage(page, /DES|Симуляция|Моделирование/i)
     await expect(
       page.getByText(/DES|демонстрац|цифров|симуляц/i).first(),
     ).toBeVisible({ timeout: 30_000 })
 
     // Report / export
-    await stages.getByRole('button', { name: /Отчёт/i }).click()
+    await clickStage(page, /Отчёт/i)
     await expect(page.getByText(/Экспорт|PDF|Excel|результат/i).first()).toBeVisible({
       timeout: 30_000,
     })

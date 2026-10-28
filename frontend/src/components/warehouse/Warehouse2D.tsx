@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import type { VisualizationLayout } from '../../types'
 import type { LayerFlags, SimRobot, SimCollision } from '../../simulation/types'
 import { pointAlongPolyline } from '../../simulation/pathMath'
+import { useThemeStore } from '../../store/themeStore'
+import { readCanvasColors } from '../../utils/chartTheme'
 import {
   drawAmrBody,
   drawStatusPill,
@@ -34,6 +36,7 @@ export function Warehouse2D({
   heatSamples = [],
 }: Warehouse2DProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const theme = useThemeStore((s) => s.theme)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -44,14 +47,15 @@ export function Warehouse2D({
     const h = layout.height || 500
     canvas.width = w
     canvas.height = h
+    const colors = readCanvasColors()
 
-    // floor
+    // floor — theme-aware industrial canvas
     ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = '#f4f5f7'
+    ctx.fillStyle = colors.floor
     ctx.fillRect(0, 0, w, h)
 
-    // subtle grid
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)'
+    // grid
+    ctx.strokeStyle = colors.grid
     ctx.lineWidth = 1
     for (let x = 0; x <= w; x += 40) {
       ctx.beginPath()
@@ -67,7 +71,7 @@ export function Warehouse2D({
     }
 
     // frame
-    ctx.strokeStyle = '#14171c'
+    ctx.strokeStyle = colors.frame
     ctx.lineWidth = 2
     ctx.strokeRect(1, 1, w - 2, h - 2)
 
@@ -302,7 +306,7 @@ export function Warehouse2D({
         }
       }
     }
-  }, [layout, robots, collisions, layers, selectedRobotId, selectedRouteId, heatSamples])
+  }, [layout, robots, collisions, layers, selectedRobotId, selectedRouteId, heatSamples, theme])
 
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -325,10 +329,10 @@ export function Warehouse2D({
   return (
     <canvas
       ref={canvasRef}
-      className="mx-auto block max-w-full cursor-pointer rounded-sm shadow-sm ring-1 ring-steel-200/80"
+      className="mx-auto block max-w-full cursor-pointer rounded-sm shadow-sm ring-1 ring-[var(--nc-border)]"
       onClick={onClick}
       role="img"
-      aria-label="Демонстрационный план склада 2D"
+      aria-label="План склада 2D"
     />
   )
 }

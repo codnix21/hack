@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { clickStage } from './helpers'
 
 /**
  * Критический путь демо заказчика (мастер создания + этапы продукта).
@@ -56,11 +57,11 @@ test.describe('acceptance critical path', () => {
     }
 
     const stages = page.getByRole('navigation', { name: /Этапы проекта/i })
-    await stages.getByRole('button', { name: /Подбор/i }).click()
+    await clickStage(page, /Подбор/i)
     await page.getByRole('button', { name: /Запустить подбор/i }).first().click()
     await expect(page.getByText(/Подходит|В фильтре:/i).first()).toBeVisible({ timeout: 90_000 })
 
-    await stages.getByRole('button', { name: /Отчёт/i }).click()
+    await clickStage(page, /Отчёт/i)
     await expect(page.getByText(/Ключевые показатели|CAPEX|предварительн/i).first()).toBeVisible({
       timeout: 60_000,
     })

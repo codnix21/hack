@@ -20,28 +20,48 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Pagination } from '../components/ui/Pagination'
 import { EmptyState } from '../components/ui/EmptyState'
-import { SkeletonRows } from '../components/ui/Skeleton'
+import { ErrorState } from '../components/ui/ErrorState'
+import { LoadingState } from '../components/ui/LoadingState'
+import { Callout } from '../components/ui/Callout'
 import { Badge } from '../components/ui/Badge'
+import { StatusPill } from '../components/ui/StatusPill'
 import { Modal, ConfirmDialog } from '../components/ui/Modal'
 import { SearchableSelect } from '../components/ui/SearchableSelect'
 import { toastError, toastSuccess } from '../store/toastStore'
 import { formatDateTime } from '../utils/format'
 import { assumptionLabel, importBatchStatusLabel, projectStatusLabel, auditActionLabel, formatAuditDetails, formatAuditEntity } from '../utils/labels'
 
-const SECTIONS = [
-  { id: 'users', label: 'Пользователи' },
-  { id: 'projects', label: 'Проекты' },
-  { id: 'catalog', label: 'Каталог' },
-  { id: 'manufacturers', label: 'Производители' },
-  { id: 'object-types', label: 'Типы объектов' },
-  { id: 'solution-types', label: 'Типы решений' },
-  { id: 'sources', label: 'Источники' },
-  { id: 'norms', label: 'Нормативы' },
-  { id: 'assumptions', label: 'Допущения' },
-  { id: 'catalog-import', label: 'Импорт каталога' },
-  { id: 'source-import', label: 'Импорт материалов' },
-  { id: 'audit', label: 'Журнал изменений' },
+const ADMIN_GROUPS: { title: string; items: { id: string; label: string }[] }[] = [
+  {
+    title: 'Доступ и проекты',
+    items: [
+      { id: 'users', label: 'Пользователи' },
+      { id: 'projects', label: 'Проекты' },
+      { id: 'audit', label: 'Журнал' },
+    ],
+  },
+  {
+    title: 'Каталог и справочники',
+    items: [
+      { id: 'catalog', label: 'Каталог роботов' },
+      { id: 'manufacturers', label: 'Производители' },
+      { id: 'object-types', label: 'Типы объектов' },
+      { id: 'solution-types', label: 'Типы решений' },
+      { id: 'sources', label: 'Источники' },
+    ],
+  },
+  {
+    title: 'Модель и импорт',
+    items: [
+      { id: 'norms', label: 'Нормативы' },
+      { id: 'assumptions', label: 'Допущения' },
+      { id: 'catalog-import', label: 'Импорт каталога' },
+      { id: 'source-import', label: 'Импорт материалов' },
+    ],
+  },
 ]
+
+const SECTIONS = ADMIN_GROUPS.flatMap((g) => g.items)
 
 export function AdminPage() {
   const [section, setSection] = useState('users')
@@ -304,33 +324,80 @@ export function AdminPage() {
   const batchesPage = paginate(batchesQuery.data || [])
 
   return (
-    <div>
+    <div data-testid="admin-page">
       <PageHeader
         title="Администрирование"
-        subtitle="Управление пользователями, справочниками и каталогом"
+        subtitle="Пользователи, справочники, каталог и импорт исходных материалов"
         crumbs={[
-          { label: 'Панель управления', to: '/app' },
+          { label: 'Обзор', to: '/app' },
           { label: 'Администрирование' },
         ]}
       />
 
-      <Tabs items={SECTIONS} value={section} onChange={onSectionChange} className="mb-5" />
+      <Callout variant="warning" className="mb-4" title="Ограниченный доступ">
+        Раздел доступен только роли администратора. Импорт и изменение справочников влияют на
+        расчёты всех проектов — подтверждайте опасные операции.
+      </Callout>
 
-      {['users', 'projects', 'catalog', 'audit'].includes(section) && (
-        <div className="mb-4 max-w-sm">
-          {section !== 'audit' && (
-            <Input
-              placeholder="Поиск…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value)
-                setPage(1)
-              }}
-              aria-label="Поиск"
-            />
-          )}
-        </div>
-      )}
+      <div className="mb-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <nav
+          className="page-surface h-fit space-y-4 p-3"
+          aria-label="Разделы администрирования"
+        >
+          {ADMIN_GROUPS.map((group) => (
+            <div key={group.title}>
+              <p className="mb-1.5 px-1 font-mono text-[10px] font-semibold uppercase tracking-wider text-[var(--nc-muted)]">
+                {group.title}
+              </p>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = section === item.id
+                  return (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => onSectionChange(item.id)}
+                        className={`nc-focusable w-full rounded px-2 py-1.5 text-left text-sm ${
+                          active
+                            ? 'bg-ink text-white'
+                            : 'text-[var(--nc-text)] hover:bg-[var(--nc-surface-hover)]'
+                        }`}
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        {item.label}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <StatusPill tone="info">
+              {SECTIONS.find((s) => s.id === section)?.label || 'Раздел'}
+            </StatusPill>
+            {['users', 'projects', 'catalog'].includes(section) && (
+              <div className="w-full max-w-sm sm:w-64">
+                <Input
+                  placeholder="Поиск по таблице…"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setPage(1)
+                  }}
+                  aria-label="Поиск по таблице"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Desktop tabs hide on lg — secondary nav covers; keep for narrow screens */}
+          <div className="lg:hidden">
+            <Tabs items={SECTIONS} value={section} onChange={onSectionChange} className="mb-2" />
+          </div>
 
       {section === 'users' && (
         <AdminTableCard
@@ -487,20 +554,31 @@ export function AdminPage() {
       )}
 
       {section === 'assumptions' && (
-        <Card title="Допущения расчётов (только просмотр)">
-          {assumptionsQuery.isLoading && <SkeletonRows />}
+        <div className="page-surface space-y-3 p-4">
+          <h2 className="font-display text-base font-semibold text-[var(--nc-ink)]">
+            Допущения расчётов (только просмотр)
+          </h2>
+          {assumptionsQuery.isLoading && <LoadingState rows={6} label="Загрузка допущений…" />}
           {assumptionsQuery.isError && (
-            <p className="text-sm text-red-600">{getFriendlyError(assumptionsQuery.error)}</p>
+            <ErrorState
+              title="Не удалось загрузить допущения"
+              description={getFriendlyError(assumptionsQuery.error)}
+              onRetry={() => void assumptionsQuery.refetch()}
+            />
           )}
-          <p className="mb-3 text-sm text-steel-500">
-            Значения по умолчанию модели. Редактирование нормативов — во вкладке «Нормативы».
-          </p>
-          <div className="grid gap-3 md:grid-cols-2">
-            {Object.keys(assumptionsDraft).map((k) => (
-              <Input key={k} label={assumptionLabel(k)} value={assumptionsDraft[k]} readOnly />
-            ))}
-          </div>
-        </Card>
+          {!assumptionsQuery.isLoading && !assumptionsQuery.isError && (
+            <>
+              <p className="text-sm text-[var(--nc-muted)]">
+                Значения по умолчанию модели. Редактирование — в разделе «Нормативы».
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                {Object.keys(assumptionsDraft).map((k) => (
+                  <Input key={k} label={assumptionLabel(k)} value={assumptionsDraft[k]} readOnly />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {section === 'catalog-import' && (
@@ -521,21 +599,21 @@ export function AdminPage() {
             }}
           />
           {importFile && (
-            <dl className="mt-3 grid gap-1 text-sm text-steel-700 sm:grid-cols-2">
+            <dl className="mt-3 grid gap-1 text-sm text-[var(--nc-text)] sm:grid-cols-2">
               <div>
-                <dt className="text-steel-500">Название файла</dt>
+                <dt className="text-[var(--nc-muted)]">Название файла</dt>
                 <dd className="font-medium">{importFile.name}</dd>
               </div>
               <div>
-                <dt className="text-steel-500">Тип</dt>
+                <dt className="text-[var(--nc-muted)]">Тип</dt>
                 <dd>{importFile.type || importFile.name.split('.').pop()?.toUpperCase() || '—'}</dd>
               </div>
               <div>
-                <dt className="text-steel-500">Размер</dt>
+                <dt className="text-[var(--nc-muted)]">Размер</dt>
                 <dd>{formatFileSize(importFile.size)} (лимит 10 МБ)</dd>
               </div>
               <div>
-                <dt className="text-steel-500">Дата выбора</dt>
+                <dt className="text-[var(--nc-muted)]">Дата выбора</dt>
                 <dd>{formatDateTime(new Date().toISOString())}</dd>
               </div>
             </dl>
@@ -550,7 +628,7 @@ export function AdminPage() {
           </Button>
           {importPreview && (
             <div className="mt-4 space-y-3">
-              <p className="text-sm text-steel-600">Строк в файле: {importPreview.total_rows}</p>
+              <p className="text-sm text-[var(--nc-muted)]">Строк в файле: {importPreview.total_rows}</p>
               <Table
                 columns={importPreview.columns.map((c) => ({
                   key: c,
@@ -569,7 +647,7 @@ export function AdminPage() {
             </div>
           )}
           {lastImportResult && section === 'catalog-import' && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <div className="mt-4 rounded-lg border border-[rgba(198,242,58,0.4)] bg-[var(--nc-success-soft)] p-3 text-sm text-[var(--nc-lime)]">
               {summarizeImport(lastImportResult, 'Импорт завершён')}
             </div>
           )}
@@ -579,7 +657,7 @@ export function AdminPage() {
       {section === 'source-import' && (
         <div className="space-y-5">
           <Card title="Импорт материалов проекта">
-            <p className="mb-4 text-sm text-steel-600">
+            <p className="mb-4 text-sm text-[var(--nc-muted)]">
               Загрузка каталога (`catalog_export_v4.csv`), датасетов объектов
               (`Датасеты_хакатон.xlsx`) и обогащение из DOCX-примеров решений
               из каталога `data/sources` (в Docker — `/data/sources`).
@@ -587,9 +665,9 @@ export function AdminPage() {
               из исходных материалов.
             </p>
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-lg border border-steel-200 p-4">
-                <h4 className="mb-1 font-medium text-steel-900">Каталог из CSV</h4>
-                <p className="mb-3 text-xs text-steel-500">
+              <div className="rounded-lg border border-[var(--nc-border)] p-4">
+                <h4 className="mb-1 font-medium text-[var(--nc-ink)]">Каталог из CSV</h4>
+                <p className="mb-3 text-xs text-[var(--nc-muted)]">
                   Импорт исходного каталога → роботы и происхождение данных
                 </p>
                 <Button
@@ -599,9 +677,9 @@ export function AdminPage() {
                   Импортировать каталог
                 </Button>
               </div>
-              <div className="rounded-lg border border-steel-200 p-4">
-                <h4 className="mb-1 font-medium text-steel-900">Датасеты объектов</h4>
-                <p className="mb-3 text-xs text-steel-500">
+              <div className="rounded-lg border border-[var(--nc-border)] p-4">
+                <h4 className="mb-1 font-medium text-[var(--nc-ink)]">Датасеты объектов</h4>
+                <p className="mb-3 text-xs text-[var(--nc-muted)]">
                   Параметры объектов (XLSX) → схемы Склад / Аэропорт / Медицинское учреждение
                 </p>
                 <Button
@@ -612,9 +690,9 @@ export function AdminPage() {
                   Импортировать датасеты
                 </Button>
               </div>
-              <div className="rounded-lg border border-steel-200 p-4">
-                <h4 className="mb-1 font-medium text-steel-900">Примеры из DOCX</h4>
-                <p className="mb-3 text-xs text-steel-500">
+              <div className="rounded-lg border border-[var(--nc-border)] p-4">
+                <h4 className="mb-1 font-medium text-[var(--nc-ink)]">Примеры из DOCX</h4>
+                <p className="mb-3 text-xs text-[var(--nc-muted)]">
                   `Примеры_решений_типы_объектов.docx` — обогащение сопоставленных
                   роботов (ТТХ, грузоподъёмность и ссылки при пустых полях).
                 </p>
@@ -628,12 +706,12 @@ export function AdminPage() {
               </div>
             </div>
             {lastImportResult && (
-              <div className="mt-4 rounded-lg border border-steel-200 bg-steel-50 p-4 text-sm text-steel-800">
-                <p className="mb-2 font-medium text-steel-900">Результат последней операции</p>
+              <div className="mt-4 rounded-lg border border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-4 text-sm text-[var(--nc-ink)]">
+                <p className="mb-2 font-medium text-[var(--nc-ink)]">Результат последней операции</p>
                 <p>{summarizeImport(lastImportResult, 'Импорт завершён')}</p>
                 {Array.isArray(lastImportResult.unmatched_hints) &&
                   (lastImportResult.unmatched_hints as string[]).length > 0 && (
-                    <p className="mt-2 text-amber-800">
+                    <p className="mt-2 text-[var(--nc-warning)]">
                       Не сопоставлено:{' '}
                       {(lastImportResult.unmatched_hints as string[]).join(', ')}
                     </p>
@@ -643,9 +721,9 @@ export function AdminPage() {
           </Card>
 
           <Card title="История партий импорта">
-            {batchesQuery.isLoading && <SkeletonRows />}
+            {batchesQuery.isLoading && <LoadingState rows={5} label="Загрузка партий…" />}
             {batchesQuery.isError && (
-              <p className="text-sm text-red-600">{getFriendlyError(batchesQuery.error)}</p>
+              <p className="text-sm text-[var(--nc-danger)]">{getFriendlyError(batchesQuery.error)}</p>
             )}
             {!batchesQuery.isLoading && !batchesQuery.isError && (
               <>
@@ -655,7 +733,7 @@ export function AdminPage() {
                     description="Запустите импорт каталога или датасетов — запись появится здесь."
                   />
                 ) : (
-                  <div className="overflow-hidden rounded border border-steel-200">
+                  <div className="overflow-hidden rounded border border-[var(--nc-border)]">
                     <Table
                       columns={[
                         {
@@ -746,12 +824,12 @@ export function AdminPage() {
             }
           >
             {batchDetail && (
-              <div className="space-y-3 text-sm text-steel-700">
+              <div className="space-y-3 text-sm text-[var(--nc-text)]">
                 <p>
-                  <span className="text-steel-500">Файл:</span> {batchDetail.filename}
+                  <span className="text-[var(--nc-muted)]">Файл:</span> {batchDetail.filename}
                 </p>
                 <p>
-                  <span className="text-steel-500">Статус:</span>{' '}
+                  <span className="text-[var(--nc-muted)]">Статус:</span>{' '}
                   {importBatchStatusLabel(batchDetail.status)}
                 </p>
                 <p>
@@ -783,7 +861,7 @@ export function AdminPage() {
 
       {section === 'audit' && (
         <div className="space-y-3">
-          <p className="text-sm text-steel-600">
+          <p className="text-sm text-[var(--nc-muted)]">
             История действий в системе: кто что изменил и в каком объекте. Повторные строки с разными
             версиями — это последовательные пересчёты экономики.
           </p>
@@ -827,6 +905,8 @@ export function AdminPage() {
           </AdminTableCard>
         </div>
       )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -858,12 +938,17 @@ function AdminTableCard({
 }) {
   return (
     <div className="page-surface overflow-hidden">
-      {loading && <SkeletonRows />}
-      {!!error && <p className="p-4 text-sm text-red-600">{getFriendlyError(error)}</p>}
+      {loading && <LoadingState rows={8} label="Загрузка раздела…" />}
+      {!!error && (
+        <ErrorState
+          title="Не удалось загрузить раздел"
+          description={getFriendlyError(error)}
+        />
+      )}
       {!loading && !error && empty && (
         <EmptyState title="Данные отсутствуют" description="Записи для выбранного раздела не найдены." />
       )}
-      {!loading && !error && !empty && children}
+      {!loading && !error && !empty && <div className="overflow-x-auto">{children}</div>}
       {!loading && !error && (
         <Pagination
           page={page}
@@ -889,11 +974,11 @@ function BatchErrorsTable({
   const slice = errors.slice((page - 1) * pageSize, page * pageSize)
 
   if (!total) {
-    return <p className="text-steel-500">Список ошибок пуст.</p>
+    return <p className="text-[var(--nc-muted)]">Список ошибок пуст.</p>
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-steel-200">
+    <div className="overflow-hidden rounded-lg border border-[var(--nc-border)]">
       <Table
         columns={[
           {
@@ -1068,8 +1153,10 @@ function DictSection({
         </Button>
       }
     >
-      {loading && <SkeletonRows />}
-      {!!error && <p className="text-sm text-red-600">{getFriendlyError(error)}</p>}
+      {loading && <LoadingState rows={6} label="Загрузка справочника…" />}
+      {!!error && (
+        <ErrorState title="Не удалось загрузить справочник" description={getFriendlyError(error)} />
+      )}
       {!loading && !error && total === 0 && (
         <EmptyState
           title="Данные отсутствуют"
@@ -1079,7 +1166,7 @@ function DictSection({
         />
       )}
       {!loading && !error && total > 0 && (
-        <div className="overflow-hidden rounded border border-steel-200">
+        <div className="overflow-hidden rounded border border-[var(--nc-border)]">
           <Table
             columns={[
               {
@@ -1500,13 +1587,15 @@ function NormsSection({
 
   return (
     <Card title="Нормативы">
-      {loading && <SkeletonRows />}
-      {!!error && <p className="text-sm text-red-600">{getFriendlyError(error)}</p>}
+      {loading && <LoadingState rows={6} label="Загрузка нормативов…" />}
+      {!!error && (
+        <ErrorState title="Не удалось загрузить нормативы" description={getFriendlyError(error)} />
+      )}
       {!loading && !error && total === 0 && (
         <EmptyState title="Данные отсутствуют" description="Нормативы не загружены." />
       )}
       {!loading && !error && total > 0 && (
-        <div className="overflow-hidden rounded border border-steel-200">
+        <div className="overflow-hidden rounded border border-[var(--nc-border)]">
           <Table
             columns={[
               { key: 'code', header: 'Код', render: (n) => n.code },

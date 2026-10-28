@@ -260,7 +260,7 @@ export function WarehouseIsometric({
       className="mx-auto block max-w-full cursor-pointer rounded-sm shadow-sm ring-1 ring-steel-200/80"
       onClick={onClick}
       role="img"
-      aria-label="Демонстрационная изометрия склада"
+      aria-label="Изометрия склада"
     />
   )
 }

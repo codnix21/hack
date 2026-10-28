@@ -158,7 +158,7 @@ def public_project(token: str, db: Annotated[Session, Depends(get_db)]):
         "fleet_scenarios": fleet,
         "read_only": True,
         "disclaimer": (
-            "Публичная демонстрация только для просмотра. "
+            "Публичная ссылка только для просмотра. "
             "Финансовые показатели — предварительная оценка."
         ),
     }

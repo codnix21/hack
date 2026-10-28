@@ -54,14 +54,14 @@ export function HomePage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
-      <section className="flex flex-col gap-4 border-b border-steel-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
+      <section className="flex flex-col gap-4 border-b border-[var(--nc-border)] pb-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="nc-section-label text-brand-700">NETCORE</p>
+          <p className="nc-section-label text-[var(--nc-accent)]">NETCORE</p>
           <h1 className="nc-title mt-1 text-balance">
             Предынвестиционная оценка роботизации склада
           </h1>
           <p className="nc-body mt-1.5 max-w-2xl text-pretty">
-            От исходных данных к отчёту: планировка, подбор, экономика и демонстрационная модель.
+            От исходных данных к отчёту: планировка, подбор, экономика и симуляция.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
@@ -74,7 +74,7 @@ export function HomePage() {
           </Link>
           <Link
             to="/app/demo"
-            className="nc-focusable inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded border border-steel-300 bg-white px-3.5 text-sm font-medium text-steel-800 transition hover:bg-steel-50"
+            className="nc-focusable inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-3.5 text-sm font-medium text-[var(--nc-ink)] transition hover:bg-[var(--nc-surface-hover)]"
           >
             <PlayCircle className="h-4 w-4 shrink-0" />
             Открыть пример
@@ -87,14 +87,14 @@ export function HomePage() {
           <div className="min-w-0">
             <h2 className="nc-title-sm">Продолжить работу</h2>
             {summaryLine ? (
-              <p className="mt-0.5 text-xs text-steel-500">{summaryLine}</p>
+              <p className="mt-0.5 text-xs text-[var(--nc-muted)]">{summaryLine}</p>
             ) : (
               <p className="nc-body mt-0.5 text-xs">Недавние проекты</p>
             )}
           </div>
           <Link
             to="/app/projects"
-            className="shrink-0 whitespace-nowrap text-sm font-medium text-brand-700 hover:underline"
+            className="shrink-0 whitespace-nowrap text-sm font-medium text-[var(--nc-accent)] hover:underline"
           >
             Все проекты
           </Link>
@@ -106,7 +106,7 @@ export function HomePage() {
         {!projectsQuery.isLoading && recent.length === 0 && (
           <EmptyState
             title="Проектов пока нет"
-            description="Создайте свой объект или откройте демонстрационный склад."
+            description="Создайте свой объект или откройте пример склада."
             actionLabel="Создать проект"
             onAction={() => navigate('/app/projects/new')}
           />
@@ -125,7 +125,7 @@ export function HomePage() {
                   >
                     <div className="flex min-w-0 items-start gap-2">
                       <p
-                        className="min-w-0 flex-1 text-sm font-medium leading-snug text-ink [overflow-wrap:anywhere]"
+                        className="min-w-0 flex-1 text-sm font-medium leading-snug text-[var(--nc-ink)] [overflow-wrap:anywhere]"
                         title={p.name}
                       >
                         {p.name}
@@ -134,16 +134,16 @@ export function HomePage() {
                         variant={p.is_demo ? 'warning' : 'default'}
                         className="shrink-0 self-start"
                       >
-                        {p.is_demo ? 'Демо' : PROJECT_STATUS_LABELS[p.status] || p.status}
+                        {p.is_demo ? 'Пример' : PROJECT_STATUS_LABELS[p.status] || p.status}
                       </Badge>
                     </div>
                     <div className="mt-auto flex min-w-0 items-center justify-between gap-3">
-                      <p className="min-w-0 text-xs leading-snug text-steel-500 [overflow-wrap:anywhere]">
+                      <p className="min-w-0 text-xs leading-snug text-[var(--nc-muted)] [overflow-wrap:anywhere]">
                         {typeLabel}
-                        <span className="text-steel-300"> · </span>
+                        <span className="text-[var(--nc-faint)]"> · </span>
                         {formatDate(p.updated_at)}
                       </p>
-                      <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-medium text-brand-700">
+                      <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs font-medium text-[var(--nc-accent)]">
                         Открыть
                         <ArrowRight className="h-3.5 w-3.5" />
                       </span>
@@ -156,7 +156,7 @@ export function HomePage() {
         )}
       </section>
 
-      <p className="text-xs leading-relaxed text-steel-400">
+      <p className="text-xs leading-relaxed text-[var(--nc-muted)]">
         Гостевой проект сохраняется на срок сессии. Результат — предварительная оценка и требует
         проверки на объекте.
       </p>

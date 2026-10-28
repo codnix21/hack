@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test, expect } from '@playwright/test'
+import { clickStage } from './helpers'
 
 const fixturesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const dxfPath = path.join(fixturesDir, 'sample_warehouse.dxf')
@@ -31,25 +32,30 @@ async function createWarehouseProject(page: import('@playwright/test').Page, nam
 
 test.describe('layout, simulation, reports', () => {
   test('add/move rack, DXF import, sim robots, export', async ({ page }) => {
-    test.setTimeout(240_000)
+    test.setTimeout(360_000)
     await asGuest(page)
     await createWarehouseProject(page, 'Отчёт демо склад Е2Е')
 
-    // Параметры площади (синхронизируются с layout.width_m / length_m на backend)
+    // Обязательные входы экономики (data-param-field — устойчивые селекторы)
+    await clickStage(page, /Данные/i)
+    const peak = page.locator('[data-param-field="peak_demand"] input').first()
+    await expect(peak).toBeVisible({ timeout: 20_000 })
+    await peak.fill('160')
+    await page.locator('[data-param-field="current_labor_cost_year"] input').first().fill('12000000')
+    await page.locator('[data-param-field="unit_price"] input').first().fill('3500000')
     const width = page.getByLabel(/Ширина площадки/i).first()
     if (await width.isVisible().catch(() => false)) {
       await width.fill('50')
       await page.getByLabel(/Длина площадки/i).first().fill('40')
-      await page.getByLabel(/Пиков(ый спрос|ая нагрузка)/i).first().fill('160')
-      const saveParams = page.getByRole('button', { name: /Сохранить параметры|^Сохранить$/i })
-      if (await saveParams.isEnabled().catch(() => false)) {
-        await saveParams.click()
-      }
     }
+    const saveParams = page.getByRole('button', { name: /Сохранить параметры|^Сохранить$/i })
+    await expect(saveParams).toBeEnabled({ timeout: 10_000 })
+    await saveParams.click()
+    await expect(page.getByText(/сохранен/i).first()).toBeVisible({ timeout: 20_000 })
 
     // Планировка: размеры + стеллаж
     const stages = page.getByRole('navigation', { name: /Этапы проекта/i })
-    await stages.getByRole('button', { name: /План|Планировка/i }).click()
+    await clickStage(page, /План|Планировка/i)
     await expect(page.getByTestId('layout-add-rack')).toBeVisible({ timeout: 30_000 })
     const layoutW = page.getByLabel(/^Ширина, м$/i).first()
     await expect(layoutW).toBeVisible()
@@ -80,13 +86,13 @@ test.describe('layout, simulation, reports', () => {
     })
 
     // Подбор + экономика (нужны для симуляции)
-    await stages.getByRole('button', { name: /Подбор/i }).click()
+    await clickStage(page, /Подбор/i)
     await page.getByRole('button', { name: /Запустить подбор/i }).first().click()
     await expect(
       page.getByText(/Предварительно подходит|Подходит|Требует проверки|В фильтре:|решени/i).first(),
     ).toBeVisible({ timeout: 90_000 })
 
-    await stages.getByRole('button', { name: /Экономика/i }).click()
+    await clickStage(page, /Экономика/i)
     const calcBtn = page.getByRole('button', { name: /Рассчитать|Пересчитать/i }).first()
     if (await calcBtn.isVisible().catch(() => false)) {
       await calcBtn.click()
@@ -94,16 +100,16 @@ test.describe('layout, simulation, reports', () => {
     }
 
     // Симуляция (aria-label: «Запустить симуляцию»)
-    await stages.getByRole('button', { name: /DES|Симуляция|Моделирование/i }).click()
+    await clickStage(page, /DES|Симуляция|Моделирование/i)
     const startSim = () => page.getByRole('button', { name: 'Запустить симуляцию' })
     await expect(startSim()).toBeVisible({ timeout: 90_000 })
     await expect(page.getByTestId('warehouse-scene')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('sim-robots-count')).toBeVisible({ timeout: 60_000 })
     // Поворот: явное ограничение в панели свойств
-    await stages.getByRole('button', { name: /План|Планировка/i }).click()
+    await clickStage(page, /План|Планировка/i)
     await page.getByTestId('layout-add-rack').click()
     await expect(page.getByTestId('layout-rotation-note')).toBeVisible()
-    await stages.getByRole('button', { name: /DES|Симуляция|Моделирование/i }).click()
+    await clickStage(page, /DES|Симуляция|Моделирование/i)
 
     await page.getByTestId('sim-robots-count').fill('4')
     await expect(page.getByTestId('sim-config-label')).toContainText(/4/)
@@ -128,25 +134,50 @@ test.describe('layout, simulation, reports', () => {
     await page.getByRole('button', { name: 'Сбросить симуляцию' }).click()
     await expect(startSim()).toBeEnabled({ timeout: 30_000 })
     // возврат в редактор — геометрия после DXF на месте (не «пустой» план)
-    await stages.getByRole('button', { name: /План|Планировка/i }).click()
+    await clickStage(page, /План|Планировка/i)
     const sizeAfterSim = await page.getByTestId('layout-size-label').textContent()
     expect(sizeAfterSim || '').toMatch(/Размер:\s*\d+/)
     await expect(page.getByTestId('layout-rotation-note').or(page.getByTestId('layout-add-rack'))).toBeVisible()
-    await stages.getByRole('button', { name: /DES|Симуляция|Моделирование/i }).click()
+    await clickStage(page, /DES|Симуляция|Моделирование/i)
     await page.getByTestId('sim-robots-count').fill('8')
     await expect(page.getByTestId('sim-config-label')).toContainText(/8/)
     await startSim().click()
 
-    // Отчёты
+    // Экспорт PDF/Excel требует актуальной экономики (продуктовый gate)
+    await clickStage(page, /Экономика/i)
+    const incomplete = page.getByTestId('economics-inputs-incomplete')
+    if (await incomplete.isVisible().catch(() => false)) {
+      await page.getByRole('button', { name: /К параметрам объекта/i }).click()
+      await page.locator('[data-param-field="peak_demand"] input').first().fill('160')
+      await page.locator('[data-param-field="current_labor_cost_year"] input').first().fill('12000000')
+      await page.locator('[data-param-field="unit_price"] input').first().fill('3500000')
+      const saveAgain = page.getByRole('button', { name: /Сохранить параметры|^Сохранить$/i })
+      await expect(saveAgain).toBeEnabled()
+      await saveAgain.click()
+      await expect(page.getByText(/сохранен/i).first()).toBeVisible({ timeout: 20_000 })
+      await clickStage(page, /Экономика/i)
+    }
+    const calc = page.getByRole('button', { name: /Рассчитать|Пересчитать/i }).first()
+    await expect(calc).toBeVisible({ timeout: 30_000 })
+    await expect(calc).toBeEnabled({ timeout: 15_000 })
+    await calc.click()
+    await expect(page.getByTestId('economics-freshness-badge')).toContainText(/Актуально/i, {
+      timeout: 90_000,
+    })
+
+    const pdfBtn = page.getByRole('button', { name: /Скачать PDF|Экспорт PDF|Сформировать PDF|^PDF$/i }).first()
+    await expect(pdfBtn).toBeEnabled({ timeout: 30_000 })
     const [pdfDownload] = await Promise.all([
       page.waitForEvent('download', { timeout: 60_000 }),
-      page.getByRole('button', { name: /Скачать PDF|Экспорт PDF|Сформировать PDF/i }).first().click(),
+      pdfBtn.click(),
     ])
     expect(pdfDownload.suggestedFilename()).toMatch(/\.pdf$/i)
 
+    const xlsxBtn = page.getByRole('button', { name: /Скачать Excel|Экспорт Excel|^Excel$/i }).first()
+    await expect(xlsxBtn).toBeEnabled({ timeout: 15_000 })
     const [xlsxDownload] = await Promise.all([
       page.waitForEvent('download', { timeout: 60_000 }),
-      page.getByRole('button', { name: /Скачать Excel|Экспорт Excel|Excel/i }).first().click(),
+      xlsxBtn.click(),
     ])
     expect(xlsxDownload.suggestedFilename()).toMatch(/\.xlsx$/i)
   })

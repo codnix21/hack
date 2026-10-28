@@ -385,9 +385,9 @@ export function Warehouse3D(props: Props) {
 
   if (!webglOk) {
     return (
-      <div className="flex h-[420px] flex-col items-center justify-center gap-2 rounded border border-dashed border-steel-300 bg-steel-50 p-6 text-center">
-        <p className="text-sm font-medium text-steel-800">WebGL недоступен</p>
-        <p className="max-w-sm text-sm text-steel-500">
+      <div className="flex h-[420px] flex-col items-center justify-center gap-2 rounded border border-dashed border-[var(--nc-border)] bg-[var(--nc-surface-muted)] p-6 text-center">
+        <p className="text-sm font-medium text-[var(--nc-ink)]">WebGL недоступен</p>
+        <p className="max-w-sm text-sm text-[var(--nc-text)]">
           Используйте режимы 2D или изометрия. Обновите браузер или включите аппаратное ускорение.
         </p>
       </div>

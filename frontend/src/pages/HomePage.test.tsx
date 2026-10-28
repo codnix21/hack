@@ -41,7 +41,7 @@ describe('HomePage', () => {
     )
   })
 
-  it('renders NETCORE value proposition in Russian', () => {
+  it('renders value proposition in Russian', () => {
     renderHome()
     expect(screen.getByText('NETCORE')).toBeInTheDocument()
     expect(

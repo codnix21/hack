@@ -52,14 +52,14 @@ export const PRODUCT_STAGES: ProductStage[] = [
     id: 'economics',
     label: 'Экономика и сценарии',
     short: 'Экономика',
-    description: 'CAPEX, эффект, окупаемость',
+    description: 'Инвестиции, эффект, окупаемость',
     steps: ['economics', 'scenarios', 'fleet'],
   },
   {
     id: 'visualization',
     label: 'Моделирование',
     short: 'DES',
-    description: 'Демонстрационная симуляция заданий',
+    description: 'Симуляция сценария (не цифровой двойник)',
     steps: ['visualization'],
   },
   {
@@ -119,16 +119,16 @@ export function ProjectStageNav({
                 title={`${stage.label}: ${STATUS_RU[st]}`}
                 className={`nc-focusable flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition ${
                   isActive
-                    ? 'bg-brand-50 font-medium text-brand-950'
+                    ? 'bg-[var(--nc-accent-soft)] font-medium text-[var(--nc-ink)]'
                     : isRec
-                      ? 'bg-brand-50/40 text-ink'
-                      : 'text-steel-700 hover:bg-steel-50'
+                      ? 'bg-[var(--nc-accent-soft)] text-[var(--nc-ink)]'
+                      : 'text-[var(--nc-text)] hover:bg-[var(--nc-surface-hover)]'
                 }`}
               >
                 <StatusIcon status={st} active={isActive} />
                 <span className="min-w-0 flex-1 truncate text-sm">{stage.short}</span>
                 {isRec ? (
-                  <span className="shrink-0 text-[10px] font-medium text-brand-600">далее</span>
+                  <span className="shrink-0 text-[10px] font-medium text-[var(--nc-accent)]">далее</span>
                 ) : null}
               </button>
             </li>
@@ -142,7 +142,7 @@ export function ProjectStageNav({
         </label>
         <select
           id="project-stage-select"
-          className="nc-control nc-focusable w-full border border-steel-300 bg-white px-2 text-sm"
+          className="nc-control nc-focusable w-full border border-[var(--nc-border-strong)] bg-[var(--nc-surface)] px-2 text-sm"
           value={active}
           onChange={(e) => onChange(e.target.value as StageId)}
           aria-label="Этап проекта"
@@ -163,10 +163,10 @@ export function ProjectStageNav({
 
 function StatusIcon({ status, active }: { status: StageStatus; active?: boolean }) {
   if (status === 'done')
-    return <Check className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-brand-700' : 'text-emerald-600'}`} aria-hidden />
+    return <Check className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-[var(--nc-accent)]' : 'text-[var(--nc-lime)]'}`} aria-hidden />
   if (status === 'warning' || status === 'needs_data')
-    return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden />
+    return <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[var(--nc-warning)]" aria-hidden />
   if (status === 'ready')
-    return <Circle className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-brand-600' : 'text-brand-400'}`} aria-hidden />
-  return <Circle className="h-3.5 w-3.5 shrink-0 text-steel-300" aria-hidden />
+    return <Circle className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-[var(--nc-accent)]' : 'text-brand-400'}`} aria-hidden />
+  return <Circle className="h-3.5 w-3.5 shrink-0 text-[var(--nc-faint)]" aria-hidden />
 }

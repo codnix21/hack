@@ -36,8 +36,8 @@ describe('labels', () => {
 
   it('localizes data origin badges', () => {
     expect(dataOriginLabel('source')).toBe('Исходные материалы')
-    expect(dataOriginLabel('demo')).toBe('Демонстрационные данные')
-    expect(dataOriginLabel(undefined)).toBe('Демонстрационные данные')
+    expect(dataOriginLabel('demo')).toBe('Данные каталога платформы')
+    expect(dataOriginLabel(undefined)).toBe('Данные каталога платформы')
   })
 
   it('localizes match statuses', () => {
@@ -87,7 +87,7 @@ describe('labels', () => {
       expect(label, key).not.toBe(key)
       expect(label, key).not.toMatch(/_/)
     }
-    expect(metricLabel('capex')).toContain('CAPEX')
+    expect(metricLabel('capex')).toMatch(/капитальн/i)
     expect(objectParamLabel('current_labor_cost_year')).toMatch(/персонал/i)
     expect(objectParamLabel('peak_demand')).toMatch(/нагрузк/i)
     expect(missingCheckLabel('missing_checks')).toBe('Что необходимо проверить')
@@ -124,7 +124,7 @@ describe('labels', () => {
     const withSource = catalogStatsLabel(187, true)
     expect(withSource).toContain('187')
     expect(withSource).not.toContain('223')
-    expect(catalogStatsLabel(0, false)).toMatch(/Демонстрационный каталог/)
+    expect(catalogStatsLabel(0, false)).toMatch(/Платформенный каталог/)
   })
 
   it('detects missing-data warnings in matching text', () => {

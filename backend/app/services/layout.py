@@ -544,6 +544,6 @@ def layout_to_visualization(layout: dict[str, Any], robots_count: int = 3) -> di
                 )
             ),
             "conflict_avoidance": "frontend_basic_wait",
-            "des_note": "Демонстрационная DES-модель, не цифровой двойник.",
+            "des_note": "DES-модель сценария, не цифровой двойник.",
         },
     }

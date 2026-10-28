@@ -8,7 +8,7 @@ export function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-steel-50 p-8">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--nc-bg)] p-8">
         <div className="w-full max-w-md space-y-3">
           <Skeleton className="h-8 w-2/3" />
           <Skeleton className="h-24 w-full" />
